@@ -38,6 +38,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /healthz", s.handleHealth)
 	mux.HandleFunc("GET /v1/models", s.auth(s.handleModels))
 	mux.HandleFunc("POST /v1/chat/completions", s.auth(s.handleChat))
+	mux.HandleFunc("POST /v1/images/generations", s.auth(s.handleImages))
+	mux.HandleFunc("POST /v1/audio/speech", s.auth(s.handleSpeech))
 	return mux
 }
 
@@ -120,6 +122,98 @@ func (s *Server) handleChat(w http.ResponseWriter, r *http.Request) {
 		},
 	}
 	writeJSON(w, http.StatusOK, resp)
+}
+
+// imageRequestBody is the OpenAI-compatible image request. "model" is an alias.
+type imageRequestBody struct {
+	Model       string `json:"model"`
+	Prompt      string `json:"prompt"`
+	N           int    `json:"n"`
+	Size        string `json:"size"`
+	AspectRatio string `json:"aspect_ratio"`
+}
+
+func (s *Server) handleImages(w http.ResponseWriter, r *http.Request) {
+	var body imageRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid JSON body")
+		return
+	}
+	if body.Model == "" || body.Prompt == "" {
+		writeError(w, http.StatusBadRequest, "fields 'model' (alias) and 'prompt' are required")
+		return
+	}
+
+	result, err := s.router.Image(r.Context(), body.Model, provider.ImageRequest{
+		Prompt:      body.Prompt,
+		N:           body.N,
+		Size:        body.Size,
+		AspectRatio: body.AspectRatio,
+	})
+	if err != nil {
+		writeError(w, aliasErrStatus(err, "unknown image alias"), err.Error())
+		return
+	}
+
+	w.Header().Set("X-Nabu-Provider", result.Provider)
+	w.Header().Set("X-Nabu-Model", result.Model)
+
+	data := make([]map[string]string, 0, len(result.Images))
+	for _, b64 := range result.Images {
+		data = append(data, map[string]string{"b64_json": b64})
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"created":        time.Now().Unix(),
+		"model":          result.Alias,
+		"provider":       result.Provider,
+		"upstream_model": result.Model,
+		"data":           data,
+	})
+}
+
+// speechRequestBody is the OpenAI-compatible speech request. "model" is an alias.
+type speechRequestBody struct {
+	Model          string `json:"model"`
+	Input          string `json:"input"`
+	Voice          string `json:"voice"`
+	ResponseFormat string `json:"response_format"`
+}
+
+func (s *Server) handleSpeech(w http.ResponseWriter, r *http.Request) {
+	var body speechRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid JSON body")
+		return
+	}
+	if body.Model == "" || body.Input == "" {
+		writeError(w, http.StatusBadRequest, "fields 'model' (alias) and 'input' are required")
+		return
+	}
+
+	result, err := s.router.Speech(r.Context(), body.Model, provider.SpeechRequest{
+		Input:  body.Input,
+		Voice:  body.Voice,
+		Format: body.ResponseFormat,
+	})
+	if err != nil {
+		writeError(w, aliasErrStatus(err, "unknown audio alias"), err.Error())
+		return
+	}
+
+	// OpenAI's /v1/audio/speech returns raw audio bytes, so we do too.
+	w.Header().Set("X-Nabu-Provider", result.Provider)
+	w.Header().Set("X-Nabu-Model", result.Model)
+	w.Header().Set("Content-Type", result.ContentType)
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write(result.Audio)
+}
+
+// aliasErrStatus maps an unknown-alias error to 400 and everything else to 502.
+func aliasErrStatus(err error, unknownPrefix string) int {
+	if strings.HasPrefix(err.Error(), unknownPrefix) {
+		return http.StatusBadRequest
+	}
+	return http.StatusBadGateway
 }
 
 // auth wraps a handler with bearer-token checking against the configured

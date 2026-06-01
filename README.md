@@ -59,11 +59,30 @@ Response (note the extra `provider` / `upstream_model` fields and
 
 Other endpoints:
 
-| Method & path              | Description                              |
-| -------------------------- | ---------------------------------------- |
-| `POST /v1/chat/completions`| Chat completion (alias-routed)           |
-| `GET  /v1/models`          | List available aliases                   |
-| `GET  /healthz`            | Liveness probe                           |
+| Method & path                | Description                                          |
+| ---------------------------- | --------------------------------------------------- |
+| `POST /v1/chat/completions`  | Chat completion (alias-routed)                      |
+| `POST /v1/images/generations`| Image generation; returns `data[].b64_json`         |
+| `POST /v1/audio/speech`      | Text-to-speech; returns raw audio bytes (wav/mp3)   |
+| `GET  /v1/models`            | List available aliases (chat + image + audio)       |
+| `GET  /healthz`              | Liveness probe                                      |
+
+Image example:
+
+```bash
+curl -X POST http://localhost:8080/v1/images/generations \
+  -H "Authorization: Bearer nabu_dev_key_change_me" \
+  -d '{ "model": "nabu-image", "prompt": "a calm minimal illustration", "n": 1 }'
+```
+
+Speech example (saves an audio file):
+
+```bash
+curl -X POST http://localhost:8080/v1/audio/speech \
+  -H "Authorization: Bearer nabu_dev_key_change_me" \
+  -d '{ "model": "nabu-voice", "input": "سلام", "voice": "Kore" }' \
+  --output speech.wav
+```
 
 ## Aliases (default config)
 
@@ -73,9 +92,12 @@ Other endpoints:
 | `nabu-smart`  | OpenAI 4o → Claude Sonnet → Gemini 1.5 Pro                 |
 | `nabu-cheap`  | OpenRouter Llama 8B → Groq Llama 8B                        |
 | `nabu-vision` | OpenAI 4o → Gemini 1.5 Pro                                 |
+| `nabu-image`  | OpenAI gpt-image-1 → Gemini 2.5 Flash Image (image gen)    |
+| `nabu-voice`  | OpenAI gpt-4o-mini-tts → Gemini 2.5 Flash TTS (speech)     |
 
-Edit `config.yaml` to add providers, aliases, or change routing — no code change
-needed.
+Image aliases live under `images:` and speech aliases under `audio:` in the
+config. Edit `config.yaml` to add providers, aliases, or change routing — no code
+change needed.
 
 ## Run locally
 
@@ -133,6 +155,6 @@ adapters.
 ## Roadmap (post-MVP)
 
 - Streaming (`stream: true`) passthrough
-- `/v1/embeddings`, `/v1/images`, `/v1/tts` capabilities
+- `/v1/embeddings` capability
 - Per-project policy engine (which aliases each key may use)
 - Cost tracking and rate limiting

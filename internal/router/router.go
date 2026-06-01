@@ -14,16 +14,19 @@ import (
 	"nabugate/internal/provider"
 )
 
-// Router holds the live adapters and the alias routing table.
+// Router holds the live adapters and the alias routing tables (one per
+// capability: chat, images, audio).
 type Router struct {
 	adapters map[string]provider.Adapter
 	models   map[string]config.ModelRoute
+	images   map[string]config.ModelRoute
+	audio    map[string]config.ModelRoute
 	log      *slog.Logger
 }
 
 // New builds a Router.
-func New(adapters map[string]provider.Adapter, models map[string]config.ModelRoute, log *slog.Logger) *Router {
-	return &Router{adapters: adapters, models: models, log: log}
+func New(adapters map[string]provider.Adapter, models, images, audio map[string]config.ModelRoute, log *slog.Logger) *Router {
+	return &Router{adapters: adapters, models: models, images: images, audio: audio, log: log}
 }
 
 // Result is the outcome of a successful routed call.
@@ -95,6 +98,97 @@ func (r *Router) Chat(ctx context.Context, alias string, req provider.ChatReques
 	return Result{}, fmt.Errorf("all targets failed for alias %q: %w", alias, lastErr)
 }
 
+// ImageResult is the outcome of a successful image generation.
+type ImageResult struct {
+	Alias    string
+	Provider string
+	Model    string
+	Images   []string // base64 PNG
+}
+
+// Image resolves an image alias and tries primary then fallbacks.
+func (r *Router) Image(ctx context.Context, alias string, req provider.ImageRequest) (ImageResult, error) {
+	route, ok := r.images[alias]
+	if !ok {
+		return ImageResult{}, fmt.Errorf("unknown image alias %q", alias)
+	}
+	targets := append([]config.Target{route.Primary}, route.Fallback...)
+	var lastErr error
+
+	for i, t := range targets {
+		adapter, ok := r.adapters[t.Provider]
+		if !ok {
+			lastErr = fmt.Errorf("provider %q not available", t.Provider)
+			continue
+		}
+		imgAdapter, ok := adapter.(provider.ImageAdapter)
+		if !ok {
+			lastErr = fmt.Errorf("provider %q does not support images", t.Provider)
+			r.log.Warn("skip image target", "alias", alias, "provider", t.Provider, "reason", "no image support")
+			continue
+		}
+
+		req.Model = t.Model
+		start := time.Now()
+		resp, err := imgAdapter.Image(ctx, req)
+		attrs := []any{"capability", "image", "alias", alias, "provider", t.Provider, "model", t.Model, "attempt", i + 1, "latency_ms", time.Since(start).Milliseconds()}
+		if err != nil {
+			lastErr = err
+			r.log.Warn("upstream failed", append(attrs, "error", err.Error())...)
+			continue
+		}
+		r.log.Info("upstream ok", append(attrs, "images", len(resp.Images))...)
+		return ImageResult{Alias: alias, Provider: t.Provider, Model: t.Model, Images: resp.Images}, nil
+	}
+	return ImageResult{}, fmt.Errorf("all targets failed for image alias %q: %w", alias, lastErr)
+}
+
+// SpeechResult is the outcome of a successful speech synthesis.
+type SpeechResult struct {
+	Alias       string
+	Provider    string
+	Model       string
+	Audio       []byte
+	ContentType string
+}
+
+// Speech resolves an audio alias and tries primary then fallbacks.
+func (r *Router) Speech(ctx context.Context, alias string, req provider.SpeechRequest) (SpeechResult, error) {
+	route, ok := r.audio[alias]
+	if !ok {
+		return SpeechResult{}, fmt.Errorf("unknown audio alias %q", alias)
+	}
+	targets := append([]config.Target{route.Primary}, route.Fallback...)
+	var lastErr error
+
+	for i, t := range targets {
+		adapter, ok := r.adapters[t.Provider]
+		if !ok {
+			lastErr = fmt.Errorf("provider %q not available", t.Provider)
+			continue
+		}
+		spAdapter, ok := adapter.(provider.SpeechAdapter)
+		if !ok {
+			lastErr = fmt.Errorf("provider %q does not support speech", t.Provider)
+			r.log.Warn("skip audio target", "alias", alias, "provider", t.Provider, "reason", "no speech support")
+			continue
+		}
+
+		req.Model = t.Model
+		start := time.Now()
+		resp, err := spAdapter.Speech(ctx, req)
+		attrs := []any{"capability", "speech", "alias", alias, "provider", t.Provider, "model", t.Model, "attempt", i + 1, "latency_ms", time.Since(start).Milliseconds()}
+		if err != nil {
+			lastErr = err
+			r.log.Warn("upstream failed", append(attrs, "error", err.Error())...)
+			continue
+		}
+		r.log.Info("upstream ok", append(attrs, "bytes", len(resp.Audio))...)
+		return SpeechResult{Alias: alias, Provider: t.Provider, Model: t.Model, Audio: resp.Audio, ContentType: resp.ContentType}, nil
+	}
+	return SpeechResult{}, fmt.Errorf("all targets failed for audio alias %q: %w", alias, lastErr)
+}
+
 // MarshalAliases returns a JSON-friendly model list (OpenAI /v1/models shape).
 func (r *Router) MarshalAliases() ([]byte, error) {
 	type model struct {
@@ -107,8 +201,13 @@ func (r *Router) MarshalAliases() ([]byte, error) {
 		Data   []model `json:"data"`
 	}
 	out := list{Object: "list"}
-	for alias, route := range r.models {
-		out.Data = append(out.Data, model{ID: alias, Object: "model", OwnedBy: route.Primary.Provider})
+	add := func(registry map[string]config.ModelRoute) {
+		for alias, route := range registry {
+			out.Data = append(out.Data, model{ID: alias, Object: "model", OwnedBy: route.Primary.Provider})
+		}
 	}
+	add(r.models)
+	add(r.images)
+	add(r.audio)
 	return json.Marshal(out)
 }

@@ -86,3 +86,23 @@ models:
     fallback:
       - provider: gemini
         model: "gemini-1.5-pro"
+
+# Image-generation aliases (POST /v1/images/generations).
+images:
+  nabu-image:
+    primary:
+      provider: openai
+      model: "gpt-image-1"
+    fallback:
+      - provider: gemini
+        model: "gemini-2.5-flash-image"
+
+# Text-to-speech aliases (POST /v1/audio/speech).
+audio:
+  nabu-voice:
+    primary:
+      provider: openai
+      model: "gpt-4o-mini-tts"
+    fallback:
+      - provider: gemini
+        model: "gemini-2.5-flash-preview-tts"

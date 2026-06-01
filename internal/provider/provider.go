@@ -46,6 +46,44 @@ type Adapter interface {
 	Chat(ctx context.Context, req ChatRequest) (ChatResponse, error)
 }
 
+// ImageRequest is a provider-agnostic image generation request.
+type ImageRequest struct {
+	Model       string
+	Prompt      string
+	N           int    // number of images (default 1)
+	AspectRatio string // e.g. "16:9" (best-effort; not all providers honor it)
+	Size        string // e.g. "1024x1024" (OpenAI-style)
+}
+
+// ImageResponse carries one or more base64-encoded PNG images.
+type ImageResponse struct {
+	Images []string // base64 PNG data (no data: prefix)
+}
+
+// ImageAdapter is implemented by providers that can generate images.
+type ImageAdapter interface {
+	Image(ctx context.Context, req ImageRequest) (ImageResponse, error)
+}
+
+// SpeechRequest is a provider-agnostic text-to-speech request.
+type SpeechRequest struct {
+	Model  string
+	Input  string
+	Voice  string
+	Format string // requested container, e.g. "mp3" | "wav" (best-effort)
+}
+
+// SpeechResponse carries a ready-to-play audio file.
+type SpeechResponse struct {
+	Audio       []byte
+	ContentType string // e.g. "audio/wav" | "audio/mpeg"
+}
+
+// SpeechAdapter is implemented by providers that can synthesize speech.
+type SpeechAdapter interface {
+	Speech(ctx context.Context, req SpeechRequest) (SpeechResponse, error)
+}
+
 // sharedHTTPClient is reused by all adapters; upstream calls are bounded by the
 // request context, so the client timeout is a generous safety net.
 var sharedHTTPClient = &http.Client{Timeout: 120 * time.Second}
