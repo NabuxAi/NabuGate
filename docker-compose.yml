@@ -1,0 +1,23 @@
+# NabuGate gateway — Coolify / Docker Compose deployment.
+services:
+  nabugate:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      - NABU_CONFIG=/app/config.yaml
+      # Provider secrets (set the ones you enable in config.yaml)
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - GROQ_API_KEY=${GROQ_API_KEY}
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+    ports:
+      - "8080"
+    volumes:
+      # Provide your own production config (overrides the baked-in example)
+      - ./config.yaml:/app/config.yaml:ro
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "/app/nabugate", "-config", "/dev/null"]
+      disable: true # distroless has no shell; rely on the platform's HTTP check on /healthz

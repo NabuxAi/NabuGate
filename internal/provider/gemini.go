@@ -1,0 +1,144 @@
+package provider
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
+	"net/url"
+	"strings"
+)
+
+// GeminiAdapter speaks the Google Gemini generateContent API. Gemini uses
+// "user"/"model" roles, a separate systemInstruction field, and passes the API
+// key as a query parameter.
+type GeminiAdapter struct {
+	name    string
+	baseURL string
+	apiKey  string
+}
+
+// NewGeminiAdapter builds a Gemini adapter.
+func NewGeminiAdapter(name, baseURL, apiKey string) *GeminiAdapter {
+	return &GeminiAdapter{
+		name:    name,
+		baseURL: strings.TrimRight(baseURL, "/"),
+		apiKey:  apiKey,
+	}
+}
+
+func (a *GeminiAdapter) Name() string { return a.name }
+
+type geminiPart struct {
+	Text string `json:"text"`
+}
+
+type geminiContent struct {
+	Role  string       `json:"role,omitempty"`
+	Parts []geminiPart `json:"parts"`
+}
+
+type geminiRequest struct {
+	Contents          []geminiContent `json:"contents"`
+	SystemInstruction *geminiContent  `json:"systemInstruction,omitempty"`
+	GenerationConfig  *geminiGenCfg   `json:"generationConfig,omitempty"`
+}
+
+type geminiGenCfg struct {
+	Temperature     *float64 `json:"temperature,omitempty"`
+	MaxOutputTokens *int     `json:"maxOutputTokens,omitempty"`
+}
+
+type geminiResponse struct {
+	Candidates []struct {
+		Content struct {
+			Parts []geminiPart `json:"parts"`
+		} `json:"content"`
+	} `json:"candidates"`
+	UsageMetadata struct {
+		PromptTokenCount     int `json:"promptTokenCount"`
+		CandidatesTokenCount int `json:"candidatesTokenCount"`
+		TotalTokenCount      int `json:"totalTokenCount"`
+	} `json:"usageMetadata"`
+	Error *struct {
+		Message string `json:"message"`
+	} `json:"error"`
+}
+
+func (a *GeminiAdapter) Chat(ctx context.Context, req ChatRequest) (ChatResponse, error) {
+	var system *geminiContent
+	contents := make([]geminiContent, 0, len(req.Messages))
+	for _, m := range req.Messages {
+		switch m.Role {
+		case "system":
+			if system == nil {
+				system = &geminiContent{Parts: []geminiPart{{Text: m.Content}}}
+			} else {
+				system.Parts = append(system.Parts, geminiPart{Text: m.Content})
+			}
+		case "assistant":
+			contents = append(contents, geminiContent{Role: "model", Parts: []geminiPart{{Text: m.Content}}})
+		default:
+			contents = append(contents, geminiContent{Role: "user", Parts: []geminiPart{{Text: m.Content}}})
+		}
+	}
+
+	var genCfg *geminiGenCfg
+	if req.Temperature != nil || req.MaxTokens != nil {
+		genCfg = &geminiGenCfg{Temperature: req.Temperature, MaxOutputTokens: req.MaxTokens}
+	}
+
+	body, err := json.Marshal(geminiRequest{
+		Contents:          contents,
+		SystemInstruction: system,
+		GenerationConfig:  genCfg,
+	})
+	if err != nil {
+		return ChatResponse{}, err
+	}
+
+	endpoint := fmt.Sprintf("%s/models/%s:generateContent?key=%s", a.baseURL, url.PathEscape(req.Model), url.QueryEscape(a.apiKey))
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(body))
+	if err != nil {
+		return ChatResponse{}, err
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+
+	resp, err := sharedHTTPClient.Do(httpReq)
+	if err != nil {
+		return ChatResponse{}, err
+	}
+	defer resp.Body.Close()
+	raw, _ := io.ReadAll(resp.Body)
+
+	var parsed geminiResponse
+	if err := json.Unmarshal(raw, &parsed); err != nil {
+		return ChatResponse{}, fmt.Errorf("%s: invalid response (status %d): %s", a.name, resp.StatusCode, truncate(raw))
+	}
+	if resp.StatusCode >= 400 {
+		msg := http.StatusText(resp.StatusCode)
+		if parsed.Error != nil && parsed.Error.Message != "" {
+			msg = parsed.Error.Message
+		}
+		return ChatResponse{}, fmt.Errorf("%s: upstream error (status %d): %s", a.name, resp.StatusCode, msg)
+	}
+	if len(parsed.Candidates) == 0 || len(parsed.Candidates[0].Content.Parts) == 0 {
+		return ChatResponse{}, fmt.Errorf("%s: empty completion", a.name)
+	}
+
+	var text strings.Builder
+	for _, p := range parsed.Candidates[0].Content.Parts {
+		text.WriteString(p.Text)
+	}
+
+	return ChatResponse{
+		Content: text.String(),
+		Usage: Usage{
+			PromptTokens:     parsed.UsageMetadata.PromptTokenCount,
+			CompletionTokens: parsed.UsageMetadata.CandidatesTokenCount,
+			TotalTokens:      parsed.UsageMetadata.TotalTokenCount,
+		},
+	}, nil
+}

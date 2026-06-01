@@ -1,0 +1,10 @@
+# Local secrets and config (use the .example files as templates)
+.env
+.env.*
+!.env.example
+config.yaml
+
+# Build output
+/nabugate
+/out/
+*.log

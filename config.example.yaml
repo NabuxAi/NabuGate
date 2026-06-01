@@ -1,0 +1,88 @@
+# NabuGate — central AI/LLM gateway configuration.
+#
+# Projects never talk to OpenAI / Gemini / Claude / Groq / OpenRouter directly.
+# They call NabuGate's OpenAI-compatible endpoint with an *alias* (e.g.
+# "nabu-fast") and NabuGate routes to the right provider, with fallback.
+
+server:
+  port: 8080
+  # Internal API keys that org projects must send as `Authorization: Bearer <key>`.
+  # Leave empty to disable auth in local development.
+  api_keys:
+    - "nabu_dev_key_change_me"
+
+# Upstream providers. The actual secrets live in environment variables
+# (api_key_env), never in this file — that is the Secret Manager boundary.
+providers:
+  openai:
+    enabled: true
+    type: openai
+    base_url: "https://api.openai.com/v1"
+    api_key_env: "OPENAI_API_KEY"
+
+  groq:
+    enabled: true
+    type: openai # Groq is OpenAI-wire-compatible
+    base_url: "https://api.groq.com/openai/v1"
+    api_key_env: "GROQ_API_KEY"
+
+  openrouter:
+    enabled: true
+    type: openai # OpenRouter is OpenAI-wire-compatible
+    base_url: "https://openrouter.ai/api/v1"
+    api_key_env: "OPENROUTER_API_KEY"
+
+  anthropic:
+    enabled: true
+    type: anthropic
+    base_url: "https://api.anthropic.com/v1"
+    api_key_env: "ANTHROPIC_API_KEY"
+
+  gemini:
+    enabled: true
+    type: gemini
+    base_url: "https://generativelanguage.googleapis.com/v1beta"
+    api_key_env: "GEMINI_API_KEY"
+
+# Model registry: public alias -> primary target + ordered fallbacks.
+# Projects request the alias; NabuGate picks the provider/model.
+models:
+  # Cheap & very fast — Groq first, then small hosted models.
+  nabu-fast:
+    primary:
+      provider: groq
+      model: "llama-3.1-70b-versatile"
+    fallback:
+      - provider: openai
+        model: "gpt-4o-mini"
+      - provider: anthropic
+        model: "claude-3-5-haiku-latest"
+
+  # Best general reasoning.
+  nabu-smart:
+    primary:
+      provider: openai
+      model: "gpt-4o"
+    fallback:
+      - provider: anthropic
+        model: "claude-3-5-sonnet-latest"
+      - provider: gemini
+        model: "gemini-1.5-pro"
+
+  # Cheapest acceptable quality.
+  nabu-cheap:
+    primary:
+      provider: openrouter
+      model: "meta-llama/llama-3.1-8b-instruct"
+    fallback:
+      - provider: groq
+        model: "llama-3.1-8b-instant"
+
+  # Long-context / multimodal-capable text.
+  nabu-vision:
+    primary:
+      provider: openai
+      model: "gpt-4o"
+    fallback:
+      - provider: gemini
+        model: "gemini-1.5-pro"
