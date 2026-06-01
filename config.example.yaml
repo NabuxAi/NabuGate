@@ -106,3 +106,13 @@ audio:
     fallback:
       - provider: gemini
         model: "gemini-2.5-flash-preview-tts"
+
+# Text-embedding aliases (POST /v1/embeddings).
+embeddings:
+  nabu-embed:
+    primary:
+      provider: openai
+      model: "text-embedding-3-small"
+    fallback:
+      - provider: gemini
+        model: "text-embedding-004"

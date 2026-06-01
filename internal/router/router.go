@@ -17,16 +17,17 @@ import (
 // Router holds the live adapters and the alias routing tables (one per
 // capability: chat, images, audio).
 type Router struct {
-	adapters map[string]provider.Adapter
-	models   map[string]config.ModelRoute
-	images   map[string]config.ModelRoute
-	audio    map[string]config.ModelRoute
-	log      *slog.Logger
+	adapters   map[string]provider.Adapter
+	models     map[string]config.ModelRoute
+	images     map[string]config.ModelRoute
+	audio      map[string]config.ModelRoute
+	embeddings map[string]config.ModelRoute
+	log        *slog.Logger
 }
 
 // New builds a Router.
-func New(adapters map[string]provider.Adapter, models, images, audio map[string]config.ModelRoute, log *slog.Logger) *Router {
-	return &Router{adapters: adapters, models: models, images: images, audio: audio, log: log}
+func New(adapters map[string]provider.Adapter, models, images, audio, embeddings map[string]config.ModelRoute, log *slog.Logger) *Router {
+	return &Router{adapters: adapters, models: models, images: images, audio: audio, embeddings: embeddings, log: log}
 }
 
 // Result is the outcome of a successful routed call.
@@ -189,6 +190,52 @@ func (r *Router) Speech(ctx context.Context, alias string, req provider.SpeechRe
 	return SpeechResult{}, fmt.Errorf("all targets failed for audio alias %q: %w", alias, lastErr)
 }
 
+// EmbedResult is the outcome of a successful embedding call.
+type EmbedResult struct {
+	Alias      string
+	Provider   string
+	Model      string
+	Embeddings [][]float64
+	Usage      provider.Usage
+}
+
+// Embed resolves an embedding alias and tries primary then fallbacks.
+func (r *Router) Embed(ctx context.Context, alias string, req provider.EmbeddingRequest) (EmbedResult, error) {
+	route, ok := r.embeddings[alias]
+	if !ok {
+		return EmbedResult{}, fmt.Errorf("unknown embedding alias %q", alias)
+	}
+	targets := append([]config.Target{route.Primary}, route.Fallback...)
+	var lastErr error
+
+	for i, t := range targets {
+		adapter, ok := r.adapters[t.Provider]
+		if !ok {
+			lastErr = fmt.Errorf("provider %q not available", t.Provider)
+			continue
+		}
+		embAdapter, ok := adapter.(provider.EmbeddingAdapter)
+		if !ok {
+			lastErr = fmt.Errorf("provider %q does not support embeddings", t.Provider)
+			r.log.Warn("skip embedding target", "alias", alias, "provider", t.Provider, "reason", "no embedding support")
+			continue
+		}
+
+		req.Model = t.Model
+		start := time.Now()
+		resp, err := embAdapter.Embed(ctx, req)
+		attrs := []any{"capability", "embedding", "alias", alias, "provider", t.Provider, "model", t.Model, "attempt", i + 1, "latency_ms", time.Since(start).Milliseconds()}
+		if err != nil {
+			lastErr = err
+			r.log.Warn("upstream failed", append(attrs, "error", err.Error())...)
+			continue
+		}
+		r.log.Info("upstream ok", append(attrs, "vectors", len(resp.Embeddings), "total_tokens", resp.Usage.TotalTokens)...)
+		return EmbedResult{Alias: alias, Provider: t.Provider, Model: t.Model, Embeddings: resp.Embeddings, Usage: resp.Usage}, nil
+	}
+	return EmbedResult{}, fmt.Errorf("all targets failed for embedding alias %q: %w", alias, lastErr)
+}
+
 // MarshalAliases returns a JSON-friendly model list (OpenAI /v1/models shape).
 func (r *Router) MarshalAliases() ([]byte, error) {
 	type model struct {
@@ -209,5 +256,6 @@ func (r *Router) MarshalAliases() ([]byte, error) {
 	add(r.models)
 	add(r.images)
 	add(r.audio)
+	add(r.embeddings)
 	return json.Marshal(out)
 }

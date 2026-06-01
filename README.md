@@ -64,7 +64,8 @@ Other endpoints:
 | `POST /v1/chat/completions`  | Chat completion (alias-routed)                      |
 | `POST /v1/images/generations`| Image generation; returns `data[].b64_json`         |
 | `POST /v1/audio/speech`      | Text-to-speech; returns raw audio bytes (wav/mp3)   |
-| `GET  /v1/models`            | List available aliases (chat + image + audio)       |
+| `POST /v1/embeddings`        | Text embeddings; `input` may be a string or array   |
+| `GET  /v1/models`            | List available aliases (chat/image/audio/embeddings)|
 | `GET  /healthz`              | Liveness probe                                      |
 
 Image example:
@@ -84,6 +85,14 @@ curl -X POST http://localhost:8080/v1/audio/speech \
   --output speech.wav
 ```
 
+Embeddings example:
+
+```bash
+curl -X POST http://localhost:8080/v1/embeddings \
+  -H "Authorization: Bearer nabu_dev_key_change_me" \
+  -d '{ "model": "nabu-embed", "input": ["متن اول", "متن دوم"] }'
+```
+
 ## Aliases (default config)
 
 | Alias         | Primary → fallbacks                                        |
@@ -94,10 +103,11 @@ curl -X POST http://localhost:8080/v1/audio/speech \
 | `nabu-vision` | OpenAI 4o → Gemini 1.5 Pro                                 |
 | `nabu-image`  | OpenAI gpt-image-1 → Gemini 2.5 Flash Image (image gen)    |
 | `nabu-voice`  | OpenAI gpt-4o-mini-tts → Gemini 2.5 Flash TTS (speech)     |
+| `nabu-embed`  | OpenAI text-embedding-3-small → Gemini text-embedding-004  |
 
-Image aliases live under `images:` and speech aliases under `audio:` in the
-config. Edit `config.yaml` to add providers, aliases, or change routing — no code
-change needed.
+Aliases live under `models:` (chat), `images:`, `audio:` and `embeddings:` in
+the config. Edit `config.yaml` to add providers, aliases, or change routing — no
+code change needed.
 
 ## Run locally
 
@@ -155,6 +165,5 @@ adapters.
 ## Roadmap (post-MVP)
 
 - Streaming (`stream: true`) passthrough
-- `/v1/embeddings` capability
 - Per-project policy engine (which aliases each key may use)
 - Cost tracking and rate limiting

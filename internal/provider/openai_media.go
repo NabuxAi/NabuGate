@@ -124,6 +124,61 @@ func (a *OpenAIAdapter) Speech(ctx context.Context, req SpeechRequest) (SpeechRe
 	return SpeechResponse{Audio: data, ContentType: contentType}, nil
 }
 
+// --- Embeddings (OpenAI Embeddings API) ---
+
+type openAIEmbeddingRequest struct {
+	Model string   `json:"model"`
+	Input []string `json:"input"`
+}
+
+type openAIEmbeddingResponse struct {
+	Data []struct {
+		Index     int       `json:"index"`
+		Embedding []float64 `json:"embedding"`
+	} `json:"data"`
+	Usage struct {
+		PromptTokens int `json:"prompt_tokens"`
+		TotalTokens  int `json:"total_tokens"`
+	} `json:"usage"`
+	Error *struct {
+		Message string `json:"message"`
+	} `json:"error"`
+}
+
+// Embed implements EmbeddingAdapter using POST /embeddings.
+func (a *OpenAIAdapter) Embed(ctx context.Context, req EmbeddingRequest) (EmbeddingResponse, error) {
+	raw, status, err := a.postJSON(ctx, "/embeddings", openAIEmbeddingRequest{Model: req.Model, Input: req.Input})
+	if err != nil {
+		return EmbeddingResponse{}, err
+	}
+
+	var parsed openAIEmbeddingResponse
+	if err := json.Unmarshal(raw, &parsed); err != nil {
+		return EmbeddingResponse{}, fmt.Errorf("%s: invalid embedding response (status %d): %s", a.name, status, truncate(raw))
+	}
+	if status >= 400 {
+		return EmbeddingResponse{}, fmt.Errorf("%s: upstream error (status %d): %s", a.name, status, errMsg(parsed.Error, status))
+	}
+	if len(parsed.Data) == 0 {
+		return EmbeddingResponse{}, fmt.Errorf("%s: no embeddings returned", a.name)
+	}
+
+	// Preserve input order using the returned index.
+	out := make([][]float64, len(parsed.Data))
+	for _, d := range parsed.Data {
+		if d.Index >= 0 && d.Index < len(out) {
+			out[d.Index] = d.Embedding
+		}
+	}
+	return EmbeddingResponse{
+		Embeddings: out,
+		Usage: Usage{
+			PromptTokens: parsed.Usage.PromptTokens,
+			TotalTokens:  parsed.Usage.TotalTokens,
+		},
+	}, nil
+}
+
 // postJSON is a small helper for JSON POSTs that return JSON, used by media
 // endpoints. It returns the raw body and HTTP status.
 func (a *OpenAIAdapter) postJSON(ctx context.Context, path string, payload any) ([]byte, int, error) {

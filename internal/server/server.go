@@ -40,6 +40,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /v1/chat/completions", s.auth(s.handleChat))
 	mux.HandleFunc("POST /v1/images/generations", s.auth(s.handleImages))
 	mux.HandleFunc("POST /v1/audio/speech", s.auth(s.handleSpeech))
+	mux.HandleFunc("POST /v1/embeddings", s.auth(s.handleEmbeddings))
 	return mux
 }
 
@@ -206,6 +207,65 @@ func (s *Server) handleSpeech(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", result.ContentType)
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write(result.Audio)
+}
+
+// embeddingRequestBody is the OpenAI-compatible embeddings request. "input"
+// may be a single string or an array of strings.
+type embeddingRequestBody struct {
+	Model string          `json:"model"`
+	Input json.RawMessage `json:"input"`
+}
+
+func (s *Server) handleEmbeddings(w http.ResponseWriter, r *http.Request) {
+	var body embeddingRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid JSON body")
+		return
+	}
+	if body.Model == "" {
+		writeError(w, http.StatusBadRequest, "field 'model' (alias) is required")
+		return
+	}
+
+	// Accept both string and []string for "input".
+	var inputs []string
+	if err := json.Unmarshal(body.Input, &inputs); err != nil {
+		var single string
+		if err2 := json.Unmarshal(body.Input, &single); err2 != nil {
+			writeError(w, http.StatusBadRequest, "field 'input' must be a string or array of strings")
+			return
+		}
+		inputs = []string{single}
+	}
+	if len(inputs) == 0 {
+		writeError(w, http.StatusBadRequest, "field 'input' must not be empty")
+		return
+	}
+
+	result, err := s.router.Embed(r.Context(), body.Model, provider.EmbeddingRequest{Input: inputs})
+	if err != nil {
+		writeError(w, aliasErrStatus(err, "unknown embedding alias"), err.Error())
+		return
+	}
+
+	w.Header().Set("X-Nabu-Provider", result.Provider)
+	w.Header().Set("X-Nabu-Model", result.Model)
+
+	data := make([]map[string]any, 0, len(result.Embeddings))
+	for i, vec := range result.Embeddings {
+		data = append(data, map[string]any{"object": "embedding", "index": i, "embedding": vec})
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"object":         "list",
+		"model":          result.Alias,
+		"provider":       result.Provider,
+		"upstream_model": result.Model,
+		"data":           data,
+		"usage": map[string]int{
+			"prompt_tokens": result.Usage.PromptTokens,
+			"total_tokens":  result.Usage.TotalTokens,
+		},
+	})
 }
 
 // aliasErrStatus maps an unknown-alias error to 400 and everything else to 502.

@@ -36,7 +36,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	r := router.New(adapters, cfg.Models, cfg.Images, cfg.Audio, log)
+	r := router.New(adapters, cfg.Models, cfg.Images, cfg.Audio, cfg.Embeddings, log)
 	srv := server.New(r, cfg.Server.APIKeys, log)
 
 	if len(cfg.Server.APIKeys) == 0 {

@@ -148,6 +148,64 @@ func (a *GeminiAdapter) Speech(ctx context.Context, req SpeechRequest) (SpeechRe
 	return SpeechResponse{Audio: wrapPCMAsWAV(pcm, rate), ContentType: "audio/wav"}, nil
 }
 
+// --- Embeddings (Gemini batchEmbedContents) ---
+
+type geminiEmbeddingResponse struct {
+	Embeddings []struct {
+		Values []float64 `json:"values"`
+	} `json:"embeddings"`
+	Error *struct {
+		Message string `json:"message"`
+	} `json:"error"`
+}
+
+// Embed implements EmbeddingAdapter using batchEmbedContents.
+func (a *GeminiAdapter) Embed(ctx context.Context, req EmbeddingRequest) (EmbeddingResponse, error) {
+	modelPath := "models/" + req.Model
+	requests := make([]any, 0, len(req.Input))
+	for _, text := range req.Input {
+		requests = append(requests, map[string]any{
+			"model":   modelPath,
+			"content": map[string]any{"parts": []any{map[string]any{"text": text}}},
+		})
+	}
+	payload, err := json.Marshal(map[string]any{"requests": requests})
+	if err != nil {
+		return EmbeddingResponse{}, err
+	}
+
+	endpoint := fmt.Sprintf("%s/models/%s:batchEmbedContents?key=%s", a.baseURL, url.PathEscape(req.Model), url.QueryEscape(a.apiKey))
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(payload))
+	if err != nil {
+		return EmbeddingResponse{}, err
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+
+	resp, err := sharedHTTPClient.Do(httpReq)
+	if err != nil {
+		return EmbeddingResponse{}, err
+	}
+	defer resp.Body.Close()
+	raw, _ := io.ReadAll(resp.Body)
+
+	var parsed geminiEmbeddingResponse
+	if err := json.Unmarshal(raw, &parsed); err != nil {
+		return EmbeddingResponse{}, fmt.Errorf("%s: invalid embedding response (status %d): %s", a.name, resp.StatusCode, truncate(raw))
+	}
+	if resp.StatusCode >= 400 {
+		return EmbeddingResponse{}, fmt.Errorf("%s: upstream error (status %d): %s", a.name, resp.StatusCode, geminiErr(parsed.Error, resp.StatusCode))
+	}
+	if len(parsed.Embeddings) == 0 {
+		return EmbeddingResponse{}, fmt.Errorf("%s: no embeddings returned", a.name)
+	}
+
+	out := make([][]float64, len(parsed.Embeddings))
+	for i, e := range parsed.Embeddings {
+		out[i] = e.Values
+	}
+	return EmbeddingResponse{Embeddings: out}, nil
+}
+
 func geminiErr(e *struct {
 	Message string `json:"message"`
 }, status int) string {
@@ -184,13 +242,13 @@ func wrapPCMAsWAV(pcm []byte, sampleRate int) []byte {
 	binary.Write(&buf, binary.LittleEndian, uint32(36+len(pcm)))
 	buf.WriteString("WAVE")
 	buf.WriteString("fmt ")
-	binary.Write(&buf, binary.LittleEndian, uint32(16))               // PCM fmt chunk size
-	binary.Write(&buf, binary.LittleEndian, uint16(1))                // audio format = PCM
-	binary.Write(&buf, binary.LittleEndian, uint16(numChannels))      //
-	binary.Write(&buf, binary.LittleEndian, uint32(sampleRate))       //
-	binary.Write(&buf, binary.LittleEndian, uint32(byteRate))         //
-	binary.Write(&buf, binary.LittleEndian, uint16(blockAlign))       //
-	binary.Write(&buf, binary.LittleEndian, uint16(bitsPerSample))    //
+	binary.Write(&buf, binary.LittleEndian, uint32(16))            // PCM fmt chunk size
+	binary.Write(&buf, binary.LittleEndian, uint16(1))             // audio format = PCM
+	binary.Write(&buf, binary.LittleEndian, uint16(numChannels))   //
+	binary.Write(&buf, binary.LittleEndian, uint32(sampleRate))    //
+	binary.Write(&buf, binary.LittleEndian, uint32(byteRate))      //
+	binary.Write(&buf, binary.LittleEndian, uint16(blockAlign))    //
+	binary.Write(&buf, binary.LittleEndian, uint16(bitsPerSample)) //
 	buf.WriteString("data")
 	binary.Write(&buf, binary.LittleEndian, uint32(len(pcm)))
 	buf.Write(pcm)

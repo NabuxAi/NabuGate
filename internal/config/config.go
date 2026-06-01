@@ -13,11 +13,12 @@ import (
 
 // Config is the top-level configuration file structure.
 type Config struct {
-	Server    ServerConfig              `yaml:"server"`
-	Providers map[string]ProviderConfig `yaml:"providers"`
-	Models    map[string]ModelRoute     `yaml:"models"` // chat aliases
-	Images    map[string]ModelRoute     `yaml:"images"` // image-generation aliases
-	Audio     map[string]ModelRoute     `yaml:"audio"`  // text-to-speech aliases
+	Server     ServerConfig              `yaml:"server"`
+	Providers  map[string]ProviderConfig `yaml:"providers"`
+	Models     map[string]ModelRoute     `yaml:"models"`     // chat aliases
+	Images     map[string]ModelRoute     `yaml:"images"`     // image-generation aliases
+	Audio      map[string]ModelRoute     `yaml:"audio"`      // text-to-speech aliases
+	Embeddings map[string]ModelRoute     `yaml:"embeddings"` // text-embedding aliases
 }
 
 // ServerConfig holds gateway listen options and the internal API keys that

@@ -84,6 +84,23 @@ type SpeechAdapter interface {
 	Speech(ctx context.Context, req SpeechRequest) (SpeechResponse, error)
 }
 
+// EmbeddingRequest is a provider-agnostic text embedding request.
+type EmbeddingRequest struct {
+	Model string
+	Input []string
+}
+
+// EmbeddingResponse carries one vector per input (same order).
+type EmbeddingResponse struct {
+	Embeddings [][]float64
+	Usage      Usage
+}
+
+// EmbeddingAdapter is implemented by providers that can embed text.
+type EmbeddingAdapter interface {
+	Embed(ctx context.Context, req EmbeddingRequest) (EmbeddingResponse, error)
+}
+
 // sharedHTTPClient is reused by all adapters; upstream calls are bounded by the
 // request context, so the client timeout is a generous safety net.
 var sharedHTTPClient = &http.Client{Timeout: 120 * time.Second}
