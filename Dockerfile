@@ -21,9 +21,10 @@ FROM gcr.io/distroless/static-debian12:nonroot
 
 WORKDIR /app
 COPY --from=build /out/nabugate /app/nabugate
-# A starter config; mount/override with your own in production.
-COPY config.example.yaml /app/config.yaml
 
+# No config is baked in: that would publish the example API key as a live,
+# full-access credential. Operators must mount their own config at /app/config.yaml
+# (see docker-compose.yml). The gateway fails to start if it is missing.
 ENV NABU_CONFIG=/app/config.yaml
 EXPOSE 8080
 

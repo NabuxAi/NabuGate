@@ -61,11 +61,13 @@ func (s *Server) record(r *http.Request, prov, model string, u provider.Usage) {
 		"total_tokens", u.TotalTokens, "cost_usd", cost)
 }
 
-// handleUsage reports accumulated usage. Full-access (admin) keys see all
-// projects and models; project-scoped keys see only their own totals.
+// handleUsage reports accumulated usage. Admin keys (not bound to a project,
+// i.e. the simple api_keys) see all projects and models; project-scoped keys
+// see only their own totals. Admin-ness is based on project scope, not alias
+// permissions — an all-alias project key must not see other projects' usage.
 func (s *Server) handleUsage(w http.ResponseWriter, r *http.Request) {
 	pol, hasPol := r.Context().Value(policyCtxKey{}).(policy.Policy)
-	admin := !s.policy.Enabled() || (hasPol && pol.Allows("*"))
+	admin := !s.policy.Enabled() || (hasPol && pol.Project == "")
 	if admin {
 		byProject, byModel := s.usage.Snapshot()
 		writeJSON(w, http.StatusOK, map[string]any{"by_project": byProject, "by_model": byModel})

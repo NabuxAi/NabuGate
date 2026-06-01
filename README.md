@@ -184,7 +184,12 @@ disabled (dev mode).
 
 ## Deploy with Coolify / Docker
 
+No config is baked into the image (that would publish the example API key as a
+live credential), so you must mount your own `config.yaml` — the gateway exits
+if it is missing.
+
 ```bash
+cp config.example.yaml config.yaml   # then set real api_keys
 docker build -t nabugate .
 docker run -p 8080:8080 \
   -e OPENAI_API_KEY=sk-... -e GROQ_API_KEY=gsk-... \
