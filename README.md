@@ -61,7 +61,7 @@ Other endpoints:
 
 | Method & path                | Description                                          |
 | ---------------------------- | --------------------------------------------------- |
-| `POST /v1/chat/completions`  | Chat completion (alias-routed)                      |
+| `POST /v1/chat/completions`  | Chat completion (alias-routed); supports `stream: true` |
 | `POST /v1/images/generations`| Image generation; returns `data[].b64_json`         |
 | `POST /v1/audio/speech`      | Text-to-speech; returns raw audio bytes (wav/mp3)   |
 | `POST /v1/embeddings`        | Text embeddings; `input` may be a string or array   |
@@ -92,6 +92,19 @@ curl -X POST http://localhost:8080/v1/embeddings \
   -H "Authorization: Bearer nabu_dev_key_change_me" \
   -d '{ "model": "nabu-embed", "input": ["متن اول", "متن دوم"] }'
 ```
+
+Streaming example (Server-Sent Events). The gateway normalizes every provider's
+stream into OpenAI-style `chat.completion.chunk` events ending with `[DONE]`:
+
+```bash
+curl -N -X POST http://localhost:8080/v1/chat/completions \
+  -H "Authorization: Bearer nabu_dev_key_change_me" \
+  -d '{ "model": "nabu-fast", "stream": true,
+        "messages": [{ "role": "user", "content": "خلاصه کن" }] }'
+```
+
+Fallback applies only until the first byte streams; once output has started the
+gateway is committed to that provider.
 
 ## Aliases (default config)
 
@@ -164,6 +177,5 @@ adapters.
 
 ## Roadmap (post-MVP)
 
-- Streaming (`stream: true`) passthrough
 - Per-project policy engine (which aliases each key may use)
 - Cost tracking and rate limiting

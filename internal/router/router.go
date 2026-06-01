@@ -99,6 +99,63 @@ func (r *Router) Chat(ctx context.Context, alias string, req provider.ChatReques
 	return Result{}, fmt.Errorf("all targets failed for alias %q: %w", alias, lastErr)
 }
 
+// StreamResult is the outcome of a (possibly partial) streaming completion.
+type StreamResult struct {
+	Provider string
+	Model    string
+	Usage    provider.Usage
+}
+
+// ChatStream resolves a chat alias and streams the first stream-capable target,
+// falling back to the next target only while no delta has been emitted yet
+// (once bytes are on the wire we are committed to that provider). onMeta is
+// called with the chosen provider/model before each attempt so the caller can
+// emit response headers lazily on the first delta.
+func (r *Router) ChatStream(ctx context.Context, alias string, req provider.ChatRequest, onMeta func(providerName, model string), onDelta provider.DeltaFunc) (StreamResult, error) {
+	route, ok := r.models[alias]
+	if !ok {
+		return StreamResult{}, fmt.Errorf("unknown model alias %q", alias)
+	}
+	targets := append([]config.Target{route.Primary}, route.Fallback...)
+	var lastErr error
+
+	for i, t := range targets {
+		adapter, ok := r.adapters[t.Provider]
+		if !ok {
+			lastErr = fmt.Errorf("provider %q not available", t.Provider)
+			continue
+		}
+		streamer, ok := adapter.(provider.StreamAdapter)
+		if !ok {
+			lastErr = fmt.Errorf("provider %q does not support streaming", t.Provider)
+			r.log.Warn("skip stream target", "alias", alias, "provider", t.Provider, "reason", "no stream support")
+			continue
+		}
+
+		onMeta(t.Provider, t.Model)
+		req.Model = t.Model
+		started := false
+		start := time.Now()
+		usage, err := streamer.ChatStream(ctx, req, func(delta string) error {
+			started = true
+			return onDelta(delta)
+		})
+		attrs := []any{"capability", "chat-stream", "alias", alias, "provider", t.Provider, "model", t.Model, "attempt", i + 1, "latency_ms", time.Since(start).Milliseconds()}
+		if err != nil {
+			lastErr = err
+			r.log.Warn("upstream failed", append(attrs, "error", err.Error(), "started", started)...)
+			if started {
+				// Cannot fall back once the client has received bytes.
+				return StreamResult{Provider: t.Provider, Model: t.Model, Usage: usage}, err
+			}
+			continue
+		}
+		r.log.Info("upstream ok", append(attrs, "total_tokens", usage.TotalTokens)...)
+		return StreamResult{Provider: t.Provider, Model: t.Model, Usage: usage}, nil
+	}
+	return StreamResult{}, fmt.Errorf("all targets failed for alias %q: %w", alias, lastErr)
+}
+
 // ImageResult is the outcome of a successful image generation.
 type ImageResult struct {
 	Alias    string

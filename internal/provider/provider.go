@@ -46,6 +46,16 @@ type Adapter interface {
 	Chat(ctx context.Context, req ChatRequest) (ChatResponse, error)
 }
 
+// DeltaFunc receives incremental text chunks during a streaming completion.
+type DeltaFunc func(delta string) error
+
+// StreamAdapter is implemented by providers that can stream chat completions.
+// onDelta is called for each text chunk; the returned Usage carries final token
+// accounting when the provider reports it.
+type StreamAdapter interface {
+	ChatStream(ctx context.Context, req ChatRequest, onDelta DeltaFunc) (Usage, error)
+}
+
 // ImageRequest is a provider-agnostic image generation request.
 type ImageRequest struct {
 	Model       string

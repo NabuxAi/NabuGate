@@ -142,3 +142,83 @@ func (a *GeminiAdapter) Chat(ctx context.Context, req ChatRequest) (ChatResponse
 		},
 	}, nil
 }
+
+// ChatStream implements StreamAdapter using Gemini's streamGenerateContent.
+func (a *GeminiAdapter) ChatStream(ctx context.Context, req ChatRequest, onDelta DeltaFunc) (Usage, error) {
+	var system *geminiContent
+	contents := make([]geminiContent, 0, len(req.Messages))
+	for _, m := range req.Messages {
+		switch m.Role {
+		case "system":
+			if system == nil {
+				system = &geminiContent{Parts: []geminiPart{{Text: m.Content}}}
+			} else {
+				system.Parts = append(system.Parts, geminiPart{Text: m.Content})
+			}
+		case "assistant":
+			contents = append(contents, geminiContent{Role: "model", Parts: []geminiPart{{Text: m.Content}}})
+		default:
+			contents = append(contents, geminiContent{Role: "user", Parts: []geminiPart{{Text: m.Content}}})
+		}
+	}
+
+	var genCfg *geminiGenCfg
+	if req.Temperature != nil || req.MaxTokens != nil {
+		genCfg = &geminiGenCfg{Temperature: req.Temperature, MaxOutputTokens: req.MaxTokens}
+	}
+	body, err := json.Marshal(geminiRequest{Contents: contents, SystemInstruction: system, GenerationConfig: genCfg})
+	if err != nil {
+		return Usage{}, err
+	}
+
+	endpoint := fmt.Sprintf("%s/models/%s:streamGenerateContent?alt=sse&key=%s", a.baseURL, url.PathEscape(req.Model), url.QueryEscape(a.apiKey))
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(body))
+	if err != nil {
+		return Usage{}, err
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+	httpReq.Header.Set("Accept", "text/event-stream")
+
+	resp, err := doStreamRequest(ctx, httpReq, a.name)
+	if err != nil {
+		return Usage{}, err
+	}
+	defer resp.Body.Close()
+
+	var usage Usage
+	err = readSSE(resp.Body, func(data []byte) (bool, error) {
+		var chunk struct {
+			Candidates []struct {
+				Content struct {
+					Parts []geminiPart `json:"parts"`
+				} `json:"content"`
+			} `json:"candidates"`
+			UsageMetadata struct {
+				PromptTokenCount     int `json:"promptTokenCount"`
+				CandidatesTokenCount int `json:"candidatesTokenCount"`
+				TotalTokenCount      int `json:"totalTokenCount"`
+			} `json:"usageMetadata"`
+		}
+		if json.Unmarshal(data, &chunk) != nil {
+			return false, nil
+		}
+		for _, c := range chunk.Candidates {
+			for _, p := range c.Content.Parts {
+				if p.Text != "" {
+					if err := onDelta(p.Text); err != nil {
+						return true, err
+					}
+				}
+			}
+		}
+		if chunk.UsageMetadata.TotalTokenCount > 0 {
+			usage = Usage{
+				PromptTokens:     chunk.UsageMetadata.PromptTokenCount,
+				CompletionTokens: chunk.UsageMetadata.CandidatesTokenCount,
+				TotalTokens:      chunk.UsageMetadata.TotalTokenCount,
+			}
+		}
+		return false, nil
+	})
+	return usage, err
+}

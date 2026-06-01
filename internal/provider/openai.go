@@ -108,6 +108,78 @@ func (a *OpenAIAdapter) Chat(ctx context.Context, req ChatRequest) (ChatResponse
 	}, nil
 }
 
+// ChatStream implements StreamAdapter for OpenAI-compatible providers.
+func (a *OpenAIAdapter) ChatStream(ctx context.Context, req ChatRequest, onDelta DeltaFunc) (Usage, error) {
+	payload := map[string]any{
+		"model":          req.Model,
+		"messages":       req.Messages,
+		"stream":         true,
+		"stream_options": map[string]any{"include_usage": true},
+	}
+	if req.Temperature != nil {
+		payload["temperature"] = *req.Temperature
+	}
+	if req.MaxTokens != nil {
+		payload["max_tokens"] = *req.MaxTokens
+	}
+	body, err := json.Marshal(payload)
+	if err != nil {
+		return Usage{}, err
+	}
+
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, a.baseURL+"/chat/completions", bytes.NewReader(body))
+	if err != nil {
+		return Usage{}, err
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+	httpReq.Header.Set("Authorization", "Bearer "+a.apiKey)
+	httpReq.Header.Set("Accept", "text/event-stream")
+	for k, v := range a.extraHeaders {
+		httpReq.Header.Set(k, v)
+	}
+
+	resp, err := doStreamRequest(ctx, httpReq, a.name)
+	if err != nil {
+		return Usage{}, err
+	}
+	defer resp.Body.Close()
+
+	var usage Usage
+	err = readSSE(resp.Body, func(data []byte) (bool, error) {
+		var chunk struct {
+			Choices []struct {
+				Delta struct {
+					Content string `json:"content"`
+				} `json:"delta"`
+			} `json:"choices"`
+			Usage *struct {
+				PromptTokens     int `json:"prompt_tokens"`
+				CompletionTokens int `json:"completion_tokens"`
+				TotalTokens      int `json:"total_tokens"`
+			} `json:"usage"`
+		}
+		if json.Unmarshal(data, &chunk) != nil {
+			return false, nil // skip unparsable keep-alive lines
+		}
+		for _, c := range chunk.Choices {
+			if c.Delta.Content != "" {
+				if err := onDelta(c.Delta.Content); err != nil {
+					return true, err
+				}
+			}
+		}
+		if chunk.Usage != nil {
+			usage = Usage{
+				PromptTokens:     chunk.Usage.PromptTokens,
+				CompletionTokens: chunk.Usage.CompletionTokens,
+				TotalTokens:      chunk.Usage.TotalTokens,
+			}
+		}
+		return false, nil
+	})
+	return usage, err
+}
+
 func truncate(b []byte) string {
 	const max = 300
 	s := strings.TrimSpace(string(b))

@@ -133,3 +133,90 @@ func (a *AnthropicAdapter) Chat(ctx context.Context, req ChatRequest) (ChatRespo
 		},
 	}, nil
 }
+
+// ChatStream implements StreamAdapter for the Anthropic Messages API.
+func (a *AnthropicAdapter) ChatStream(ctx context.Context, req ChatRequest, onDelta DeltaFunc) (Usage, error) {
+	var system strings.Builder
+	msgs := make([]anthropicMessage, 0, len(req.Messages))
+	for _, m := range req.Messages {
+		if m.Role == "system" {
+			if system.Len() > 0 {
+				system.WriteString("\n\n")
+			}
+			system.WriteString(m.Content)
+			continue
+		}
+		msgs = append(msgs, anthropicMessage{Role: m.Role, Content: m.Content})
+	}
+	maxTokens := 1024
+	if req.MaxTokens != nil && *req.MaxTokens > 0 {
+		maxTokens = *req.MaxTokens
+	}
+
+	payload := map[string]any{
+		"model":      req.Model,
+		"max_tokens": maxTokens,
+		"system":     system.String(),
+		"messages":   msgs,
+		"stream":     true,
+	}
+	if req.Temperature != nil {
+		payload["temperature"] = *req.Temperature
+	}
+	body, err := json.Marshal(payload)
+	if err != nil {
+		return Usage{}, err
+	}
+
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, a.baseURL+"/messages", bytes.NewReader(body))
+	if err != nil {
+		return Usage{}, err
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+	httpReq.Header.Set("x-api-key", a.apiKey)
+	httpReq.Header.Set("anthropic-version", a.version)
+	httpReq.Header.Set("Accept", "text/event-stream")
+
+	resp, err := doStreamRequest(ctx, httpReq, a.name)
+	if err != nil {
+		return Usage{}, err
+	}
+	defer resp.Body.Close()
+
+	var usage Usage
+	err = readSSE(resp.Body, func(data []byte) (bool, error) {
+		var ev struct {
+			Type  string `json:"type"`
+			Delta struct {
+				Text         string `json:"text"`
+				OutputTokens int    `json:"output_tokens"`
+			} `json:"delta"`
+			Message struct {
+				Usage struct {
+					InputTokens int `json:"input_tokens"`
+				} `json:"usage"`
+			} `json:"message"`
+			Usage struct {
+				OutputTokens int `json:"output_tokens"`
+			} `json:"usage"`
+		}
+		if json.Unmarshal(data, &ev) != nil {
+			return false, nil
+		}
+		switch ev.Type {
+		case "content_block_delta":
+			if ev.Delta.Text != "" {
+				if err := onDelta(ev.Delta.Text); err != nil {
+					return true, err
+				}
+			}
+		case "message_start":
+			usage.PromptTokens = ev.Message.Usage.InputTokens
+		case "message_delta":
+			usage.CompletionTokens = ev.Usage.OutputTokens
+		}
+		usage.TotalTokens = usage.PromptTokens + usage.CompletionTokens
+		return false, nil
+	})
+	return usage, err
+}

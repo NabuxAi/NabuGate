@@ -66,6 +66,7 @@ type chatRequestBody struct {
 	Messages    []provider.Message `json:"messages"`
 	Temperature *float64           `json:"temperature"`
 	MaxTokens   *int               `json:"max_tokens"`
+	Stream      bool               `json:"stream"`
 }
 
 func (s *Server) handleChat(w http.ResponseWriter, r *http.Request) {
@@ -80,6 +81,16 @@ func (s *Server) handleChat(w http.ResponseWriter, r *http.Request) {
 	}
 	if len(body.Messages) == 0 {
 		writeError(w, http.StatusBadRequest, "field 'messages' must not be empty")
+		return
+	}
+
+	chatReq := provider.ChatRequest{
+		Messages:    body.Messages,
+		Temperature: body.Temperature,
+		MaxTokens:   body.MaxTokens,
+	}
+	if body.Stream {
+		s.streamChat(w, r, body.Model, chatReq)
 		return
 	}
 
@@ -123,6 +134,84 @@ func (s *Server) handleChat(w http.ResponseWriter, r *http.Request) {
 		},
 	}
 	writeJSON(w, http.StatusOK, resp)
+}
+
+// streamChat streams a chat completion as OpenAI-style SSE chunks. Response
+// headers (including the chosen provider) are written lazily on the first delta
+// so that, if every target fails before producing output, we can still return a
+// normal JSON error with the right status code.
+func (s *Server) streamChat(w http.ResponseWriter, r *http.Request, alias string, req provider.ChatRequest) {
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		writeError(w, http.StatusInternalServerError, "streaming not supported")
+		return
+	}
+
+	id := "nabu-" + fmt.Sprint(time.Now().UnixNano())
+	created := time.Now().Unix()
+	var metaProvider, metaModel string
+	headersWritten := false
+
+	writeSSE := func(v any) {
+		payload, _ := json.Marshal(v)
+		fmt.Fprintf(w, "data: %s\n\n", payload)
+		flusher.Flush()
+	}
+	startHeaders := func() {
+		w.Header().Set("Content-Type", "text/event-stream")
+		w.Header().Set("Cache-Control", "no-cache")
+		w.Header().Set("Connection", "keep-alive")
+		w.Header().Set("X-Accel-Buffering", "no")
+		w.Header().Set("X-Nabu-Provider", metaProvider)
+		w.Header().Set("X-Nabu-Model", metaModel)
+		w.WriteHeader(http.StatusOK)
+		headersWritten = true
+		writeSSE(streamChunk(id, created, alias, metaProvider, metaModel, map[string]any{"role": "assistant"}, nil))
+	}
+
+	result, err := s.router.ChatStream(r.Context(), alias, req,
+		func(p, m string) { metaProvider, metaModel = p, m },
+		func(delta string) error {
+			if !headersWritten {
+				startHeaders()
+			}
+			writeSSE(streamChunk(id, created, alias, metaProvider, metaModel, map[string]any{"content": delta}, nil))
+			return nil
+		},
+	)
+
+	if !headersWritten {
+		if err != nil {
+			writeError(w, aliasErrStatus(err, "unknown model alias"), err.Error())
+			return
+		}
+		startHeaders() // succeeded but produced no text; emit an empty stream
+	}
+
+	finish := "stop"
+	if err != nil {
+		finish = "error"
+	}
+	writeSSE(streamChunk(id, created, alias, result.Provider, result.Model, map[string]any{}, &finish))
+	fmt.Fprint(w, "data: [DONE]\n\n")
+	flusher.Flush()
+}
+
+// streamChunk builds one OpenAI-style chat.completion.chunk object.
+func streamChunk(id string, created int64, alias, prov, model string, delta map[string]any, finish *string) map[string]any {
+	return map[string]any{
+		"id":             id,
+		"object":         "chat.completion.chunk",
+		"created":        created,
+		"model":          alias,
+		"provider":       prov,
+		"upstream_model": model,
+		"choices": []map[string]any{{
+			"index":         0,
+			"delta":         delta,
+			"finish_reason": finish,
+		}},
+	}
 }
 
 // imageRequestBody is the OpenAI-compatible image request. "model" is an alias.
