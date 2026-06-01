@@ -6,10 +6,23 @@
 
 server:
   port: 8080
-  # Internal API keys that org projects must send as `Authorization: Bearer <key>`.
-  # Leave empty to disable auth in local development.
+  # Simple full-access keys (any alias, no rate limit). Leave both api_keys and
+  # keys empty to disable auth in local development.
   api_keys:
     - "nabu_dev_key_change_me"
+
+  # Rich per-project keys (Policy Engine): restrict which aliases a key may use
+  # and cap its request rate. `allow` supports globs ("nabu-*"); "*" or empty
+  # means all. `rate_limit` is requests per minute (0 = unlimited).
+  keys:
+    - key: "crm_prod_key_change_me"
+      project: "crm"
+      allow: ["nabu-fast", "nabu-embed"]
+      rate_limit: 120
+    - key: "support_key_change_me"
+      project: "support"
+      allow: ["nabu-*"]
+      rate_limit: 60
 
 # Upstream providers. The actual secrets live in environment variables
 # (api_key_env), never in this file — that is the Secret Manager boundary.

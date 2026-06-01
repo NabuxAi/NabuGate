@@ -8,6 +8,7 @@ import (
 
 	"gopkg.in/yaml.v3"
 
+	"nabugate/internal/policy"
 	"nabugate/internal/provider"
 )
 
@@ -22,10 +23,12 @@ type Config struct {
 }
 
 // ServerConfig holds gateway listen options and the internal API keys that
-// projects must present.
+// projects must present. APIKeys is the simple full-access form; Keys is the
+// rich per-project form with allow-lists and rate limits.
 type ServerConfig struct {
-	Port    int      `yaml:"port"`
-	APIKeys []string `yaml:"api_keys"`
+	Port    int                `yaml:"port"`
+	APIKeys []string           `yaml:"api_keys"`
+	Keys    []policy.KeyConfig `yaml:"keys"`
 }
 
 // ProviderConfig describes one upstream provider.

@@ -2,6 +2,7 @@
 package server
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"log/slog"
@@ -9,27 +10,24 @@ import (
 	"strings"
 	"time"
 
+	"nabugate/internal/policy"
 	"nabugate/internal/provider"
 	"nabugate/internal/router"
 )
 
-// Server wires the router and auth into an http.Handler.
+type policyCtxKey struct{}
+
+// Server wires the router, auth and policy into an http.Handler.
 type Server struct {
-	router  *router.Router
-	apiKeys map[string]bool
-	log     *slog.Logger
+	router *router.Router
+	policy *policy.Enforcer
+	log    *slog.Logger
 }
 
-// New builds a Server. If apiKeys is empty, authentication is disabled (dev
-// mode) and a warning is logged by the caller.
-func New(r *router.Router, apiKeys []string, log *slog.Logger) *Server {
-	keys := make(map[string]bool, len(apiKeys))
-	for _, k := range apiKeys {
-		if k != "" {
-			keys[k] = true
-		}
-	}
-	return &Server{router: r, apiKeys: keys, log: log}
+// New builds a Server. If the enforcer has no keys, authentication is disabled
+// (dev mode) and a warning is logged by the caller.
+func New(r *router.Router, enforcer *policy.Enforcer, log *slog.Logger) *Server {
+	return &Server{router: r, policy: enforcer, log: log}
 }
 
 // Handler returns the root http.Handler with routes and middleware applied.
@@ -48,15 +46,16 @@ func (s *Server) handleHealth(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 
-func (s *Server) handleModels(w http.ResponseWriter, _ *http.Request) {
-	raw, err := s.router.MarshalAliases()
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
-		return
+func (s *Server) handleModels(w http.ResponseWriter, r *http.Request) {
+	pol, hasPol := r.Context().Value(policyCtxKey{}).(policy.Policy)
+	data := make([]map[string]string, 0)
+	for _, a := range s.router.AliasInfos() {
+		if s.policy.Enabled() && hasPol && !pol.Allows(a.ID) {
+			continue // hide aliases this key may not use
+		}
+		data = append(data, map[string]string{"id": a.ID, "object": "model", "owned_by": a.Owner})
 	}
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	_, _ = w.Write(raw)
+	writeJSON(w, http.StatusOK, map[string]any{"object": "list", "data": data})
 }
 
 // chatRequestBody is the OpenAI-compatible request projects send. "model" is a
@@ -81,6 +80,9 @@ func (s *Server) handleChat(w http.ResponseWriter, r *http.Request) {
 	}
 	if len(body.Messages) == 0 {
 		writeError(w, http.StatusBadRequest, "field 'messages' must not be empty")
+		return
+	}
+	if !s.aliasAllowed(w, r, body.Model) {
 		return
 	}
 
@@ -233,6 +235,9 @@ func (s *Server) handleImages(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "fields 'model' (alias) and 'prompt' are required")
 		return
 	}
+	if !s.aliasAllowed(w, r, body.Model) {
+		return
+	}
 
 	result, err := s.router.Image(r.Context(), body.Model, provider.ImageRequest{
 		Prompt:      body.Prompt,
@@ -277,6 +282,9 @@ func (s *Server) handleSpeech(w http.ResponseWriter, r *http.Request) {
 	}
 	if body.Model == "" || body.Input == "" {
 		writeError(w, http.StatusBadRequest, "fields 'model' (alias) and 'input' are required")
+		return
+	}
+	if !s.aliasAllowed(w, r, body.Model) {
 		return
 	}
 
@@ -330,6 +338,9 @@ func (s *Server) handleEmbeddings(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "field 'input' must not be empty")
 		return
 	}
+	if !s.aliasAllowed(w, r, body.Model) {
+		return
+	}
 
 	result, err := s.router.Embed(r.Context(), body.Model, provider.EmbeddingRequest{Input: inputs})
 	if err != nil {
@@ -365,19 +376,42 @@ func aliasErrStatus(err error, unknownPrefix string) int {
 	return http.StatusBadGateway
 }
 
-// auth wraps a handler with bearer-token checking against the configured
-// internal API keys. When no keys are configured, requests pass through.
+// auth validates the bearer token, enforces the per-key rate limit, and stores
+// the resolved policy in the request context for later alias checks. When no
+// keys are configured, requests pass through (dev mode).
 func (s *Server) auth(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if len(s.apiKeys) > 0 {
-			token := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
-			if !s.apiKeys[strings.TrimSpace(token)] {
-				writeError(w, http.StatusUnauthorized, "invalid or missing API key")
-				return
-			}
+		if !s.policy.Enabled() {
+			next(w, r)
+			return
 		}
-		next(w, r)
+		token := strings.TrimSpace(strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer "))
+		pol, ok := s.policy.Lookup(token)
+		if !ok {
+			writeError(w, http.StatusUnauthorized, "invalid or missing API key")
+			return
+		}
+		if !s.policy.RateOK(token) {
+			w.Header().Set("Retry-After", "1")
+			writeError(w, http.StatusTooManyRequests, "rate limit exceeded")
+			return
+		}
+		next(w, r.WithContext(context.WithValue(r.Context(), policyCtxKey{}, pol)))
 	}
+}
+
+// aliasAllowed reports whether the request's key may use the given alias, and
+// writes a 403 if not. Returns true when policy is disabled.
+func (s *Server) aliasAllowed(w http.ResponseWriter, r *http.Request, alias string) bool {
+	if !s.policy.Enabled() {
+		return true
+	}
+	pol, ok := r.Context().Value(policyCtxKey{}).(policy.Policy)
+	if ok && pol.Allows(alias) {
+		return true
+	}
+	writeError(w, http.StatusForbidden, fmt.Sprintf("alias %q is not permitted for this key", alias))
+	return false
 }
 
 func writeJSON(w http.ResponseWriter, status int, v any) {

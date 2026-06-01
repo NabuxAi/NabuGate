@@ -25,6 +25,7 @@ project ──▶ POST /v1/chat/completions { "model": "nabu-fast", ... }
 | **Router**         | Pick the target for a task/alias (`internal/router`)       |
 | **Fallback Engine**| If the primary fails, try the next target (`internal/router`) |
 | **Observability**  | Structured JSON logs: latency, tokens, status              |
+| **Policy Engine**  | Per-key alias allow-list + request rate limit (`internal/policy`) |
 | **Secret Manager** | API keys live in env vars, never in code or project repos  |
 
 ## API
@@ -122,6 +123,27 @@ Aliases live under `models:` (chat), `images:`, `audio:` and `embeddings:` in
 the config. Edit `config.yaml` to add providers, aliases, or change routing — no
 code change needed.
 
+## Policy Engine (per-project keys)
+
+Keys come in two forms. Simple `api_keys` get full access; rich `keys` carry a
+per-project policy:
+
+```yaml
+server:
+  api_keys: ["admin_key"]            # full access, no rate limit
+  keys:
+    - key: "crm_prod_key"
+      project: "crm"
+      allow: ["nabu-fast", "nabu-embed"]  # globs ok ("nabu-*"); "*"/empty = all
+      rate_limit: 120                      # requests/minute (0 = unlimited)
+```
+
+- A request for an alias outside `allow` returns **403**.
+- Exceeding `rate_limit` returns **429** (token bucket, per key).
+- `GET /v1/models` is filtered to the aliases each key may use.
+
+If both `api_keys` and `keys` are empty, auth is disabled (dev mode).
+
 ## Run locally
 
 ```bash
@@ -177,5 +199,4 @@ adapters.
 
 ## Roadmap (post-MVP)
 
-- Per-project policy engine (which aliases each key may use)
-- Cost tracking and rate limiting
+- Cost tracking (per-project token spend)

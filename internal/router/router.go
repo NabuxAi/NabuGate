@@ -5,7 +5,6 @@ package router
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"log/slog"
 	"time"
@@ -293,26 +292,23 @@ func (r *Router) Embed(ctx context.Context, alias string, req provider.Embedding
 	return EmbedResult{}, fmt.Errorf("all targets failed for embedding alias %q: %w", alias, lastErr)
 }
 
-// MarshalAliases returns a JSON-friendly model list (OpenAI /v1/models shape).
-func (r *Router) MarshalAliases() ([]byte, error) {
-	type model struct {
-		ID      string `json:"id"`
-		Object  string `json:"object"`
-		OwnedBy string `json:"owned_by"`
-	}
-	type list struct {
-		Object string  `json:"object"`
-		Data   []model `json:"data"`
-	}
-	out := list{Object: "list"}
+// AliasInfo describes one public alias and the provider that primarily serves it.
+type AliasInfo struct {
+	ID    string
+	Owner string
+}
+
+// AliasInfos returns every configured alias across all capabilities.
+func (r *Router) AliasInfos() []AliasInfo {
+	var out []AliasInfo
 	add := func(registry map[string]config.ModelRoute) {
 		for alias, route := range registry {
-			out.Data = append(out.Data, model{ID: alias, Object: "model", OwnedBy: route.Primary.Provider})
+			out = append(out, AliasInfo{ID: alias, Owner: route.Primary.Provider})
 		}
 	}
 	add(r.models)
 	add(r.images)
 	add(r.audio)
 	add(r.embeddings)
-	return json.Marshal(out)
+	return out
 }
