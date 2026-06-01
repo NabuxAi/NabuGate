@@ -14,6 +14,7 @@ import (
 	"nabugate/internal/policy"
 	"nabugate/internal/router"
 	"nabugate/internal/server"
+	"nabugate/internal/usage"
 )
 
 func main() {
@@ -39,7 +40,8 @@ func main() {
 
 	r := router.New(adapters, cfg.Models, cfg.Images, cfg.Audio, cfg.Embeddings, log)
 	enforcer := policy.New(cfg.Server.APIKeys, cfg.Server.Keys)
-	srv := server.New(r, enforcer, log)
+	tracker := usage.New(cfg.Pricing)
+	srv := server.New(r, enforcer, tracker, log)
 
 	if !enforcer.Enabled() {
 		log.Warn("no api keys configured: authentication is DISABLED (dev mode)")

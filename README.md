@@ -24,7 +24,8 @@ project ──▶ POST /v1/chat/completions { "model": "nabu-fast", ... }
 | **Model Registry** | Alias → provider/model table (`models:` in `config.yaml`)  |
 | **Router**         | Pick the target for a task/alias (`internal/router`)       |
 | **Fallback Engine**| If the primary fails, try the next target (`internal/router`) |
-| **Observability**  | Structured JSON logs: latency, tokens, status              |
+| **Observability**  | Structured JSON logs: latency, tokens, cost, status        |
+| **Cost Tracking**  | Per-project / per-model token + USD totals (`internal/usage`) |
 | **Policy Engine**  | Per-key alias allow-list + request rate limit (`internal/policy`) |
 | **Secret Manager** | API keys live in env vars, never in code or project repos  |
 
@@ -67,6 +68,7 @@ Other endpoints:
 | `POST /v1/audio/speech`      | Text-to-speech; returns raw audio bytes (wav/mp3)   |
 | `POST /v1/embeddings`        | Text embeddings; `input` may be a string or array   |
 | `GET  /v1/models`            | List available aliases (chat/image/audio/embeddings)|
+| `GET  /v1/usage`             | Accumulated token usage and cost (per project/model)|
 | `GET  /healthz`              | Liveness probe                                      |
 
 Image example:
@@ -144,6 +146,29 @@ server:
 
 If both `api_keys` and `keys` are empty, auth is disabled (dev mode).
 
+## Cost tracking
+
+Add a price table (USD per 1M tokens, keyed by `provider/model`); the gateway
+attributes each call's tokens and cost to the calling project and the upstream
+model, and logs a `billed` line per request.
+
+```yaml
+pricing:
+  "openai/gpt-4o": { input: 2.5, output: 10 }
+  "gemini/gemini-1.5-pro": { input: 1.25, output: 5 }
+```
+
+Inspect totals at `GET /v1/usage` — admin (full-access) keys see every project
+and model; project-scoped keys see only their own totals:
+
+```json
+{ "by_project": { "crm": { "requests": 2, "prompt_tokens": 2000,
+                           "completion_tokens": 1000, "cost_usd": 0.015 } },
+  "by_model":   { "openai/gpt-4o": { "requests": 2, "cost_usd": 0.015, ... } } }
+```
+
+Unpriced models are still tracked for token usage (cost 0).
+
 ## Run locally
 
 ```bash
@@ -197,6 +222,8 @@ models:
 OpenRouter, and OpenAI-compatible gateways). Anthropic and Gemini have dedicated
 adapters.
 
-## Roadmap (post-MVP)
+## Roadmap (future)
 
-- Cost tracking (per-project token spend)
+- Streaming for media/embeddings (chat streaming is implemented)
+- Persisted usage metrics (current totals are in-memory, reset on restart)
+- Prometheus `/metrics` export

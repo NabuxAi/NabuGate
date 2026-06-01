@@ -13,21 +13,23 @@ import (
 	"nabugate/internal/policy"
 	"nabugate/internal/provider"
 	"nabugate/internal/router"
+	"nabugate/internal/usage"
 )
 
 type policyCtxKey struct{}
 
-// Server wires the router, auth and policy into an http.Handler.
+// Server wires the router, auth, policy and usage tracking into an http.Handler.
 type Server struct {
 	router *router.Router
 	policy *policy.Enforcer
+	usage  *usage.Tracker
 	log    *slog.Logger
 }
 
 // New builds a Server. If the enforcer has no keys, authentication is disabled
 // (dev mode) and a warning is logged by the caller.
-func New(r *router.Router, enforcer *policy.Enforcer, log *slog.Logger) *Server {
-	return &Server{router: r, policy: enforcer, log: log}
+func New(r *router.Router, enforcer *policy.Enforcer, tracker *usage.Tracker, log *slog.Logger) *Server {
+	return &Server{router: r, policy: enforcer, usage: tracker, log: log}
 }
 
 // Handler returns the root http.Handler with routes and middleware applied.
@@ -39,7 +41,38 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /v1/images/generations", s.auth(s.handleImages))
 	mux.HandleFunc("POST /v1/audio/speech", s.auth(s.handleSpeech))
 	mux.HandleFunc("POST /v1/embeddings", s.auth(s.handleEmbeddings))
+	mux.HandleFunc("GET /v1/usage", s.auth(s.handleUsage))
 	return mux
+}
+
+// project returns the calling key's project (or a placeholder in dev mode).
+func (s *Server) project(r *http.Request) string {
+	if pol, ok := r.Context().Value(policyCtxKey{}).(policy.Policy); ok && pol.Project != "" {
+		return pol.Project
+	}
+	return "(unscoped)"
+}
+
+// record attributes a call's usage to the project/model and logs the cost.
+func (s *Server) record(r *http.Request, prov, model string, u provider.Usage) {
+	project := s.project(r)
+	cost := s.usage.Record(project, prov, model, u)
+	s.log.Info("billed", "project", project, "provider", prov, "model", model,
+		"total_tokens", u.TotalTokens, "cost_usd", cost)
+}
+
+// handleUsage reports accumulated usage. Full-access (admin) keys see all
+// projects and models; project-scoped keys see only their own totals.
+func (s *Server) handleUsage(w http.ResponseWriter, r *http.Request) {
+	pol, hasPol := r.Context().Value(policyCtxKey{}).(policy.Policy)
+	admin := !s.policy.Enabled() || (hasPol && pol.Allows("*"))
+	if admin {
+		byProject, byModel := s.usage.Snapshot()
+		writeJSON(w, http.StatusOK, map[string]any{"by_project": byProject, "by_model": byModel})
+		return
+	}
+	project := s.project(r)
+	writeJSON(w, http.StatusOK, map[string]any{"project": project, "stats": s.usage.ProjectSnapshot(project)})
 }
 
 func (s *Server) handleHealth(w http.ResponseWriter, _ *http.Request) {
@@ -110,6 +143,8 @@ func (s *Server) handleChat(w http.ResponseWriter, r *http.Request) {
 		writeError(w, status, err.Error())
 		return
 	}
+
+	s.record(r, result.Provider, result.Model, result.Response.Usage)
 
 	w.Header().Set("X-Nabu-Provider", result.Provider)
 	w.Header().Set("X-Nabu-Model", result.Model)
@@ -189,6 +224,8 @@ func (s *Server) streamChat(w http.ResponseWriter, r *http.Request, alias string
 		}
 		startHeaders() // succeeded but produced no text; emit an empty stream
 	}
+
+	s.record(r, result.Provider, result.Model, result.Usage)
 
 	finish := "stop"
 	if err != nil {
@@ -347,6 +384,8 @@ func (s *Server) handleEmbeddings(w http.ResponseWriter, r *http.Request) {
 		writeError(w, aliasErrStatus(err, "unknown embedding alias"), err.Error())
 		return
 	}
+
+	s.record(r, result.Provider, result.Model, result.Usage)
 
 	w.Header().Set("X-Nabu-Provider", result.Provider)
 	w.Header().Set("X-Nabu-Model", result.Model)

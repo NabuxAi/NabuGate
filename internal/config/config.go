@@ -10,6 +10,7 @@ import (
 
 	"nabugate/internal/policy"
 	"nabugate/internal/provider"
+	"nabugate/internal/usage"
 )
 
 // Config is the top-level configuration file structure.
@@ -20,6 +21,7 @@ type Config struct {
 	Images     map[string]ModelRoute     `yaml:"images"`     // image-generation aliases
 	Audio      map[string]ModelRoute     `yaml:"audio"`      // text-to-speech aliases
 	Embeddings map[string]ModelRoute     `yaml:"embeddings"` // text-embedding aliases
+	Pricing    map[string]usage.Price    `yaml:"pricing"`    // USD per 1M tokens, keyed by "provider/model"
 }
 
 // ServerConfig holds gateway listen options and the internal API keys that

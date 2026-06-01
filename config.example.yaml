@@ -129,3 +129,15 @@ embeddings:
     fallback:
       - provider: gemini
         model: "text-embedding-004"
+
+# Cost tracking: USD per 1,000,000 tokens, keyed by "provider/model".
+# Unpriced models are tracked for token usage but contribute 0 cost.
+# Inspect totals at GET /v1/usage.
+pricing:
+  "openai/gpt-4o": { input: 2.5, output: 10 }
+  "openai/gpt-4o-mini": { input: 0.15, output: 0.6 }
+  "openai/text-embedding-3-small": { input: 0.02, output: 0 }
+  "anthropic/claude-3-5-sonnet-latest": { input: 3, output: 15 }
+  "anthropic/claude-3-5-haiku-latest": { input: 0.8, output: 4 }
+  "gemini/gemini-1.5-pro": { input: 1.25, output: 5 }
+  "groq/llama-3.1-70b-versatile": { input: 0.59, output: 0.79 }
