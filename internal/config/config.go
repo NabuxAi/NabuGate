@@ -54,14 +54,25 @@ type ModelRoute struct {
 	Fallback []Target `yaml:"fallback"`
 }
 
-// Load reads and parses the config file at path.
+// Load reads and parses the config file at path. Any ${VAR} references in the
+// file are expanded from the environment first, so secrets (gateway API keys,
+// etc.) can be injected at runtime instead of baked into the file.
 func Load(path string) (*Config, error) {
+	// A bind mount whose host source is missing makes Docker auto-create the
+	// target as an empty *directory*; os.ReadFile then fails with the cryptic
+	// "is a directory". Detect that case and explain it.
+	if info, err := os.Stat(path); err == nil && info.IsDir() {
+		return nil, fmt.Errorf("config path %q is a directory, not a file "+
+			"(a Docker bind mount with a missing host file creates an empty "+
+			"directory — mount a real config file or remove the mount)", path)
+	}
 	raw, err := os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("read config: %w", err)
 	}
+	expanded := os.ExpandEnv(string(raw))
 	var cfg Config
-	if err := yaml.Unmarshal(raw, &cfg); err != nil {
+	if err := yaml.Unmarshal([]byte(expanded), &cfg); err != nil {
 		return nil, fmt.Errorf("parse config: %w", err)
 	}
 	if cfg.Server.Port == 0 {
