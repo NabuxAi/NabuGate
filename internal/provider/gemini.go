@@ -48,7 +48,34 @@ type geminiRequest struct {
 
 type geminiGenCfg struct {
 	Temperature     *float64 `json:"temperature,omitempty"`
+	TopP            *float64 `json:"topP,omitempty"`
 	MaxOutputTokens *int     `json:"maxOutputTokens,omitempty"`
+	StopSequences   []string `json:"stopSequences,omitempty"`
+}
+
+// geminiGenConfig builds a generationConfig from the request, or nil if no
+// generation parameters were set.
+func geminiGenConfig(req ChatRequest) *geminiGenCfg {
+	stops := stopToSlice(req.Stop)
+	if req.Temperature == nil && req.TopP == nil && req.MaxTokens == nil && len(stops) == 0 {
+		return nil
+	}
+	return &geminiGenCfg{
+		Temperature:     req.Temperature,
+		TopP:            req.TopP,
+		MaxOutputTokens: req.MaxTokens,
+		StopSequences:   stops,
+	}
+}
+
+// mapGeminiFinish normalizes Gemini's finishReason to the OpenAI vocabulary.
+func mapGeminiFinish(r string) string {
+	switch r {
+	case "MAX_TOKENS":
+		return "length"
+	default:
+		return "stop"
+	}
 }
 
 type geminiResponse struct {
@@ -56,6 +83,7 @@ type geminiResponse struct {
 		Content struct {
 			Parts []geminiPart `json:"parts"`
 		} `json:"content"`
+		FinishReason string `json:"finishReason"`
 	} `json:"candidates"`
 	UsageMetadata struct {
 		PromptTokenCount     int `json:"promptTokenCount"`
@@ -85,10 +113,7 @@ func (a *GeminiAdapter) Chat(ctx context.Context, req ChatRequest) (ChatResponse
 		}
 	}
 
-	var genCfg *geminiGenCfg
-	if req.Temperature != nil || req.MaxTokens != nil {
-		genCfg = &geminiGenCfg{Temperature: req.Temperature, MaxOutputTokens: req.MaxTokens}
-	}
+	genCfg := geminiGenConfig(req)
 
 	body, err := json.Marshal(geminiRequest{
 		Contents:          contents,
@@ -134,7 +159,8 @@ func (a *GeminiAdapter) Chat(ctx context.Context, req ChatRequest) (ChatResponse
 	}
 
 	return ChatResponse{
-		Content: text.String(),
+		Content:      text.String(),
+		FinishReason: mapGeminiFinish(parsed.Candidates[0].FinishReason),
 		Usage: Usage{
 			PromptTokens:     parsed.UsageMetadata.PromptTokenCount,
 			CompletionTokens: parsed.UsageMetadata.CandidatesTokenCount,
@@ -162,10 +188,7 @@ func (a *GeminiAdapter) ChatStream(ctx context.Context, req ChatRequest, onDelta
 		}
 	}
 
-	var genCfg *geminiGenCfg
-	if req.Temperature != nil || req.MaxTokens != nil {
-		genCfg = &geminiGenCfg{Temperature: req.Temperature, MaxOutputTokens: req.MaxTokens}
-	}
+	genCfg := geminiGenConfig(req)
 	body, err := json.Marshal(geminiRequest{Contents: contents, SystemInstruction: system, GenerationConfig: genCfg})
 	if err != nil {
 		return Usage{}, err
