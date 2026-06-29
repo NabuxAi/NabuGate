@@ -33,11 +33,13 @@ func NewAnthropicAdapter(name, baseURL, apiKey string) *AnthropicAdapter {
 func (a *AnthropicAdapter) Name() string { return a.name }
 
 type anthropicRequest struct {
-	Model       string             `json:"model"`
-	MaxTokens   int                `json:"max_tokens"`
-	System      string             `json:"system,omitempty"`
-	Messages    []anthropicMessage `json:"messages"`
-	Temperature *float64           `json:"temperature,omitempty"`
+	Model         string             `json:"model"`
+	MaxTokens     int                `json:"max_tokens"`
+	System        string             `json:"system,omitempty"`
+	Messages      []anthropicMessage `json:"messages"`
+	Temperature   *float64           `json:"temperature,omitempty"`
+	TopP          *float64           `json:"top_p,omitempty"`
+	StopSequences []string           `json:"stop_sequences,omitempty"`
 }
 
 type anthropicMessage struct {
@@ -49,13 +51,26 @@ type anthropicResponse struct {
 	Content []struct {
 		Text string `json:"text"`
 	} `json:"content"`
-	Usage struct {
+	StopReason string `json:"stop_reason"`
+	Usage      struct {
 		InputTokens  int `json:"input_tokens"`
 		OutputTokens int `json:"output_tokens"`
 	} `json:"usage"`
 	Error *struct {
 		Message string `json:"message"`
 	} `json:"error"`
+}
+
+// mapAnthropicFinish normalizes Anthropic's stop_reason to the OpenAI vocabulary.
+func mapAnthropicFinish(r string) string {
+	switch r {
+	case "max_tokens":
+		return "length"
+	case "tool_use":
+		return "tool_calls"
+	default:
+		return "stop"
+	}
 }
 
 func (a *AnthropicAdapter) Chat(ctx context.Context, req ChatRequest) (ChatResponse, error) {
@@ -79,11 +94,13 @@ func (a *AnthropicAdapter) Chat(ctx context.Context, req ChatRequest) (ChatRespo
 	}
 
 	body, err := json.Marshal(anthropicRequest{
-		Model:       req.Model,
-		MaxTokens:   maxTokens,
-		System:      system.String(),
-		Messages:    msgs,
-		Temperature: req.Temperature,
+		Model:         req.Model,
+		MaxTokens:     maxTokens,
+		System:        system.String(),
+		Messages:      msgs,
+		Temperature:   req.Temperature,
+		TopP:          req.TopP,
+		StopSequences: stopToSlice(req.Stop),
 	})
 	if err != nil {
 		return ChatResponse{}, err
@@ -125,7 +142,8 @@ func (a *AnthropicAdapter) Chat(ctx context.Context, req ChatRequest) (ChatRespo
 	}
 
 	return ChatResponse{
-		Content: text.String(),
+		Content:      text.String(),
+		FinishReason: mapAnthropicFinish(parsed.StopReason),
 		Usage: Usage{
 			PromptTokens:     parsed.Usage.InputTokens,
 			CompletionTokens: parsed.Usage.OutputTokens,
@@ -162,6 +180,12 @@ func (a *AnthropicAdapter) ChatStream(ctx context.Context, req ChatRequest, onDe
 	}
 	if req.Temperature != nil {
 		payload["temperature"] = *req.Temperature
+	}
+	if req.TopP != nil {
+		payload["top_p"] = *req.TopP
+	}
+	if stops := stopToSlice(req.Stop); len(stops) > 0 {
+		payload["stop_sequences"] = stops
 	}
 	body, err := json.Marshal(payload)
 	if err != nil {

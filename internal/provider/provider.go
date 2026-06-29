@@ -3,7 +3,11 @@
 package provider
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
+	"fmt"
+	"io"
 	"net/http"
 	"time"
 )
@@ -20,7 +24,16 @@ type ChatRequest struct {
 	Model       string
 	Messages    []Message
 	Temperature *float64
+	TopP        *float64
 	MaxTokens   *int
+	Stop        json.RawMessage // OpenAI "stop": string or []string
+
+	// Raw is the original OpenAI-style request body, field by field. OpenAI-wire
+	// adapters forward it verbatim (overriding only model/stream) so any
+	// parameter — tools, tool_choice, response_format, seed, penalties, … —
+	// passes through untouched. Non-OpenAI adapters (Anthropic, Gemini) translate
+	// the typed fields above instead.
+	Raw map[string]json.RawMessage
 }
 
 // Usage captures token accounting returned by the upstream provider.
@@ -32,8 +45,10 @@ type Usage struct {
 
 // ChatResponse is the normalized response returned by every adapter.
 type ChatResponse struct {
-	Content string
-	Usage   Usage
+	Content      string
+	ToolCalls    json.RawMessage // raw OpenAI tool_calls array, if the model called tools
+	FinishReason string          // normalized: "stop" | "length" | "tool_calls"
+	Usage        Usage
 }
 
 // Adapter converts the unified request into a provider's native API call and
@@ -114,3 +129,65 @@ type EmbeddingAdapter interface {
 // sharedHTTPClient is reused by all adapters; upstream calls are bounded by the
 // request context, so the client timeout is a generous safety net.
 var sharedHTTPClient = &http.Client{Timeout: 120 * time.Second}
+
+// isTransient reports whether an upstream HTTP status is worth retrying.
+func isTransient(status int) bool {
+	return status == http.StatusTooManyRequests || status >= 500
+}
+
+// postJSON sends a JSON POST and retries transient failures (network errors,
+// 429, 5xx) with exponential backoff, bounded by ctx. It returns the final
+// status code and response body. The body is fixed across attempts, so it is
+// safe to replay.
+func postJSON(ctx context.Context, url string, headers map[string]string, body []byte, name string) (int, []byte, error) {
+	const maxAttempts = 3
+	backoff := 200 * time.Millisecond
+	var lastErr error
+	for attempt := 0; attempt < maxAttempts; attempt++ {
+		if attempt > 0 {
+			select {
+			case <-ctx.Done():
+				return 0, nil, ctx.Err()
+			case <-time.After(backoff):
+			}
+			backoff *= 2
+		}
+		req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))
+		if err != nil {
+			return 0, nil, err
+		}
+		for k, v := range headers {
+			req.Header.Set(k, v)
+		}
+		resp, err := sharedHTTPClient.Do(req)
+		if err != nil {
+			lastErr = err
+			continue
+		}
+		raw, _ := io.ReadAll(resp.Body)
+		resp.Body.Close()
+		if isTransient(resp.StatusCode) {
+			lastErr = fmt.Errorf("%s: transient upstream status %d", name, resp.StatusCode)
+			continue
+		}
+		return resp.StatusCode, raw, nil
+	}
+	return 0, nil, lastErr
+}
+
+// stopToSlice normalizes an OpenAI "stop" value (string or []string) to a slice,
+// used by the non-OpenAI adapters.
+func stopToSlice(raw json.RawMessage) []string {
+	if len(raw) == 0 {
+		return nil
+	}
+	var arr []string
+	if json.Unmarshal(raw, &arr) == nil {
+		return arr
+	}
+	var s string
+	if json.Unmarshal(raw, &s) == nil && s != "" {
+		return []string{s}
+	}
+	return nil
+}

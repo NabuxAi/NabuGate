@@ -93,49 +93,70 @@ func (s *Server) handleModels(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"object": "list", "data": data})
 }
 
-// chatRequestBody is the OpenAI-compatible request projects send. "model" is a
-// NabuGate alias (e.g. "nabu-fast"), not a real upstream model.
-type chatRequestBody struct {
-	Model       string             `json:"model"`
-	Messages    []provider.Message `json:"messages"`
-	Temperature *float64           `json:"temperature"`
-	MaxTokens   *int               `json:"max_tokens"`
-	Stream      bool               `json:"stream"`
-}
-
+// handleChat accepts the full OpenAI-compatible chat body. Only "model" (a
+// NabuGate alias) and "messages" are inspected here; the entire body is carried
+// through to the upstream provider so any OpenAI parameter — tools, tool_choice,
+// response_format, top_p, stop, seed, penalties — passes through untouched.
 func (s *Server) handleChat(w http.ResponseWriter, r *http.Request) {
-	var body chatRequestBody
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+	var raw map[string]json.RawMessage
+	if err := json.NewDecoder(r.Body).Decode(&raw); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid JSON body")
 		return
 	}
-	if body.Model == "" {
+
+	var alias string
+	if len(raw["model"]) > 0 {
+		_ = json.Unmarshal(raw["model"], &alias)
+	}
+	if alias == "" {
 		writeError(w, http.StatusBadRequest, "field 'model' (alias) is required")
 		return
 	}
-	if len(body.Messages) == 0 {
+
+	var msgsRaw []json.RawMessage
+	if len(raw["messages"]) == 0 || json.Unmarshal(raw["messages"], &msgsRaw) != nil || len(msgsRaw) == 0 {
 		writeError(w, http.StatusBadRequest, "field 'messages' must not be empty")
 		return
 	}
-	if !s.aliasAllowed(w, r, body.Model) {
+	if !s.aliasAllowed(w, r, alias) {
 		return
+	}
+
+	// Typed fields are used by the non-OpenAI adapters (Anthropic, Gemini); the
+	// OpenAI-wire adapter forwards the raw body directly.
+	var temperature, topP *float64
+	var maxTokens *int
+	var stream bool
+	var msgs []provider.Message
+	_ = json.Unmarshal(raw["messages"], &msgs)
+	if len(raw["temperature"]) > 0 {
+		_ = json.Unmarshal(raw["temperature"], &temperature)
+	}
+	if len(raw["top_p"]) > 0 {
+		_ = json.Unmarshal(raw["top_p"], &topP)
+	}
+	if len(raw["max_tokens"]) > 0 {
+		_ = json.Unmarshal(raw["max_tokens"], &maxTokens)
+	}
+	if len(raw["stream"]) > 0 {
+		_ = json.Unmarshal(raw["stream"], &stream)
 	}
 
 	chatReq := provider.ChatRequest{
-		Messages:    body.Messages,
-		Temperature: body.Temperature,
-		MaxTokens:   body.MaxTokens,
+		Messages:    msgs,
+		Temperature: temperature,
+		TopP:        topP,
+		MaxTokens:   maxTokens,
+		Stop:        raw["stop"],
+		Raw:         raw,
 	}
-	if body.Stream {
-		s.streamChat(w, r, body.Model, chatReq)
+
+	if stream {
+		s.streamChat(w, r, alias, chatReq)
 		return
 	}
 
-	result, err := s.router.Chat(r.Context(), body.Model, provider.ChatRequest{
-		Messages:    body.Messages,
-		Temperature: body.Temperature,
-		MaxTokens:   body.MaxTokens,
-	})
+	result, err := s.router.Chat(r.Context(), alias, chatReq)
 	if err != nil {
 		// Unknown alias is a client error; everything else is upstream/bad gateway.
 		status := http.StatusBadGateway
@@ -151,6 +172,15 @@ func (s *Server) handleChat(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("X-Nabu-Provider", result.Provider)
 	w.Header().Set("X-Nabu-Model", result.Model)
 
+	message := map[string]any{"role": "assistant", "content": result.Response.Content}
+	if len(result.Response.ToolCalls) > 0 {
+		message["tool_calls"] = result.Response.ToolCalls
+	}
+	finish := result.Response.FinishReason
+	if finish == "" {
+		finish = "stop"
+	}
+
 	resp := map[string]any{
 		"id":             "nabu-" + fmt.Sprint(time.Now().UnixNano()),
 		"object":         "chat.completion",
@@ -160,11 +190,8 @@ func (s *Server) handleChat(w http.ResponseWriter, r *http.Request) {
 		"upstream_model": result.Model,
 		"choices": []map[string]any{{
 			"index":         0,
-			"finish_reason": "stop",
-			"message": map[string]string{
-				"role":    "assistant",
-				"content": result.Response.Content,
-			},
+			"finish_reason": finish,
+			"message":       message,
 		}},
 		"usage": map[string]int{
 			"prompt_tokens":     result.Response.Usage.PromptTokens,

@@ -109,6 +109,19 @@ curl -N -X POST http://localhost:8080/v1/chat/completions \
 Fallback applies only until the first byte streams; once output has started the
 gateway is committed to that provider.
 
+### Parameter passthrough & tools
+
+For OpenAI-wire providers (OpenAI, Groq, OpenRouter) the whole request body is
+forwarded upstream verbatim — the gateway overrides only `model` (alias →
+upstream) and the streaming flags. So every OpenAI parameter passes through
+untouched: `tools` / `tool_choice` (function calling), `response_format` (JSON
+mode), `top_p`, `stop`, `seed`, `presence_penalty`, `frequency_penalty`, `n`,
+`user`, … and `tool_calls` come back in the response. Anthropic and Gemini map
+the common typed params (`temperature`, `top_p`, `max_tokens`, `stop`); native
+tool translation for those two is a follow-up. Transient upstream failures
+(network, 429, 5xx) are retried with backoff before the router moves to the next
+fallback target.
+
 ## Aliases (default config)
 
 | Alias         | Primary → fallbacks                                        |
