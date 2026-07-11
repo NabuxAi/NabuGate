@@ -45,6 +45,14 @@ providers:
     base_url: "https://openrouter.ai/api/v1"
     api_key_env: "OPENROUTER_API_KEY"
 
+  # Dahl inference — OpenAI-wire-compatible endpoint hosting open models
+  # (MiniMax, Kimi, …). This is the org's default upstream for general chat.
+  dahl:
+    enabled: true
+    type: openai # inference.dahl.global speaks the OpenAI /v1 wire format
+    base_url: "https://inference.dahl.global/v1"
+    api_key_env: "DAHL_API_KEY"
+
   anthropic:
     enabled: true
     type: anthropic
@@ -60,23 +68,27 @@ providers:
 # Model registry: public alias -> primary target + ordered fallbacks.
 # Projects request the alias; NabuGate picks the provider/model.
 models:
-  # Cheap & very fast — Groq first, then small hosted models.
+  # Cheap & very fast — Dahl MiniMax first, then Groq and small hosted models.
   nabu-fast:
     primary:
-      provider: groq
-      model: "llama-3.1-70b-versatile"
+      provider: dahl
+      model: "MiniMaxAI/MiniMax-M2.7"
     fallback:
+      - provider: groq
+        model: "llama-3.1-70b-versatile"
       - provider: openai
         model: "gpt-4o-mini"
       - provider: anthropic
         model: "claude-3-5-haiku-latest"
 
-  # Best general reasoning.
+  # Best general reasoning — Dahl Kimi first, then the hosted flagships.
   nabu-smart:
     primary:
-      provider: openai
-      model: "gpt-4o"
+      provider: dahl
+      model: "moonshotai/Kimi-K2.6"
     fallback:
+      - provider: openai
+        model: "gpt-4o"
       - provider: anthropic
         model: "claude-3-5-sonnet-latest"
       - provider: gemini
@@ -90,6 +102,8 @@ models:
     fallback:
       - provider: groq
         model: "llama-3.1-8b-instant"
+      - provider: dahl
+        model: "MiniMaxAI/MiniMax-M2.7"
 
   # Long-context / multimodal-capable text.
   nabu-vision:
@@ -99,6 +113,23 @@ models:
     fallback:
       - provider: gemini
         model: "gemini-1.5-pro"
+
+  # Explicit Dahl model aliases (pin a specific upstream model on demand).
+  nabu-minimax:
+    primary:
+      provider: dahl
+      model: "MiniMaxAI/MiniMax-M2.7"
+    fallback:
+      - provider: groq
+        model: "llama-3.1-70b-versatile"
+
+  nabu-kimi:
+    primary:
+      provider: dahl
+      model: "moonshotai/Kimi-K2.6"
+    fallback:
+      - provider: openai
+        model: "gpt-4o"
 
 # Image-generation aliases (POST /v1/images/generations).
 images:
@@ -141,3 +172,7 @@ pricing:
   "anthropic/claude-3-5-haiku-latest": { input: 0.8, output: 4 }
   "gemini/gemini-1.5-pro": { input: 1.25, output: 5 }
   "groq/llama-3.1-70b-versatile": { input: 0.59, output: 0.79 }
+  # Dahl pricing is not published yet; leave unpriced (tracked at 0 cost) or set
+  # your negotiated rate here once known.
+  # "dahl/MiniMaxAI/MiniMax-M2.7": { input: 0, output: 0 }
+  # "dahl/moonshotai/Kimi-K2.6": { input: 0, output: 0 }

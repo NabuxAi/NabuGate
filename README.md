@@ -12,8 +12,12 @@ project ──▶ POST /v1/chat/completions { "model": "nabu-fast", ... }
                   │ NabuGate │  auth → router → provider adapter → fallback
                   └────┬─────┘
         ┌──────────────┼───────────────┬───────────────┐
-     OpenAI          Groq         Anthropic          Gemini   (OpenRouter…)
+     Dahl           OpenAI          Groq / Anthropic / Gemini   (OpenRouter…)
 ```
+
+The org's default upstream is **Dahl** (`inference.dahl.global`, OpenAI-wire),
+serving open models such as MiniMax and Kimi; the hosted vendors act as
+fallbacks.
 
 ## Components
 
@@ -124,15 +128,17 @@ fallback target.
 
 ## Aliases (default config)
 
-| Alias         | Primary → fallbacks                                        |
-| ------------- | --------------------------------------------------------- |
-| `nabu-fast`   | Groq → OpenAI mini → Claude Haiku                          |
-| `nabu-smart`  | OpenAI 4o → Claude Sonnet → Gemini 1.5 Pro                 |
-| `nabu-cheap`  | OpenRouter Llama 8B → Groq Llama 8B                        |
-| `nabu-vision` | OpenAI 4o → Gemini 1.5 Pro                                 |
-| `nabu-image`  | OpenAI gpt-image-1 → Gemini 2.5 Flash Image (image gen)    |
-| `nabu-voice`  | OpenAI gpt-4o-mini-tts → Gemini 2.5 Flash TTS (speech)     |
-| `nabu-embed`  | OpenAI text-embedding-3-small → Gemini text-embedding-004  |
+| Alias          | Primary → fallbacks                                          |
+| -------------- | ----------------------------------------------------------- |
+| `nabu-fast`    | Dahl MiniMax → Groq → OpenAI mini → Claude Haiku            |
+| `nabu-smart`   | Dahl Kimi → OpenAI 4o → Claude Sonnet → Gemini 1.5 Pro      |
+| `nabu-cheap`   | OpenRouter Llama 8B → Groq Llama 8B → Dahl MiniMax          |
+| `nabu-vision`  | OpenAI 4o → Gemini 1.5 Pro                                   |
+| `nabu-minimax` | Dahl MiniMax-M2.7 → Groq (pin MiniMax explicitly)           |
+| `nabu-kimi`    | Dahl Kimi-K2.6 → OpenAI 4o (pin Kimi explicitly)            |
+| `nabu-image`   | OpenAI gpt-image-1 → Gemini 2.5 Flash Image (image gen)     |
+| `nabu-voice`   | OpenAI gpt-4o-mini-tts → Gemini 2.5 Flash TTS (speech)      |
+| `nabu-embed`   | OpenAI text-embedding-3-small → Gemini text-embedding-004   |
 
 Aliases live under `models:` (chat), `images:`, `audio:` and `embeddings:` in
 the config. Edit `config.yaml` to add providers, aliases, or change routing — no
@@ -205,7 +211,7 @@ if it is missing.
 cp config.example.yaml config.yaml   # then set real api_keys
 docker build -t nabugate .
 docker run -p 8080:8080 \
-  -e OPENAI_API_KEY=sk-... -e GROQ_API_KEY=gsk-... \
+  -e DAHL_API_KEY=dahl-... -e OPENAI_API_KEY=sk-... -e GROQ_API_KEY=gsk-... \
   -v $(pwd)/config.yaml:/app/config.yaml:ro \
   nabugate
 ```
