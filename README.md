@@ -136,9 +136,18 @@ fallback target.
 | `nabu-vision`  | OpenAI 4o → Gemini 1.5 Pro                                   |
 | `nabu-minimax` | Dahl MiniMax-M2.7 → Groq (pin MiniMax explicitly)           |
 | `nabu-kimi`    | Dahl Kimi-K2.6 → OpenAI 4o (pin Kimi explicitly)            |
+| `nabu-local`   | Ollama (local, on-prem — no fallback so data never leaves)  |
 | `nabu-image`   | OpenAI gpt-image-1 → Gemini 2.5 Flash Image (image gen)     |
 | `nabu-voice`   | OpenAI gpt-4o-mini-tts → Gemini 2.5 Flash TTS (speech)      |
 | `nabu-embed`   | OpenAI text-embedding-3-small → Gemini text-embedding-004   |
+
+The `nabu-local` alias routes to a self-hosted **Ollama** server (OpenAI-wire
+compatible), so even on-prem/local inference goes through the gateway rather than
+projects talking to Ollama directly. Its `ollama` provider is *keyless* — it is
+enabled purely by setting `OLLAMA_BASE_URL` (the OpenAI-compatible root incl.
+`/v1`, e.g. `http://ollama:11434/v1`) and skipped when that is unset. It has no
+cloud fallback on purpose: if Ollama is unreachable the call fails instead of
+silently spilling the request to a hosted provider.
 
 Aliases live under `models:` (chat), `images:`, `audio:` and `embeddings:` in
 the config. Edit `config.yaml` to add providers, aliases, or change routing — no

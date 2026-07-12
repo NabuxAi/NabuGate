@@ -27,6 +27,10 @@ services:
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
       - GEMINI_API_KEY=${GEMINI_API_KEY}
       - DAHL_API_KEY=${DAHL_API_KEY}
+      # Ollama (local, on-prem models behind the nabu-local alias). Keyless:
+      # set the OpenAI-compatible base URL incl. /v1 to enable, e.g.
+      # http://ollama:11434/v1. Left empty, the ollama provider is skipped.
+      - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-}
     # Coolify's reverse proxy reaches the gateway over the internal Docker
     # network, so the port only needs to be EXPOSEd, not published to the host.
     # Publishing to a random host port (`ports: - "8080"`) does NOT make the
