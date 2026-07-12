@@ -10,6 +10,10 @@ services:
       # var and no file mount is needed. Leave it empty to load from a mounted
       # file instead (see the volumes note below).
       - NABU_CONFIG_YAML=${NABU_CONFIG_YAML:-}
+      # Coolify magic variable: auto-assign a domain for this service and route
+      # it to the gateway's port 8080. Coolify fills it in (or use your own
+      # domain under Configuration → Domains). Ignored outside Coolify.
+      - SERVICE_FQDN_NABUGATE_8080
       # Provider secrets (set the ones you enable in your config)
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - GROQ_API_KEY=${GROQ_API_KEY}
@@ -17,8 +21,16 @@ services:
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
       - GEMINI_API_KEY=${GEMINI_API_KEY}
       - DAHL_API_KEY=${DAHL_API_KEY}
-    ports:
+    # Coolify's reverse proxy reaches the gateway over the internal Docker
+    # network, so the port only needs to be EXPOSEd, not published to the host.
+    # Publishing to a random host port (`ports: - "8080"`) does NOT make the
+    # proxy route to it — that is why the domain returned nothing before.
+    expose:
       - "8080"
+    # For a plain local `docker compose up` (no proxy), publish to the host
+    # instead by uncommenting:
+    # ports:
+    #   - "8080:8080"
     # To load config from a file instead of NABU_CONFIG_YAML, create ./config.yaml
     # FIRST, then uncomment the mount below. Do not enable it without the file:
     # Docker turns a missing bind-mount source into an empty directory and the
