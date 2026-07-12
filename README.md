@@ -204,22 +204,45 @@ disabled (dev mode).
 ## Deploy with Coolify / Docker
 
 No config is baked into the image (that would publish the example API key as a
-live credential), so you must mount your own `config.yaml` — the gateway exits
-if it is missing.
+live credential), so you must supply your own — the gateway exits if it can't
+find one. There are two ways to provide it:
+
+**Recommended — inline via `NABU_CONFIG_YAML` (no file, no mount).** Set the
+whole config as an environment variable. This is the safest option on a PaaS
+like Coolify, where a bind mount of a not-yet-existing host file is silently
+turned by Docker into an empty directory, which crash-loops the gateway with
+`config path "/app/config.yaml" is a directory, not a file`.
+
+```bash
+docker build -t nabugate .
+docker run -p 8080:8080 \
+  -e DAHL_API_KEY=dahl-... -e OPENAI_API_KEY=sk-... -e GROQ_API_KEY=gsk-... \
+  -e NABU_CONFIG_YAML="$(cat config.yaml)" \
+  nabugate
+```
+
+In Coolify, deploy this directory as a **Docker Compose** or **Dockerfile**
+resource, set the provider keys and `NABU_CONFIG_YAML` (paste the full config)
+as environment variables, and expose port **8080** (Coolify provides TLS + the
+`/healthz` check). The bundled `docker-compose.yml` already reads
+`NABU_CONFIG_YAML` and mounts no file by default, so it deploys cleanly from a
+fresh checkout.
+
+**Alternative — mount a `config.yaml` file.** Create the file first, then mount
+it. A *missing* source file is the crash cause above, so never enable the mount
+without the file present.
 
 ```bash
 cp config.example.yaml config.yaml   # then set real api_keys
-docker build -t nabugate .
 docker run -p 8080:8080 \
   -e DAHL_API_KEY=dahl-... -e OPENAI_API_KEY=sk-... -e GROQ_API_KEY=gsk-... \
   -v $(pwd)/config.yaml:/app/config.yaml:ro \
   nabugate
 ```
 
-In Coolify, deploy this directory as a **Docker Compose** or **Dockerfile**
-resource, set the provider keys as environment variables, mount your
-`config.yaml`, and expose port **8080** (Coolify provides TLS + the `/healthz`
-check).
+`NABU_CONFIG_YAML` wins when both are provided, so a stale mounted file can't
+shadow it. In both cases `${VAR}` references inside the config are expanded from
+the environment, so gateway `api_keys` can also come from env.
 
 ## Configuration
 

@@ -5,6 +5,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"gopkg.in/yaml.v3"
 
@@ -12,6 +13,13 @@ import (
 	"nabugate/internal/provider"
 	"nabugate/internal/usage"
 )
+
+// EnvConfigYAML, when set to a non-empty value, supplies the whole config file
+// inline instead of reading it from disk. This is the mount-free option for
+// PaaS deploys (Coolify, Railway, …) where a bind mount of a not-yet-existing
+// host file would otherwise be auto-created by Docker as an empty directory and
+// crash the gateway on start.
+const EnvConfigYAML = "NABU_CONFIG_YAML"
 
 // Config is the top-level configuration file structure.
 type Config struct {
@@ -54,6 +62,21 @@ type ModelRoute struct {
 	Fallback []Target `yaml:"fallback"`
 }
 
+// Resolve loads the config from the NABU_CONFIG_YAML env var when it is set
+// (the mount-free path for PaaS deploys), otherwise from the file at path.
+// Inline config takes precedence so a stale or auto-created bind-mount file
+// cannot shadow it.
+func Resolve(path string) (*Config, error) {
+	if inline := strings.TrimSpace(os.Getenv(EnvConfigYAML)); inline != "" {
+		cfg, err := Parse(inline)
+		if err != nil {
+			return nil, fmt.Errorf("%s: %w", EnvConfigYAML, err)
+		}
+		return cfg, nil
+	}
+	return Load(path)
+}
+
 // Load reads and parses the config file at path. Any ${VAR} references in the
 // file are expanded from the environment first, so secrets (gateway API keys,
 // etc.) can be injected at runtime instead of baked into the file.
@@ -64,13 +87,21 @@ func Load(path string) (*Config, error) {
 	if info, err := os.Stat(path); err == nil && info.IsDir() {
 		return nil, fmt.Errorf("config path %q is a directory, not a file "+
 			"(a Docker bind mount with a missing host file creates an empty "+
-			"directory — mount a real config file or remove the mount)", path)
+			"directory — mount a real config file, remove the mount, or supply "+
+			"the config inline via the %s env var)", path, EnvConfigYAML)
 	}
 	raw, err := os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("read config: %w", err)
 	}
-	expanded := os.ExpandEnv(string(raw))
+	return Parse(string(raw))
+}
+
+// Parse builds a Config from raw YAML content. Any ${VAR} references are
+// expanded from the environment first, so secrets can be injected at runtime
+// instead of baked into the file. It is shared by file and inline (env) loading.
+func Parse(raw string) (*Config, error) {
+	expanded := os.ExpandEnv(raw)
 	var cfg Config
 	if err := yaml.Unmarshal([]byte(expanded), &cfg); err != nil {
 		return nil, fmt.Errorf("parse config: %w", err)
