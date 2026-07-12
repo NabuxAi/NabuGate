@@ -23,8 +23,10 @@ WORKDIR /app
 COPY --from=build /out/nabugate /app/nabugate
 
 # No config is baked in: that would publish the example API key as a live,
-# full-access credential. Operators must mount their own config at /app/config.yaml
-# (see docker-compose.yml). The gateway fails to start if it is missing.
+# full-access credential. Operators supply their own config at runtime — either
+# inline via the NABU_CONFIG_YAML env var (mount-free, recommended for PaaS) or
+# by mounting a file at /app/config.yaml (see docker-compose.yml). The gateway
+# fails to start if neither is provided.
 ENV NABU_CONFIG=/app/config.yaml
 EXPOSE 8080
 
