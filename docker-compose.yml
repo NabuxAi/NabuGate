@@ -27,6 +27,7 @@ services:
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
       - GEMINI_API_KEY=${GEMINI_API_KEY}
       - DAHL_API_KEY=${DAHL_API_KEY}
+      - PARSPACK_API_KEY=${PARSPACK_API_KEY}
     # Coolify's reverse proxy reaches the gateway over the internal Docker
     # network, so the port only needs to be EXPOSEd, not published to the host.
     # Publishing to a random host port (`ports: - "8080"`) does NOT make the
