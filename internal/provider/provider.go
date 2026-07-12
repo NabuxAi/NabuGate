@@ -126,9 +126,24 @@ type EmbeddingAdapter interface {
 	Embed(ctx context.Context, req EmbeddingRequest) (EmbeddingResponse, error)
 }
 
-// sharedHTTPClient is reused by all adapters; upstream calls are bounded by the
-// request context, so the client timeout is a generous safety net.
+// sharedHTTPClient is reused by all adapters for non-streaming calls; each call
+// is also bounded by the request context, so the client timeout is a generous
+// safety net.
 var sharedHTTPClient = &http.Client{Timeout: 120 * time.Second}
+
+// streamHTTPClient is used for SSE streaming. It deliberately has NO
+// whole-request timeout: http.Client.Timeout also covers reading the response
+// body, so a fixed cap would sever a long-running stream mid-generation.
+// Streaming is instead bounded by the request context (client disconnect or
+// server shutdown), while ResponseHeaderTimeout still caps a dead upstream that
+// never sends the first byte.
+var streamHTTPClient = newStreamClient()
+
+func newStreamClient() *http.Client {
+	tr := http.DefaultTransport.(*http.Transport).Clone()
+	tr.ResponseHeaderTimeout = 120 * time.Second
+	return &http.Client{Transport: tr}
+}
 
 // isTransient reports whether an upstream HTTP status is worth retrying.
 func isTransient(status int) bool {

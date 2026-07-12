@@ -174,9 +174,11 @@ func (a *AnthropicAdapter) ChatStream(ctx context.Context, req ChatRequest, onDe
 	payload := map[string]any{
 		"model":      req.Model,
 		"max_tokens": maxTokens,
-		"system":     system.String(),
 		"messages":   msgs,
 		"stream":     true,
+	}
+	if system.Len() > 0 {
+		payload["system"] = system.String()
 	}
 	if req.Temperature != nil {
 		payload["temperature"] = *req.Temperature

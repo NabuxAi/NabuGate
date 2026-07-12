@@ -163,7 +163,9 @@ server:
 - Exceeding `rate_limit` returns **429** (token bucket, per key).
 - `GET /v1/models` is filtered to the aliases each key may use.
 
-If both `api_keys` and `keys` are empty, auth is disabled (dev mode).
+If both `api_keys` and `keys` are empty the gateway refuses to start (so it is
+never accidentally left open); set `NABU_ALLOW_NO_AUTH=1` to run without auth
+for local development.
 
 ## Cost tracking
 
@@ -198,51 +200,56 @@ go run ./cmd/gateway -config config.yaml
 ```
 
 Providers whose API-key env var is empty are skipped automatically, so you can
-start with just one provider configured. If `server.api_keys` is empty, auth is
-disabled (dev mode).
+start with just one provider configured. `config.example.yaml` ships a dev
+`api_keys` entry; if you empty it, set `NABU_ALLOW_NO_AUTH=1` to run without auth
+(the gateway otherwise refuses to start open).
 
 ## Deploy with Coolify / Docker
 
-No config is baked into the image (that would publish the example API key as a
-live credential), so you must supply your own — the gateway exits if it can't
-find one. There are two ways to provide it:
+The image bakes a **secret-free default config** ([`config.default.yaml`](config.default.yaml))
+at `/app/config.yaml`, so the gateway boots out of the box — you only provide
+secrets as environment variables. Minimum to go live:
 
-**Recommended — inline via `NABU_CONFIG_YAML` (no file, no mount).** Set the
-whole config as an environment variable. This is the safest option on a PaaS
-like Coolify, where a bind mount of a not-yet-existing host file is silently
-turned by Docker into an empty directory, which crash-loops the gateway with
-`config path "/app/config.yaml" is a directory, not a file`.
+- `NABU_API_KEY` — the gateway admin key projects must send. **Required:** the
+  gateway refuses to start open unless this (or a config `api_keys`) is set, so
+  you can't accidentally expose an unauthenticated, money-spending gateway. For
+  local dev only, set `NABU_ALLOW_NO_AUTH=1` to run without auth.
+- At least one provider key (`DAHL_API_KEY`, `OPENAI_API_KEY`, …). Providers
+  whose key is unset are skipped automatically.
 
 ```bash
 docker build -t nabugate .
 docker run -p 8080:8080 \
-  -e DAHL_API_KEY=dahl-... -e OPENAI_API_KEY=sk-... -e GROQ_API_KEY=gsk-... \
-  -e NABU_CONFIG_YAML="$(cat config.yaml)" \
+  -e NABU_API_KEY=nabu_prod_key \
+  -e DAHL_API_KEY=dahl-... -e OPENAI_API_KEY=sk-... \
   nabugate
 ```
 
 In Coolify, deploy this directory as a **Docker Compose** or **Dockerfile**
-resource, set the provider keys and `NABU_CONFIG_YAML` (paste the full config)
-as environment variables, and expose port **8080** (Coolify provides TLS + the
-`/healthz` check). The bundled `docker-compose.yml` already reads
-`NABU_CONFIG_YAML` and mounts no file by default, so it deploys cleanly from a
-fresh checkout.
+resource, set `NABU_API_KEY` + your provider keys as environment variables,
+assign a domain to port **8080** (Configuration → Domains), and deploy. Coolify
+provides TLS and can health-check `/healthz`. Opening the bare domain returns
+`404` by design — the gateway only serves `/healthz` and the `/v1/*` endpoints.
 
-**Alternative — mount a `config.yaml` file.** Create the file first, then mount
-it. A *missing* source file is the crash cause above, so never enable the mount
-without the file present.
+**Custom routing (optional).** To change aliases/providers, override the baked
+default in one of two ways (either wins over the default):
+
+- **Inline (no mount):** set `NABU_CONFIG_YAML` to the entire config. Ideal on a
+  PaaS — no file, so no bind-mount-of-a-missing-file trap (which Docker turns
+  into an empty directory and crash-loops the gateway).
+- **Mounted file:** create `config.yaml` first, then mount it at
+  `/app/config.yaml`. Never mount a *missing* source file — that is the empty
+  directory trap.
 
 ```bash
-cp config.example.yaml config.yaml   # then set real api_keys
 docker run -p 8080:8080 \
-  -e DAHL_API_KEY=dahl-... -e OPENAI_API_KEY=sk-... -e GROQ_API_KEY=gsk-... \
-  -v $(pwd)/config.yaml:/app/config.yaml:ro \
+  -e NABU_API_KEY=nabu_prod_key -e DAHL_API_KEY=dahl-... \
+  -e NABU_CONFIG_YAML="$(cat config.yaml)" \
   nabugate
 ```
 
-`NABU_CONFIG_YAML` wins when both are provided, so a stale mounted file can't
-shadow it. In both cases `${VAR}` references inside the config are expanded from
-the environment, so gateway `api_keys` can also come from env.
+`${VAR}` references inside the config are expanded from the environment, so
+gateway `api_keys` and other values can come from env.
 
 ## Configuration
 

@@ -73,6 +73,51 @@ func TestResolveFallsBackToFile(t *testing.T) {
 	}
 }
 
+// TestLoadMissingFileError checks the missing-config error is actionable and
+// points at the inline-env escape hatch (not a bare os error).
+func TestLoadMissingFileError(t *testing.T) {
+	t.Setenv(EnvConfigYAML, "")
+
+	_, err := Resolve(filepath.Join(t.TempDir(), "does-not-exist.yaml"))
+	if err == nil {
+		t.Fatal("expected an error for a missing config file, got nil")
+	}
+	if !strings.Contains(err.Error(), "not found") {
+		t.Errorf("error %q should say the file was not found", err)
+	}
+	if !strings.Contains(err.Error(), EnvConfigYAML) {
+		t.Errorf("error %q should point at the %s escape hatch", err, EnvConfigYAML)
+	}
+}
+
+// TestDefaultConfigParses guards the secret-free default baked into the image:
+// it must be valid YAML, expand ${NABU_API_KEY} into the admin key, and carry
+// the provider/model routing (no hardcoded gateway credential shipped).
+func TestDefaultConfigParses(t *testing.T) {
+	t.Setenv("NABU_API_KEY", "admin-from-env")
+
+	raw, err := os.ReadFile("../../config.default.yaml")
+	if err != nil {
+		t.Fatalf("read config.default.yaml: %v", err)
+	}
+	cfg, err := Parse(string(raw))
+	if err != nil {
+		t.Fatalf("parse config.default.yaml: %v", err)
+	}
+	if cfg.Server.Port != 8080 {
+		t.Errorf("port = %d, want 8080", cfg.Server.Port)
+	}
+	if len(cfg.Server.APIKeys) != 1 || cfg.Server.APIKeys[0] != "admin-from-env" {
+		t.Errorf("api_keys = %v, want [admin-from-env] (env expansion)", cfg.Server.APIKeys)
+	}
+	if _, ok := cfg.Providers["dahl"]; !ok {
+		t.Error("default config should define the dahl provider")
+	}
+	if _, ok := cfg.Models["nabu-fast"]; !ok {
+		t.Error("default config should define the nabu-fast alias")
+	}
+}
+
 // TestLoadDirectoryError reproduces the Docker missing-mount case (target is a
 // directory) and checks the error explains the inline-env escape hatch.
 func TestLoadDirectoryError(t *testing.T) {

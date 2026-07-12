@@ -45,7 +45,16 @@ func main() {
 	srv := server.New(r, enforcer, tracker, log)
 
 	if !enforcer.Enabled() {
-		log.Warn("no api keys configured: authentication is DISABLED (dev mode)")
+		// A gateway that holds provider secrets and spends money must not come up
+		// open by accident (e.g. NABU_API_KEY left unset). Fail closed unless the
+		// operator explicitly opts into an unauthenticated gateway.
+		if os.Getenv("NABU_ALLOW_NO_AUTH") == "" {
+			log.Error("refusing to start with authentication disabled: no api keys configured " +
+				"(set NABU_API_KEY, or server.api_keys in your config; " +
+				"set NABU_ALLOW_NO_AUTH=1 to run an open gateway for local dev)")
+			os.Exit(1)
+		}
+		log.Warn("authentication is DISABLED (NABU_ALLOW_NO_AUTH set): the gateway is open to anyone who can reach it")
 	}
 
 	providerNames := make([]string, 0, len(adapters))
@@ -62,6 +71,9 @@ func main() {
 		Addr:              fmt.Sprintf(":%d", cfg.Server.Port),
 		Handler:           srv.Handler(),
 		ReadHeaderTimeout: 10 * time.Second,
+		// Bound how long a client may take to send its request body (slow-loris);
+		// intentionally no WriteTimeout, which would sever long SSE streams.
+		ReadTimeout: 60 * time.Second,
 	}
 	if err := httpServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		log.Error("server stopped", "error", err)
