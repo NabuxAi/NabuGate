@@ -77,13 +77,6 @@ providers:
     enabled: true
     type: openai # Ollama exposes an OpenAI-compatible /v1 API
     base_url: "${OLLAMA_BASE_URL}"
-  # Parspack AI Studio — OpenAI-wire-compatible aggregator hosting many hosted
-  # and open models (GPT, Claude, Gemini, Grok, Qwen, MiniMax, Kimi, …).
-  parspack:
-    enabled: true
-    type: openai # my.parspack.com speaks the OpenAI /v1 wire format
-    base_url: "https://my.parspack.com/api/aistudio/api/v1"
-    api_key_env: "PARSPACK_API_KEY"
 
 # Model registry: public alias -> primary target + ordered fallbacks.
 models:

@@ -130,6 +130,21 @@ func TestDefaultConfigParses(t *testing.T) {
 	if len(local.Fallback) != 0 {
 		t.Errorf("nabu-local should have no cloud fallback (on-prem), got %d", len(local.Fallback))
 	}
+
+	// Parspack provider + alias are wired and the OpenAI-wire adapter builds.
+	p, ok := cfg.Providers["parspack"]
+	if !ok || p.Type != "openai" || p.APIKeyEnv != "PARSPACK_API_KEY" {
+		t.Errorf("parspack provider = %+v, want type=openai api_key_env=PARSPACK_API_KEY", p)
+	}
+	route, ok := cfg.Models["nabu-parspack"]
+	if !ok || route.Primary.Provider != "parspack" {
+		t.Errorf("nabu-parspack primary = %+v, want provider=parspack", route.Primary)
+	}
+	t.Setenv("PARSPACK_API_KEY", "pk-test")
+	adapters, _ := cfg.BuildAdapters()
+	if _, ok := adapters["parspack"]; !ok {
+		t.Error("BuildAdapters should build the parspack adapter when its key is set")
+	}
 }
 
 // TestBuildAdaptersKeylessProvider verifies the keyless-provider path used by a
@@ -175,21 +190,6 @@ func containsSubstr(haystack []string, needle string) bool {
 		}
 	}
 	return false
-
-	// Parspack provider + alias are wired and the OpenAI-wire adapter builds.
-	p, ok := cfg.Providers["parspack"]
-	if !ok || p.Type != "openai" || p.APIKeyEnv != "PARSPACK_API_KEY" {
-		t.Errorf("parspack provider = %+v, want type=openai api_key_env=PARSPACK_API_KEY", p)
-	}
-	route, ok := cfg.Models["nabu-parspack"]
-	if !ok || route.Primary.Provider != "parspack" {
-		t.Errorf("nabu-parspack primary = %+v, want provider=parspack", route.Primary)
-	}
-	t.Setenv("PARSPACK_API_KEY", "pk-test")
-	adapters, _ := cfg.BuildAdapters()
-	if _, ok := adapters["parspack"]; !ok {
-		t.Error("BuildAdapters should build the parspack adapter when its key is set")
-	}
 }
 
 // TestLoadDirectoryError reproduces the Docker missing-mount case (target is a
