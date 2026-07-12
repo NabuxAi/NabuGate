@@ -22,11 +22,11 @@ FROM gcr.io/distroless/static-debian12:nonroot
 WORKDIR /app
 COPY --from=build /out/nabugate /app/nabugate
 
-# No config is baked in: that would publish the example API key as a live,
-# full-access credential. Operators supply their own config at runtime — either
-# inline via the NABU_CONFIG_YAML env var (mount-free, recommended for PaaS) or
-# by mounting a file at /app/config.yaml (see docker-compose.yml). The gateway
-# fails to start if neither is provided.
+# A secret-free default config is baked in so the gateway boots out of the box:
+# it ships no keys — the admin key comes from ${NABU_API_KEY} and provider
+# secrets from their own env vars. Override it by mounting your own file at
+# /app/config.yaml or by setting NABU_CONFIG_YAML (either wins over this default).
+COPY config.default.yaml /app/config.yaml
 ENV NABU_CONFIG=/app/config.yaml
 EXPOSE 8080
 

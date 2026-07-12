@@ -92,6 +92,10 @@ func Load(path string) (*Config, error) {
 	}
 	raw, err := os.ReadFile(path)
 	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, fmt.Errorf("config file %q not found "+
+				"(mount a config file there or supply it inline via the %s env var)", path, EnvConfigYAML)
+		}
 		return nil, fmt.Errorf("read config: %w", err)
 	}
 	return Parse(string(raw))

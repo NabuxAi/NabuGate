@@ -1,0 +1,156 @@
+# NabuGate — default config baked into the Docker image (/app/config.yaml).
+#
+# It ships NO secrets: the gateway admin key comes from ${NABU_API_KEY} and every
+# provider secret from its own env var (api_key_env), so this file is safe to
+# publish. Override it entirely by mounting your own /app/config.yaml or by
+# setting NABU_CONFIG_YAML — either takes precedence over this default.
+#
+# Keep it in sync with config.example.yaml (same routing; example adds a dev key
+# and per-project key samples for local use).
+
+server:
+  port: 8080
+  # Gateway admin key(s) projects must send as `Authorization: Bearer …`.
+  # Sourced from the environment; if NABU_API_KEY is unset the list is empty and
+  # the gateway refuses to start (open-gateway guard) unless NABU_ALLOW_NO_AUTH=1.
+  api_keys:
+    - "${NABU_API_KEY}"
+
+# Upstream providers. Secrets live in environment variables (api_key_env), never
+# in this file. A provider whose env var is empty is skipped automatically, so
+# the gateway can start with only the providers you have keys for.
+providers:
+  openai:
+    enabled: true
+    type: openai
+    base_url: "https://api.openai.com/v1"
+    api_key_env: "OPENAI_API_KEY"
+
+  groq:
+    enabled: true
+    type: openai # Groq is OpenAI-wire-compatible
+    base_url: "https://api.groq.com/openai/v1"
+    api_key_env: "GROQ_API_KEY"
+
+  openrouter:
+    enabled: true
+    type: openai # OpenRouter is OpenAI-wire-compatible
+    base_url: "https://openrouter.ai/api/v1"
+    api_key_env: "OPENROUTER_API_KEY"
+
+  # Dahl inference — OpenAI-wire-compatible endpoint hosting open models
+  # (MiniMax, Kimi, …). This is the org's default upstream for general chat.
+  dahl:
+    enabled: true
+    type: openai # inference.dahl.global speaks the OpenAI /v1 wire format
+    base_url: "https://inference.dahl.global/v1"
+    api_key_env: "DAHL_API_KEY"
+
+  anthropic:
+    enabled: true
+    type: anthropic
+    base_url: "https://api.anthropic.com/v1"
+    api_key_env: "ANTHROPIC_API_KEY"
+
+  gemini:
+    enabled: true
+    type: gemini
+    base_url: "https://generativelanguage.googleapis.com/v1beta"
+    api_key_env: "GEMINI_API_KEY"
+
+# Model registry: public alias -> primary target + ordered fallbacks.
+models:
+  nabu-fast:
+    primary:
+      provider: dahl
+      model: "MiniMaxAI/MiniMax-M2.7"
+    fallback:
+      - provider: groq
+        model: "llama-3.1-70b-versatile"
+      - provider: openai
+        model: "gpt-4o-mini"
+      - provider: anthropic
+        model: "claude-3-5-haiku-latest"
+
+  nabu-smart:
+    primary:
+      provider: dahl
+      model: "moonshotai/Kimi-K2.6"
+    fallback:
+      - provider: openai
+        model: "gpt-4o"
+      - provider: anthropic
+        model: "claude-3-5-sonnet-latest"
+      - provider: gemini
+        model: "gemini-1.5-pro"
+
+  nabu-cheap:
+    primary:
+      provider: openrouter
+      model: "meta-llama/llama-3.1-8b-instruct"
+    fallback:
+      - provider: groq
+        model: "llama-3.1-8b-instant"
+      - provider: dahl
+        model: "MiniMaxAI/MiniMax-M2.7"
+
+  nabu-vision:
+    primary:
+      provider: openai
+      model: "gpt-4o"
+    fallback:
+      - provider: gemini
+        model: "gemini-1.5-pro"
+
+  nabu-minimax:
+    primary:
+      provider: dahl
+      model: "MiniMaxAI/MiniMax-M2.7"
+    fallback:
+      - provider: groq
+        model: "llama-3.1-70b-versatile"
+
+  nabu-kimi:
+    primary:
+      provider: dahl
+      model: "moonshotai/Kimi-K2.6"
+    fallback:
+      - provider: openai
+        model: "gpt-4o"
+
+images:
+  nabu-image:
+    primary:
+      provider: openai
+      model: "gpt-image-1"
+    fallback:
+      - provider: gemini
+        model: "gemini-2.5-flash-image"
+
+audio:
+  nabu-voice:
+    primary:
+      provider: openai
+      model: "gpt-4o-mini-tts"
+    fallback:
+      - provider: gemini
+        model: "gemini-2.5-flash-preview-tts"
+
+embeddings:
+  nabu-embed:
+    primary:
+      provider: openai
+      model: "text-embedding-3-small"
+    fallback:
+      - provider: gemini
+        model: "text-embedding-004"
+
+# Cost tracking: USD per 1,000,000 tokens, keyed by "provider/model".
+pricing:
+  "openai/gpt-4o": { input: 2.5, output: 10 }
+  "openai/gpt-4o-mini": { input: 0.15, output: 0.6 }
+  "openai/text-embedding-3-small": { input: 0.02, output: 0 }
+  "anthropic/claude-3-5-sonnet-latest": { input: 3, output: 15 }
+  "anthropic/claude-3-5-haiku-latest": { input: 0.8, output: 4 }
+  "gemini/gemini-1.5-pro": { input: 1.25, output: 5 }
+  "groq/llama-3.1-70b-versatile": { input: 0.59, output: 0.79 }

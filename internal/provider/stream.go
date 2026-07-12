@@ -44,7 +44,7 @@ func readSSE(body io.Reader, onData func(data []byte) (stop bool, err error)) er
 // doStreamRequest issues an HTTP request and returns the response for SSE
 // reading. On a non-2xx status it drains the body and returns it as an error.
 func doStreamRequest(ctx context.Context, req *http.Request, name string) (*http.Response, error) {
-	resp, err := sharedHTTPClient.Do(req)
+	resp, err := streamHTTPClient.Do(req)
 	if err != nil {
 		return nil, err
 	}

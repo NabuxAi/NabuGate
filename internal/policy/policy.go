@@ -19,6 +19,7 @@ type KeyConfig struct {
 
 // Policy is the resolved access policy attached to a key.
 type Policy struct {
+	Admin     bool // full-access simple api_key: may see every project's usage
 	Project   string
 	Allow     []string
 	RateLimit int
@@ -57,7 +58,7 @@ func New(simpleKeys []string, richKeys []KeyConfig) *Enforcer {
 	policies := make(map[string]Policy)
 	for _, k := range simpleKeys {
 		if k != "" {
-			policies[k] = Policy{Allow: []string{"*"}}
+			policies[k] = Policy{Admin: true, Allow: []string{"*"}}
 		}
 	}
 	for _, k := range richKeys {

@@ -18,6 +18,11 @@ import (
 
 type policyCtxKey struct{}
 
+// maxRequestBytes caps the size of a request body the gateway will read, so a
+// single oversized (or slow-trickle) upload can't exhaust memory. Generous
+// enough for long chat histories and large embedding batches.
+const maxRequestBytes = 16 << 20 // 16 MiB
+
 // Server wires the router, auth, policy and usage tracking into an http.Handler.
 type Server struct {
 	router *router.Router
@@ -67,7 +72,9 @@ func (s *Server) record(r *http.Request, prov, model string, u provider.Usage) {
 // permissions — an all-alias project key must not see other projects' usage.
 func (s *Server) handleUsage(w http.ResponseWriter, r *http.Request) {
 	pol, hasPol := r.Context().Value(policyCtxKey{}).(policy.Policy)
-	admin := !s.policy.Enabled() || (hasPol && pol.Project == "")
+	// Admin is granted only to the simple full-access api_keys, not to any rich
+	// key that merely omits `project:` (which would leak every project's usage).
+	admin := !s.policy.Enabled() || (hasPol && pol.Admin)
 	if admin {
 		byProject, byModel := s.usage.Snapshot()
 		writeJSON(w, http.StatusOK, map[string]any{"by_project": byProject, "by_model": byModel})
@@ -254,7 +261,12 @@ func (s *Server) streamChat(w http.ResponseWriter, r *http.Request, alias string
 		startHeaders() // succeeded but produced no text; emit an empty stream
 	}
 
-	s.record(r, result.Provider, result.Model, result.Usage)
+	// Bill only successful generations, matching the non-streaming path. A
+	// mid-stream failure leaves result.Usage zero-valued and must not inflate
+	// per-project request/usage counters.
+	if err == nil {
+		s.record(r, result.Provider, result.Model, result.Usage)
+	}
 
 	finish := "stop"
 	if err != nil {
@@ -449,6 +461,8 @@ func aliasErrStatus(err error, unknownPrefix string) int {
 // keys are configured, requests pass through (dev mode).
 func (s *Server) auth(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		// Cap the body before any handler reads it (bounds memory / slow-loris).
+		r.Body = http.MaxBytesReader(w, r.Body, maxRequestBytes)
 		if !s.policy.Enabled() {
 			next(w, r)
 			return

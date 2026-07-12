@@ -6,10 +6,16 @@ services:
       dockerfile: Dockerfile
     environment:
       - NABU_CONFIG=/app/config.yaml
-      # Recommended for Coolify / PaaS: paste the whole config.yaml as this env
-      # var and no file mount is needed. Leave it empty to load from a mounted
-      # file instead (see the volumes note below).
+      # The image already bakes a secret-free default config, so you do NOT need
+      # to provide a config to boot. Set NABU_API_KEY (below) + a provider key
+      # and it works out of the box. Override the routing only if you need to:
+      # paste a whole config here (mount-free) or mount a file (see volumes note).
       - NABU_CONFIG_YAML=${NABU_CONFIG_YAML:-}
+      # Gateway admin key projects must send as `Authorization: Bearer …`.
+      # REQUIRED: the gateway refuses to start open unless this is set (or you
+      # set NABU_ALLOW_NO_AUTH=1 to explicitly run without auth for local dev).
+      - NABU_API_KEY=${NABU_API_KEY:-}
+      - NABU_ALLOW_NO_AUTH=${NABU_ALLOW_NO_AUTH:-}
       # Coolify magic variable: auto-assign a domain for this service and route
       # it to the gateway's port 8080. Coolify fills it in (or use your own
       # domain under Configuration → Domains). Ignored outside Coolify.
