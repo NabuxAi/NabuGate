@@ -12,7 +12,7 @@ project ──▶ POST /v1/chat/completions { "model": "nabu-fast", ... }
                   │ NabuGate │  auth → router → provider adapter → fallback
                   └────┬─────┘
         ┌──────────────┼───────────────┬───────────────┐
-     Dahl           OpenAI          Groq / Anthropic / Gemini   (OpenRouter…)
+     Dahl           OpenAI          Groq / Anthropic / Gemini   (OpenRouter / Parspack…)
 ```
 
 The org's default upstream is **Dahl** (`inference.dahl.global`, OpenAI-wire),
@@ -136,6 +136,7 @@ fallback target.
 | `nabu-vision`  | OpenAI 4o → Gemini 1.5 Pro                                   |
 | `nabu-minimax` | Dahl MiniMax-M2.7 → Groq (pin MiniMax explicitly)           |
 | `nabu-kimi`    | Dahl Kimi-K2.6 → OpenAI 4o (pin Kimi explicitly)            |
+| `nabu-parspack`| Parspack GPT-5.5 → Claude Sonnet 4.6 → Gemini 2.5 Flash     |
 | `nabu-image`   | OpenAI gpt-image-1 → Gemini 2.5 Flash Image (image gen)     |
 | `nabu-voice`   | OpenAI gpt-4o-mini-tts → Gemini 2.5 Flash TTS (speech)      |
 | `nabu-embed`   | OpenAI text-embedding-3-small → Gemini text-embedding-004   |
