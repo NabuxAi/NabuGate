@@ -68,6 +68,15 @@ providers:
     base_url: "https://generativelanguage.googleapis.com/v1beta"
     api_key_env: "GEMINI_API_KEY"
 
+  # Ollama — a local, OpenAI-wire-compatible model server. Keeps inference (and
+  # data) on-prem. It has no api_key_env: keyless providers are enabled purely by
+  # their base_url, so this provider is skipped automatically when OLLAMA_BASE_URL
+  # is unset. Point OLLAMA_BASE_URL at the OpenAI-compatible root, incl. /v1
+  # (e.g. http://ollama:11434/v1).
+  ollama:
+    enabled: true
+    type: openai # Ollama exposes an OpenAI-compatible /v1 API
+    base_url: "${OLLAMA_BASE_URL}"
   # Parspack AI Studio — OpenAI-wire-compatible aggregator hosting many hosted
   # and open models (GPT, Claude, Gemini, Grok, Qwen, MiniMax, Kimi, …).
   parspack:
@@ -136,6 +145,15 @@ models:
       - provider: openai
         model: "gpt-4o"
 
+  # Local / on-prem chat via Ollama. Deliberately has NO cloud fallback: the
+  # point of routing to a local model is that data never leaves the server, so
+  # if Ollama is unreachable this alias fails rather than silently spilling the
+  # request to a hosted provider. Override OLLAMA_MODEL upstream in Ollama; the
+  # model name here is what the Ollama server serves (pull it first).
+  nabu-local:
+    primary:
+      provider: ollama
+      model: "llama3.1"
   # Frontier models via Parspack (needs only PARSPACK_API_KEY). Self-contained:
   # both primary and fallbacks route through Parspack, so it works even when the
   # direct OpenAI/Anthropic/Gemini keys are unset.

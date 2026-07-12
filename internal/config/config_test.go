@@ -116,6 +116,65 @@ func TestDefaultConfigParses(t *testing.T) {
 	if _, ok := cfg.Models["nabu-fast"]; !ok {
 		t.Error("default config should define the nabu-fast alias")
 	}
+	// Ollama (local, on-prem) must be routable through the gateway too.
+	if _, ok := cfg.Providers["ollama"]; !ok {
+		t.Error("default config should define the ollama provider")
+	}
+	local, ok := cfg.Models["nabu-local"]
+	if !ok {
+		t.Fatal("default config should define the nabu-local alias")
+	}
+	if local.Primary.Provider != "ollama" {
+		t.Errorf("nabu-local primary provider = %q, want ollama", local.Primary.Provider)
+	}
+	if len(local.Fallback) != 0 {
+		t.Errorf("nabu-local should have no cloud fallback (on-prem), got %d", len(local.Fallback))
+	}
+}
+
+// TestBuildAdaptersKeylessProvider verifies the keyless-provider path used by a
+// local Ollama endpoint: a type:openai provider with no api_key_env is built
+// when it has a base_url (enabling the nabu-local alias) and skipped otherwise.
+func TestBuildAdaptersKeylessProvider(t *testing.T) {
+	withBase := &Config{Providers: map[string]ProviderConfig{
+		"ollama": {Enabled: true, Type: "openai", BaseURL: "http://ollama:11434/v1"},
+	}}
+	adapters, _ := withBase.BuildAdapters()
+	if _, ok := adapters["ollama"]; !ok {
+		t.Error("keyless ollama provider with a base_url should be built")
+	}
+
+	noBase := &Config{Providers: map[string]ProviderConfig{
+		"ollama": {Enabled: true, Type: "openai", BaseURL: ""},
+	}}
+	adapters, warnings := noBase.BuildAdapters()
+	if _, ok := adapters["ollama"]; ok {
+		t.Error("keyless ollama provider without a base_url should be skipped")
+	}
+	if !containsSubstr(warnings, "base_url") {
+		t.Errorf("expected a base_url warning, got %v", warnings)
+	}
+
+	// A keyless non-OpenAI provider is a misconfiguration, not a local endpoint.
+	badType := &Config{Providers: map[string]ProviderConfig{
+		"claude": {Enabled: true, Type: "anthropic", BaseURL: "https://api.anthropic.com/v1"},
+	}}
+	adapters, warnings = badType.BuildAdapters()
+	if _, ok := adapters["claude"]; ok {
+		t.Error("keyless anthropic provider should be skipped (requires api_key_env)")
+	}
+	if !containsSubstr(warnings, "api_key_env") {
+		t.Errorf("expected an api_key_env warning, got %v", warnings)
+	}
+}
+
+func containsSubstr(haystack []string, needle string) bool {
+	for _, s := range haystack {
+		if strings.Contains(s, needle) {
+			return true
+		}
+	}
+	return false
 
 	// Parspack provider + alias are wired and the OpenAI-wire adapter builds.
 	p, ok := cfg.Providers["parspack"]

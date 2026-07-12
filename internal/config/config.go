@@ -128,7 +128,25 @@ func (c *Config) BuildAdapters() (map[string]provider.Adapter, []string) {
 			continue
 		}
 		apiKey := os.Getenv(p.APIKeyEnv)
-		if apiKey == "" {
+		if strings.TrimSpace(p.APIKeyEnv) == "" {
+			// Keyless provider (e.g. a self-hosted Ollama endpoint): it declares
+			// no api_key_env, so it is enabled purely by having a base_url. The
+			// OpenAI-wire adapter still sends a placeholder bearer token, which
+			// such local endpoints ignore. Only OpenAI-wire providers may be
+			// keyless — Anthropic/Gemini always need a real key, so a missing
+			// api_key_env there is a misconfiguration, not a local endpoint.
+			if p.Type != "openai" {
+				warnings = append(warnings, fmt.Sprintf("provider %q disabled: %q providers require an api_key_env", name, p.Type))
+				continue
+			}
+			if strings.TrimSpace(p.BaseURL) == "" {
+				warnings = append(warnings, fmt.Sprintf("provider %q disabled: keyless provider needs a base_url", name))
+				continue
+			}
+			if apiKey == "" {
+				apiKey = "-" // placeholder; keyless local endpoints ignore it
+			}
+		} else if apiKey == "" {
 			warnings = append(warnings, fmt.Sprintf("provider %q disabled: env %s is empty", name, p.APIKeyEnv))
 			continue
 		}
