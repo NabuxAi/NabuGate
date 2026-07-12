@@ -15,9 +15,13 @@ func TestStreamClientHasNoWholeRequestTimeout(t *testing.T) {
 	if streamHTTPClient.Timeout != 0 {
 		t.Errorf("streamHTTPClient.Timeout = %v, want 0 (would cut long streams)", streamHTTPClient.Timeout)
 	}
-	tr, ok := streamHTTPClient.Transport.(*http.Transport)
+	uat, ok := streamHTTPClient.Transport.(*userAgentTransport)
 	if !ok {
-		t.Fatalf("streamHTTPClient.Transport is %T, want *http.Transport", streamHTTPClient.Transport)
+		t.Fatalf("streamHTTPClient.Transport is %T, want *userAgentTransport", streamHTTPClient.Transport)
+	}
+	tr, ok := uat.base.(*http.Transport)
+	if !ok {
+		t.Fatalf("streamHTTPClient transport base is %T, want *http.Transport", uat.base)
 	}
 	if tr.ResponseHeaderTimeout <= 0 || tr.ResponseHeaderTimeout > 5*time.Minute {
 		t.Errorf("ResponseHeaderTimeout = %v, want a sane positive cap", tr.ResponseHeaderTimeout)

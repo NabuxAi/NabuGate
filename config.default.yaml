@@ -46,6 +46,16 @@ providers:
     base_url: "https://inference.dahl.global/v1"
     api_key_env: "DAHL_API_KEY"
 
+  # Parspack AI Studio — OpenAI-wire-compatible aggregator (my.parspack.com)
+  # fronting 100+ models (OpenAI, Anthropic, Gemini, Qwen, MiniMax, …) behind a
+  # single key. The base URL ends in /v1; skipped automatically when
+  # PARSPACK_API_KEY is empty.
+  parspack:
+    enabled: true
+    type: openai # Parspack AI Studio speaks the OpenAI /v1 wire format
+    base_url: "https://my.parspack.com/api/aistudio/api/v1"
+    api_key_env: "PARSPACK_API_KEY"
+
   anthropic:
     enabled: true
     type: anthropic
@@ -67,6 +77,13 @@ providers:
     enabled: true
     type: openai # Ollama exposes an OpenAI-compatible /v1 API
     base_url: "${OLLAMA_BASE_URL}"
+  # Parspack AI Studio — OpenAI-wire-compatible aggregator hosting many hosted
+  # and open models (GPT, Claude, Gemini, Grok, Qwen, MiniMax, Kimi, …).
+  parspack:
+    enabled: true
+    type: openai # my.parspack.com speaks the OpenAI /v1 wire format
+    base_url: "https://my.parspack.com/api/aistudio/api/v1"
+    api_key_env: "PARSPACK_API_KEY"
 
 # Model registry: public alias -> primary target + ordered fallbacks.
 models:
@@ -137,6 +154,18 @@ models:
     primary:
       provider: ollama
       model: "llama3.1"
+  # Frontier models via Parspack (needs only PARSPACK_API_KEY). Self-contained:
+  # both primary and fallbacks route through Parspack, so it works even when the
+  # direct OpenAI/Anthropic/Gemini keys are unset.
+  nabu-parspack:
+    primary:
+      provider: parspack
+      model: "openai/gpt-5.5"
+    fallback:
+      - provider: parspack
+        model: "anthropic/claude-sonnet-4.6"
+      - provider: parspack
+        model: "google/gemini-2.5-flash"
 
 images:
   nabu-image:

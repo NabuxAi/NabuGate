@@ -31,6 +31,7 @@ services:
       # set the OpenAI-compatible base URL incl. /v1 to enable, e.g.
       # http://ollama:11434/v1. Left empty, the ollama provider is skipped.
       - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-}
+      - PARSPACK_API_KEY=${PARSPACK_API_KEY}
     # Coolify's reverse proxy reaches the gateway over the internal Docker
     # network, so the port only needs to be EXPOSEd, not published to the host.
     # Publishing to a random host port (`ports: - "8080"`) does NOT make the
