@@ -136,6 +136,7 @@ fallback target.
 | `nabu-vision`  | OpenAI 4o → Gemini 1.5 Pro                                   |
 | `nabu-minimax` | Dahl MiniMax-M2.7 → Groq (pin MiniMax explicitly)           |
 | `nabu-kimi`    | Dahl Kimi-K2.6 → OpenAI 4o (pin Kimi explicitly)            |
+| `nabu-parspack`| Parspack GPT-4o-mini → Claude Haiku 4.5 → Gemini 2.5 Flash  |
 | `nabu-image`   | OpenAI gpt-image-1 → Gemini 2.5 Flash Image (image gen)     |
 | `nabu-voice`   | OpenAI gpt-4o-mini-tts → Gemini 2.5 Flash TTS (speech)      |
 | `nabu-embed`   | OpenAI text-embedding-3-small → Gemini text-embedding-004   |
@@ -143,6 +144,12 @@ fallback target.
 Aliases live under `models:` (chat), `images:`, `audio:` and `embeddings:` in
 the config. Edit `config.yaml` to add providers, aliases, or change routing — no
 code change needed.
+
+`nabu-parspack` is an opt-in route to **Parspack AI Studio**
+(`my.parspack.com`), an OpenAI-wire-compatible aggregator fronting 100+ models
+behind one key (`PARSPACK_API_KEY`). Point the alias's `model` at any id from
+`GET https://my.parspack.com/api/aistudio/api/v1/models` to pin a specific
+Parspack model.
 
 ## Policy Engine (per-project keys)
 

@@ -53,6 +53,16 @@ providers:
     base_url: "https://inference.dahl.global/v1"
     api_key_env: "DAHL_API_KEY"
 
+  # Parspack AI Studio — OpenAI-wire-compatible aggregator (my.parspack.com)
+  # fronting 100+ models (OpenAI, Anthropic, Gemini, Qwen, MiniMax, …) behind a
+  # single key. The base URL ends in /v1; list live models with
+  # GET https://my.parspack.com/api/aistudio/api/v1/models.
+  parspack:
+    enabled: true
+    type: openai # Parspack AI Studio speaks the OpenAI /v1 wire format
+    base_url: "https://my.parspack.com/api/aistudio/api/v1"
+    api_key_env: "PARSPACK_API_KEY"
+
   anthropic:
     enabled: true
     type: anthropic
@@ -130,6 +140,18 @@ models:
     fallback:
       - provider: openai
         model: "gpt-4o"
+
+  # Parspack AI Studio (opt-in). Pin any model from the Parspack catalog here;
+  # retarget `model` to any id from GET /api/aistudio/api/v1/models.
+  nabu-parspack:
+    primary:
+      provider: parspack
+      model: "openai/gpt-4o-mini"
+    fallback:
+      - provider: parspack
+        model: "anthropic/claude-haiku-4.5"
+      - provider: parspack
+        model: "google/gemini-2.5-flash"
 
 # Image-generation aliases (POST /v1/images/generations).
 images:
