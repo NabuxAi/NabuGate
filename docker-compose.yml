@@ -6,7 +6,11 @@ services:
       dockerfile: Dockerfile
     environment:
       - NABU_CONFIG=/app/config.yaml
-      # Provider secrets (set the ones you enable in config.yaml)
+      # Recommended for Coolify / PaaS: paste the whole config.yaml as this env
+      # var and no file mount is needed. Leave it empty to load from a mounted
+      # file instead (see the volumes note below).
+      - NABU_CONFIG_YAML=${NABU_CONFIG_YAML:-}
+      # Provider secrets (set the ones you enable in your config)
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - GROQ_API_KEY=${GROQ_API_KEY}
       - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
@@ -15,9 +19,12 @@ services:
       - DAHL_API_KEY=${DAHL_API_KEY}
     ports:
       - "8080"
-    volumes:
-      # Provide your own production config (overrides the baked-in example)
-      - ./config.yaml:/app/config.yaml:ro
+    # To load config from a file instead of NABU_CONFIG_YAML, create ./config.yaml
+    # FIRST, then uncomment the mount below. Do not enable it without the file:
+    # Docker turns a missing bind-mount source into an empty directory and the
+    # gateway refuses to start (crash loop).
+    # volumes:
+    #   - ./config.yaml:/app/config.yaml:ro
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "/app/nabugate", "-config", "/dev/null"]

@@ -18,12 +18,13 @@ import (
 )
 
 func main() {
-	configPath := flag.String("config", envOr("NABU_CONFIG", "config.yaml"), "path to the YAML config file")
+	configPath := flag.String("config", envOr("NABU_CONFIG", "config.yaml"),
+		"path to the YAML config file (ignored when the NABU_CONFIG_YAML env var holds the config inline)")
 	flag.Parse()
 
 	log := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
 
-	cfg, err := config.Load(*configPath)
+	cfg, err := config.Resolve(*configPath)
 	if err != nil {
 		log.Error("failed to load config", "error", err)
 		os.Exit(1)
