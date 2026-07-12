@@ -145,6 +145,12 @@ Aliases live under `models:` (chat), `images:`, `audio:` and `embeddings:` in
 the config. Edit `config.yaml` to add providers, aliases, or change routing — no
 code change needed.
 
+`nabu-parspack` is an opt-in route to **Parspack AI Studio**
+(`my.parspack.com`), an OpenAI-wire-compatible aggregator fronting 100+ models
+behind one key (`PARSPACK_API_KEY`). Point the alias's `model` at any id from
+`GET https://my.parspack.com/api/aistudio/api/v1/models` to pin a specific
+Parspack model.
+
 ## Policy Engine (per-project keys)
 
 Keys come in two forms. Simple `api_keys` get full access; rich `keys` carry a

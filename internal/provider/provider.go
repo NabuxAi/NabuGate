@@ -126,10 +126,36 @@ type EmbeddingAdapter interface {
 	Embed(ctx context.Context, req EmbeddingRequest) (EmbeddingResponse, error)
 }
 
+// userAgent is the product User-Agent sent on every outbound provider request.
+// Go's net/http default ("Go-http-client/1.1") is treated as a bot signature by
+// some upstream WAFs (e.g. Parspack AI Studio), which then answer with a 403
+// block page instead of the API response, so we always identify as the gateway.
+const userAgent = "NabuGate/1.0"
+
+// userAgentTransport injects userAgent on any request that does not already set
+// a User-Agent, then delegates to base. It wraps the transport of both shared
+// clients so every adapter/endpoint (chat, stream, image, speech, embeddings)
+// is covered in one place.
+type userAgentTransport struct {
+	base http.RoundTripper
+}
+
+func (t *userAgentTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	if req.Header.Get("User-Agent") == "" {
+		// Clone before mutating: a RoundTripper must not modify the caller's request.
+		req = req.Clone(req.Context())
+		req.Header.Set("User-Agent", userAgent)
+	}
+	return t.base.RoundTrip(req)
+}
+
 // sharedHTTPClient is reused by all adapters for non-streaming calls; each call
 // is also bounded by the request context, so the client timeout is a generous
 // safety net.
-var sharedHTTPClient = &http.Client{Timeout: 120 * time.Second}
+var sharedHTTPClient = &http.Client{
+	Timeout:   120 * time.Second,
+	Transport: &userAgentTransport{base: http.DefaultTransport},
+}
 
 // streamHTTPClient is used for SSE streaming. It deliberately has NO
 // whole-request timeout: http.Client.Timeout also covers reading the response
@@ -142,7 +168,7 @@ var streamHTTPClient = newStreamClient()
 func newStreamClient() *http.Client {
 	tr := http.DefaultTransport.(*http.Transport).Clone()
 	tr.ResponseHeaderTimeout = 120 * time.Second
-	return &http.Client{Transport: tr}
+	return &http.Client{Transport: &userAgentTransport{base: tr}}
 }
 
 // isTransient reports whether an upstream HTTP status is worth retrying.

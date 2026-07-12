@@ -46,6 +46,16 @@ providers:
     base_url: "https://inference.dahl.global/v1"
     api_key_env: "DAHL_API_KEY"
 
+  # Parspack AI Studio — OpenAI-wire-compatible aggregator (my.parspack.com)
+  # fronting 100+ models (OpenAI, Anthropic, Gemini, Qwen, MiniMax, …) behind a
+  # single key. The base URL ends in /v1; skipped automatically when
+  # PARSPACK_API_KEY is empty.
+  parspack:
+    enabled: true
+    type: openai # Parspack AI Studio speaks the OpenAI /v1 wire format
+    base_url: "https://my.parspack.com/api/aistudio/api/v1"
+    api_key_env: "PARSPACK_API_KEY"
+
   anthropic:
     enabled: true
     type: anthropic
