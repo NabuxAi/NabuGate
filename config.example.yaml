@@ -1,31 +1,15 @@
-# NabuGate — central AI/LLM gateway configuration.
-#
-# Projects never talk to OpenAI / Gemini / Claude / Groq / OpenRouter directly.
-# They call NabuGate's OpenAI-compatible endpoint with an *alias* (e.g.
-# "nabu-fast") and NabuGate routes to the right provider, with fallback.
+# NabuGate example configuration for local development.
 
 server:
   port: 8080
-  # Simple full-access keys (any alias, no rate limit). Leave both api_keys and
-  # keys empty to disable auth in local development.
   api_keys:
     - "nabu_dev_key_change_me"
-
-  # Rich per-project keys (Policy Engine): restrict which aliases a key may use
-  # and cap its request rate. `allow` supports globs ("nabu-*"); "*" or empty
-  # means all. `rate_limit` is requests per minute (0 = unlimited).
   keys:
     - key: "crm_prod_key_change_me"
       project: "crm"
       allow: ["nabu-fast", "nabu-embed"]
       rate_limit: 120
-    - key: "support_key_change_me"
-      project: "support"
-      allow: ["nabu-*"]
-      rate_limit: 60
 
-# Upstream providers. The actual secrets live in environment variables
-# (api_key_env), never in this file — that is the Secret Manager boundary.
 providers:
   openai:
     enabled: true
@@ -35,31 +19,25 @@ providers:
 
   groq:
     enabled: true
-    type: openai # Groq is OpenAI-wire-compatible
+    type: openai
     base_url: "https://api.groq.com/openai/v1"
     api_key_env: "GROQ_API_KEY"
 
   openrouter:
     enabled: true
-    type: openai # OpenRouter is OpenAI-wire-compatible
+    type: openai
     base_url: "https://openrouter.ai/api/v1"
     api_key_env: "OPENROUTER_API_KEY"
 
-  # Dahl inference — OpenAI-wire-compatible endpoint hosting open models
-  # (MiniMax, Kimi, …). This is the org's default upstream for general chat.
   dahl:
     enabled: true
-    type: openai # inference.dahl.global speaks the OpenAI /v1 wire format
+    type: openai
     base_url: "https://inference.dahl.global/v1"
     api_key_env: "DAHL_API_KEY"
 
-  # Parspack AI Studio — OpenAI-wire-compatible aggregator (my.parspack.com)
-  # fronting 100+ models (OpenAI, Anthropic, Gemini, Qwen, MiniMax, …) behind a
-  # single key. The base URL ends in /v1; list live models with
-  # GET https://my.parspack.com/api/aistudio/api/v1/models.
   parspack:
     enabled: true
-    type: openai # Parspack AI Studio speaks the OpenAI /v1 wire format
+    type: openai
     base_url: "https://my.parspack.com/api/aistudio/api/v1"
     api_key_env: "PARSPACK_API_KEY"
 
@@ -75,27 +53,12 @@ providers:
     base_url: "https://generativelanguage.googleapis.com/v1beta"
     api_key_env: "GEMINI_API_KEY"
 
-  # Ollama — a local, OpenAI-wire-compatible model server for on-prem inference
-  # (data never leaves your server). It declares no api_key_env: keyless
-  # providers are enabled purely by their base_url, so this provider is skipped
-  # automatically when OLLAMA_BASE_URL is unset. Point OLLAMA_BASE_URL at the
-  # OpenAI-compatible root, including /v1 (e.g. http://ollama:11434/v1).
   ollama:
     enabled: true
-    type: openai # Ollama exposes an OpenAI-compatible /v1 API
+    type: openai
     base_url: "${OLLAMA_BASE_URL}"
-  # Parspack AI Studio — OpenAI-wire-compatible aggregator hosting many hosted
-  # and open models (GPT, Claude, Gemini, Grok, Qwen, MiniMax, Kimi, …).
-  parspack:
-    enabled: true
-    type: openai # my.parspack.com speaks the OpenAI /v1 wire format
-    base_url: "https://my.parspack.com/api/aistudio/api/v1"
-    api_key_env: "PARSPACK_API_KEY"
 
-# Model registry: public alias -> primary target + ordered fallbacks.
-# Projects request the alias; NabuGate picks the provider/model.
 models:
-  # Cheap & very fast — Dahl MiniMax first, then Groq and small hosted models.
   nabu-fast:
     primary:
       provider: dahl
@@ -108,7 +71,6 @@ models:
       - provider: anthropic
         model: "claude-3-5-haiku-latest"
 
-  # Best general reasoning — Dahl Kimi first, then the hosted flagships.
   nabu-smart:
     primary:
       provider: dahl
@@ -121,7 +83,6 @@ models:
       - provider: gemini
         model: "gemini-1.5-pro"
 
-  # Cheapest acceptable quality.
   nabu-cheap:
     primary:
       provider: openrouter
@@ -132,7 +93,6 @@ models:
       - provider: dahl
         model: "MiniMaxAI/MiniMax-M2.7"
 
-  # Long-context / multimodal-capable text.
   nabu-vision:
     primary:
       provider: openai
@@ -141,7 +101,6 @@ models:
       - provider: gemini
         model: "gemini-1.5-pro"
 
-  # Explicit Dahl model aliases (pin a specific upstream model on demand).
   nabu-minimax:
     primary:
       provider: dahl
@@ -158,18 +117,11 @@ models:
       - provider: openai
         model: "gpt-4o"
 
-  # Local / on-prem chat via Ollama. Deliberately has NO cloud fallback: routing
-  # to a local model means data never leaves the server, so if Ollama is
-  # unreachable this alias fails rather than silently spilling to a hosted
-  # provider. "model" is whatever the Ollama server serves (pull it first).
   nabu-local:
     primary:
       provider: ollama
       model: "llama3.1"
-  # Frontier models via Parspack (needs only PARSPACK_API_KEY). Self-contained:
-  # both primary and fallbacks route through Parspack, so it works even when the
-  # direct OpenAI/Anthropic/Gemini keys are unset. Any of Parspack's ~114 models
-  # can be pinned here by id (e.g. "x-ai/grok-4", "qwen/qwen3-coder").
+
   nabu-parspack:
     primary:
       provider: parspack
@@ -180,7 +132,6 @@ models:
       - provider: parspack
         model: "google/gemini-2.5-flash"
 
-# Image-generation aliases (POST /v1/images/generations).
 images:
   nabu-image:
     primary:
@@ -190,7 +141,6 @@ images:
       - provider: gemini
         model: "gemini-2.5-flash-image"
 
-# Text-to-speech aliases (POST /v1/audio/speech).
 audio:
   nabu-voice:
     primary:
@@ -200,7 +150,6 @@ audio:
       - provider: gemini
         model: "gemini-2.5-flash-preview-tts"
 
-# Text-embedding aliases (POST /v1/embeddings).
 embeddings:
   nabu-embed:
     primary:
@@ -210,9 +159,6 @@ embeddings:
       - provider: gemini
         model: "text-embedding-004"
 
-# Cost tracking: USD per 1,000,000 tokens, keyed by "provider/model".
-# Unpriced models are tracked for token usage but contribute 0 cost.
-# Inspect totals at GET /v1/usage.
 pricing:
   "openai/gpt-4o": { input: 2.5, output: 10 }
   "openai/gpt-4o-mini": { input: 0.15, output: 0.6 }
@@ -221,7 +167,3 @@ pricing:
   "anthropic/claude-3-5-haiku-latest": { input: 0.8, output: 4 }
   "gemini/gemini-1.5-pro": { input: 1.25, output: 5 }
   "groq/llama-3.1-70b-versatile": { input: 0.59, output: 0.79 }
-  # Dahl pricing is not published yet; leave unpriced (tracked at 0 cost) or set
-  # your negotiated rate here once known.
-  # "dahl/MiniMaxAI/MiniMax-M2.7": { input: 0, output: 0 }
-  # "dahl/moonshotai/Kimi-K2.6": { input: 0, output: 0 }
