@@ -1,1 +1,0 @@
-Temporary marker to trigger CI smoke-test pull request. This file can be removed after the workflow change is merged.
