@@ -18,8 +18,6 @@ providers:
     api_key_env: "OPENAI_API_KEY"
 `
 
-// TestParseExpandsEnvAndDefaultsPort verifies ${VAR} expansion and the default
-// port fallback shared by file and inline loading.
 func TestParseExpandsEnvAndDefaultsPort(t *testing.T) {
 	t.Setenv("NABU_ADMIN_KEY", "secret-admin")
 
@@ -31,68 +29,59 @@ func TestParseExpandsEnvAndDefaultsPort(t *testing.T) {
 		t.Errorf("default port = %d, want 8080", cfg.Server.Port)
 	}
 	if got := cfg.Server.APIKeys; len(got) != 1 || got[0] != "secret-admin" {
-		t.Errorf("api_keys = %v, want [secret-admin] (env expansion)", got)
+		t.Errorf("api_keys = %v, want [secret-admin]", got)
 	}
 }
 
-// TestResolvePrefersInlineEnv verifies NABU_CONFIG_YAML wins over the file path,
-// so an auto-created/stale bind-mount file can't shadow the inline config.
 func TestResolvePrefersInlineEnv(t *testing.T) {
 	dir := t.TempDir()
-	path := filepath.Join(dir, "config.yaml")
-	if err := os.WriteFile(path, []byte("server:\n  port: 1111\n"), 0o600); err != nil {
+	configPath := filepath.Join(dir, "config.yaml")
+	if err := os.WriteFile(configPath, []byte("server:\n  port: 1111\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	t.Setenv(EnvConfigYAML, "server:\n  port: 2222\n")
 
-	cfg, err := Resolve(path)
+	cfg, err := Resolve(configPath)
 	if err != nil {
 		t.Fatalf("Resolve: %v", err)
 	}
 	if cfg.Server.Port != 2222 {
-		t.Errorf("port = %d, want 2222 (inline env should win)", cfg.Server.Port)
+		t.Errorf("port = %d, want 2222", cfg.Server.Port)
 	}
 }
 
-// TestResolveFallsBackToFile verifies the file is used when the env var is unset
-// or blank (whitespace-only must not be treated as inline config).
 func TestResolveFallsBackToFile(t *testing.T) {
 	dir := t.TempDir()
-	path := filepath.Join(dir, "config.yaml")
-	if err := os.WriteFile(path, []byte("server:\n  port: 3333\n"), 0o600); err != nil {
+	configPath := filepath.Join(dir, "config.yaml")
+	if err := os.WriteFile(configPath, []byte("server:\n  port: 3333\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	t.Setenv(EnvConfigYAML, "   \n")
 
-	cfg, err := Resolve(path)
+	cfg, err := Resolve(configPath)
 	if err != nil {
 		t.Fatalf("Resolve: %v", err)
 	}
 	if cfg.Server.Port != 3333 {
-		t.Errorf("port = %d, want 3333 (should read the file)", cfg.Server.Port)
+		t.Errorf("port = %d, want 3333", cfg.Server.Port)
 	}
 }
 
-// TestLoadMissingFileError checks the missing-config error is actionable and
-// points at the inline-env escape hatch (not a bare os error).
 func TestLoadMissingFileError(t *testing.T) {
 	t.Setenv(EnvConfigYAML, "")
 
 	_, err := Resolve(filepath.Join(t.TempDir(), "does-not-exist.yaml"))
 	if err == nil {
-		t.Fatal("expected an error for a missing config file, got nil")
+		t.Fatal("expected an error for a missing config file")
 	}
 	if !strings.Contains(err.Error(), "not found") {
-		t.Errorf("error %q should say the file was not found", err)
+		t.Errorf("error %q should mention not found", err)
 	}
 	if !strings.Contains(err.Error(), EnvConfigYAML) {
-		t.Errorf("error %q should point at the %s escape hatch", err, EnvConfigYAML)
+		t.Errorf("error %q should mention %s", err, EnvConfigYAML)
 	}
 }
 
-// TestDefaultConfigParses guards the secret-free default baked into the image:
-// it must be valid YAML, expand ${NABU_API_KEY} into the admin key, and carry
-// the provider/model routing (no hardcoded gateway credential shipped).
 func TestDefaultConfigParses(t *testing.T) {
 	t.Setenv("NABU_API_KEY", "admin-from-env")
 
@@ -104,98 +93,94 @@ func TestDefaultConfigParses(t *testing.T) {
 	if err != nil {
 		t.Fatalf("parse config.default.yaml: %v", err)
 	}
+
 	if cfg.Server.Port != 8080 {
 		t.Errorf("port = %d, want 8080", cfg.Server.Port)
 	}
 	if len(cfg.Server.APIKeys) != 1 || cfg.Server.APIKeys[0] != "admin-from-env" {
-		t.Errorf("api_keys = %v, want [admin-from-env] (env expansion)", cfg.Server.APIKeys)
+		t.Errorf("api_keys = %v, want [admin-from-env]", cfg.Server.APIKeys)
 	}
-	if _, ok := cfg.Providers["dahl"]; !ok {
-		t.Error("default config should define the dahl provider")
+
+	for _, name := range []string{"dahl", "parspack", "ollama"} {
+		if _, ok := cfg.Providers[name]; !ok {
+			t.Errorf("default config should define provider %q", name)
+		}
 	}
-	if _, ok := cfg.Models["nabu-fast"]; !ok {
-		t.Error("default config should define the nabu-fast alias")
+	for _, alias := range []string{"nabu-fast", "nabu-local", "nabu-parspack"} {
+		if _, ok := cfg.Models[alias]; !ok {
+			t.Errorf("default config should define alias %q", alias)
+		}
 	}
-	// Ollama (local, on-prem) must be routable through the gateway too.
-	if _, ok := cfg.Providers["ollama"]; !ok {
-		t.Error("default config should define the ollama provider")
-	}
-	local, ok := cfg.Models["nabu-local"]
-	if !ok {
-		t.Fatal("default config should define the nabu-local alias")
-	}
+
+	local := cfg.Models["nabu-local"]
 	if local.Primary.Provider != "ollama" {
 		t.Errorf("nabu-local primary provider = %q, want ollama", local.Primary.Provider)
 	}
 	if len(local.Fallback) != 0 {
-		t.Errorf("nabu-local should have no cloud fallback (on-prem), got %d", len(local.Fallback))
+		t.Errorf("nabu-local should have no fallback, got %d", len(local.Fallback))
+	}
+
+	parspack := cfg.Providers["parspack"]
+	if parspack.Type != "openai" || parspack.APIKeyEnv != "PARSPACK_API_KEY" {
+		t.Errorf("parspack provider = %+v", parspack)
+	}
+	parspackRoute := cfg.Models["nabu-parspack"]
+	if parspackRoute.Primary.Provider != "parspack" {
+		t.Errorf("nabu-parspack primary provider = %q, want parspack", parspackRoute.Primary.Provider)
+	}
+
+	t.Setenv("PARSPACK_API_KEY", "pk-test")
+	adapters, _ := cfg.BuildAdapters()
+	if _, ok := adapters["parspack"]; !ok {
+		t.Error("BuildAdapters should build parspack when its key is set")
 	}
 }
 
-// TestBuildAdaptersKeylessProvider verifies the keyless-provider path used by a
-// local Ollama endpoint: a type:openai provider with no api_key_env is built
-// when it has a base_url (enabling the nabu-local alias) and skipped otherwise.
 func TestBuildAdaptersKeylessProvider(t *testing.T) {
 	withBase := &Config{Providers: map[string]ProviderConfig{
-		"ollama": {Enabled: true, Type: "openai", BaseURL: "http://ollama:11434/v1"},
+		"ollama": {
+			Enabled: true,
+			Type:    "openai",
+			BaseURL: "http://ollama:11434/v1",
+		},
 	}}
 	adapters, _ := withBase.BuildAdapters()
 	if _, ok := adapters["ollama"]; !ok {
-		t.Error("keyless ollama provider with a base_url should be built")
+		t.Error("keyless ollama provider with base_url should be built")
 	}
 
-	noBase := &Config{Providers: map[string]ProviderConfig{
-		"ollama": {Enabled: true, Type: "openai", BaseURL: ""},
+	withoutBase := &Config{Providers: map[string]ProviderConfig{
+		"ollama": {
+			Enabled: true,
+			Type:    "openai",
+		},
 	}}
-	adapters, warnings := noBase.BuildAdapters()
+	adapters, warnings := withoutBase.BuildAdapters()
 	if _, ok := adapters["ollama"]; ok {
-		t.Error("keyless ollama provider without a base_url should be skipped")
+		t.Error("keyless ollama provider without base_url should be skipped")
 	}
 	if !containsSubstr(warnings, "base_url") {
 		t.Errorf("expected a base_url warning, got %v", warnings)
 	}
 
-	// A keyless non-OpenAI provider is a misconfiguration, not a local endpoint.
 	badType := &Config{Providers: map[string]ProviderConfig{
-		"claude": {Enabled: true, Type: "anthropic", BaseURL: "https://api.anthropic.com/v1"},
+		"claude": {
+			Enabled: true,
+			Type:    "anthropic",
+			BaseURL: "https://api.anthropic.com/v1",
+		},
 	}}
 	adapters, warnings = badType.BuildAdapters()
 	if _, ok := adapters["claude"]; ok {
-		t.Error("keyless anthropic provider should be skipped (requires api_key_env)")
+		t.Error("keyless anthropic provider should be skipped")
 	}
 	if !containsSubstr(warnings, "api_key_env") {
 		t.Errorf("expected an api_key_env warning, got %v", warnings)
 	}
 }
 
-func containsSubstr(haystack []string, needle string) bool {
-	for _, s := range haystack {
-		if strings.Contains(s, needle) {
-			return true
-		}
-	}
-	return false
-
-	// Parspack provider + alias are wired and the OpenAI-wire adapter builds.
-	p, ok := cfg.Providers["parspack"]
-	if !ok || p.Type != "openai" || p.APIKeyEnv != "PARSPACK_API_KEY" {
-		t.Errorf("parspack provider = %+v, want type=openai api_key_env=PARSPACK_API_KEY", p)
-	}
-	route, ok := cfg.Models["nabu-parspack"]
-	if !ok || route.Primary.Provider != "parspack" {
-		t.Errorf("nabu-parspack primary = %+v, want provider=parspack", route.Primary)
-	}
-	t.Setenv("PARSPACK_API_KEY", "pk-test")
-	adapters, _ := cfg.BuildAdapters()
-	if _, ok := adapters["parspack"]; !ok {
-		t.Error("BuildAdapters should build the parspack adapter when its key is set")
-	}
-}
-
-// TestLoadDirectoryError reproduces the Docker missing-mount case (target is a
-// directory) and checks the error explains the inline-env escape hatch.
 func TestLoadDirectoryError(t *testing.T) {
-	t.Setenv(EnvConfigYAML, "") // ensure the file path is taken
+	t.Setenv(EnvConfigYAML, "")
 
 	dir := t.TempDir()
 	mount := filepath.Join(dir, "config.yaml")
@@ -205,12 +190,21 @@ func TestLoadDirectoryError(t *testing.T) {
 
 	_, err := Resolve(mount)
 	if err == nil {
-		t.Fatal("expected an error for a directory config path, got nil")
+		t.Fatal("expected an error for a directory config path")
 	}
 	if !strings.Contains(err.Error(), "is a directory") {
-		t.Errorf("error %q should mention it is a directory", err)
+		t.Errorf("error %q should mention directory", err)
 	}
 	if !strings.Contains(err.Error(), EnvConfigYAML) {
-		t.Errorf("error %q should point at the %s escape hatch", err, EnvConfigYAML)
+		t.Errorf("error %q should mention %s", err, EnvConfigYAML)
 	}
+}
+
+func containsSubstr(haystack []string, needle string) bool {
+	for _, value := range haystack {
+		if strings.Contains(value, needle) {
+			return true
+		}
+	}
+	return false
 }
