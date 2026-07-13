@@ -19,3 +19,36 @@ jobs:
         run: go build ./...
       - name: Test
         run: go test ./...
+      - name: Build Docker image
+        run: docker build -t nabugate:ci .
+      - name: Docker startup smoke test
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run -d --name nabugate-ci -p 18080:8080 \
+            -e NABU_API_KEY=ci-admin-key \
+            -e OPENAI_API_KEY=ci-dummy-provider-key \
+            nabugate:ci
+
+          cleanup() {
+            docker logs nabugate-ci || true
+            docker rm -f nabugate-ci >/dev/null 2>&1 || true
+          }
+          trap cleanup EXIT
+
+          for attempt in {1..30}; do
+            if curl --fail --silent http://127.0.0.1:18080/healthz >/tmp/health.json; then
+              break
+            fi
+            if ! docker inspect -f '{{.State.Running}}' nabugate-ci 2>/dev/null | grep -q true; then
+              echo "NabuGate container exited before becoming healthy"
+              exit 1
+            fi
+            sleep 1
+          done
+
+          grep -q '"status":"ok"' /tmp/health.json
+          curl --fail --silent \
+            -H 'Authorization: Bearer ci-admin-key' \
+            http://127.0.0.1:18080/v1/models >/tmp/models.json
+          grep -q 'nabu-fast' /tmp/models.json
