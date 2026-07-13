@@ -1,24 +1,14 @@
 # NabuGate — default config baked into the Docker image (/app/config.yaml).
 #
-# It ships NO secrets: the gateway admin key comes from ${NABU_API_KEY} and every
-# provider secret from its own env var (api_key_env), so this file is safe to
-# publish. Override it entirely by mounting your own /app/config.yaml or by
-# setting NABU_CONFIG_YAML — either takes precedence over this default.
-#
-# Keep it in sync with config.example.yaml (same routing; example adds a dev key
-# and per-project key samples for local use).
+# This file contains no secrets. Gateway and provider keys are injected through
+# environment variables at runtime. Providers without an available key are
+# skipped automatically.
 
 server:
   port: 8080
-  # Gateway admin key(s) projects must send as `Authorization: Bearer …`.
-  # Sourced from the environment; if NABU_API_KEY is unset the list is empty and
-  # the gateway refuses to start (open-gateway guard) unless NABU_ALLOW_NO_AUTH=1.
   api_keys:
     - "${NABU_API_KEY}"
 
-# Upstream providers. Secrets live in environment variables (api_key_env), never
-# in this file. A provider whose env var is empty is skipped automatically, so
-# the gateway can start with only the providers you have keys for.
 providers:
   openai:
     enabled: true
@@ -28,31 +18,25 @@ providers:
 
   groq:
     enabled: true
-    type: openai # Groq is OpenAI-wire-compatible
+    type: openai
     base_url: "https://api.groq.com/openai/v1"
     api_key_env: "GROQ_API_KEY"
 
   openrouter:
     enabled: true
-    type: openai # OpenRouter is OpenAI-wire-compatible
+    type: openai
     base_url: "https://openrouter.ai/api/v1"
     api_key_env: "OPENROUTER_API_KEY"
 
-  # Dahl inference — OpenAI-wire-compatible endpoint hosting open models
-  # (MiniMax, Kimi, …). This is the org's default upstream for general chat.
   dahl:
     enabled: true
-    type: openai # inference.dahl.global speaks the OpenAI /v1 wire format
+    type: openai
     base_url: "https://inference.dahl.global/v1"
     api_key_env: "DAHL_API_KEY"
 
-  # Parspack AI Studio — OpenAI-wire-compatible aggregator (my.parspack.com)
-  # fronting 100+ models (OpenAI, Anthropic, Gemini, Qwen, MiniMax, …) behind a
-  # single key. The base URL ends in /v1; skipped automatically when
-  # PARSPACK_API_KEY is empty.
   parspack:
     enabled: true
-    type: openai # Parspack AI Studio speaks the OpenAI /v1 wire format
+    type: openai
     base_url: "https://my.parspack.com/api/aistudio/api/v1"
     api_key_env: "PARSPACK_API_KEY"
 
@@ -68,24 +52,11 @@ providers:
     base_url: "https://generativelanguage.googleapis.com/v1beta"
     api_key_env: "GEMINI_API_KEY"
 
-  # Ollama — a local, OpenAI-wire-compatible model server. Keeps inference (and
-  # data) on-prem. It has no api_key_env: keyless providers are enabled purely by
-  # their base_url, so this provider is skipped automatically when OLLAMA_BASE_URL
-  # is unset. Point OLLAMA_BASE_URL at the OpenAI-compatible root, incl. /v1
-  # (e.g. http://ollama:11434/v1).
   ollama:
     enabled: true
-    type: openai # Ollama exposes an OpenAI-compatible /v1 API
+    type: openai
     base_url: "${OLLAMA_BASE_URL}"
-  # Parspack AI Studio — OpenAI-wire-compatible aggregator hosting many hosted
-  # and open models (GPT, Claude, Gemini, Grok, Qwen, MiniMax, Kimi, …).
-  parspack:
-    enabled: true
-    type: openai # my.parspack.com speaks the OpenAI /v1 wire format
-    base_url: "https://my.parspack.com/api/aistudio/api/v1"
-    api_key_env: "PARSPACK_API_KEY"
 
-# Model registry: public alias -> primary target + ordered fallbacks.
 models:
   nabu-fast:
     primary:
@@ -145,18 +116,11 @@ models:
       - provider: openai
         model: "gpt-4o"
 
-  # Local / on-prem chat via Ollama. Deliberately has NO cloud fallback: the
-  # point of routing to a local model is that data never leaves the server, so
-  # if Ollama is unreachable this alias fails rather than silently spilling the
-  # request to a hosted provider. Override OLLAMA_MODEL upstream in Ollama; the
-  # model name here is what the Ollama server serves (pull it first).
   nabu-local:
     primary:
       provider: ollama
       model: "llama3.1"
-  # Frontier models via Parspack (needs only PARSPACK_API_KEY). Self-contained:
-  # both primary and fallbacks route through Parspack, so it works even when the
-  # direct OpenAI/Anthropic/Gemini keys are unset.
+
   nabu-parspack:
     primary:
       provider: parspack
@@ -194,7 +158,6 @@ embeddings:
       - provider: gemini
         model: "text-embedding-004"
 
-# Cost tracking: USD per 1,000,000 tokens, keyed by "provider/model".
 pricing:
   "openai/gpt-4o": { input: 2.5, output: 10 }
   "openai/gpt-4o-mini": { input: 0.15, output: 0.6 }
