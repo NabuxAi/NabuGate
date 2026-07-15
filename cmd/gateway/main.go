@@ -43,7 +43,11 @@ func main() {
 	r := router.New(adapters, cfg.Models, cfg.Images, cfg.Audio, cfg.Embeddings, passthrough, log)
 	enforcer := policy.New(cfg.Server.APIKeys, cfg.Server.Keys)
 	tracker := usage.New(cfg.Pricing)
-	srv := server.New(r, enforcer, tracker, log)
+	agents, agentWarnings := cfg.BuildAgents()
+	for _, w := range agentWarnings {
+		log.Warn(w)
+	}
+	srv := server.New(r, enforcer, tracker, agents, log)
 
 	if !enforcer.Enabled() {
 		// A gateway that holds provider secrets and spends money must not come up
@@ -71,6 +75,7 @@ func main() {
 		"providers", providerNames,
 		"aliases", r.Aliases(),
 		"passthrough", passthroughNames,
+		"agents", agents.Names(),
 	)
 
 	httpServer := &http.Server{

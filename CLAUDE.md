@@ -20,7 +20,9 @@ internal/provider/         # آداپتورها: openai (+groq/openrouter)، ant
 internal/config/           # خواندن config.yaml و ساختِ آداپتورها
 internal/policy/           # کلیدِ پروژه‌ای: allow-list + rate-limit
 internal/usage/            # شمارشِ توکن و هزینه per-project/per-model
-config.example.yaml        # نمونهٔ پیکربندی (alias‌ها، providerها، pricing)
+internal/agent/            # ساب‌ایجنت‌ها: system prompt + پارامترهای پیش‌فرض روی یک alias
+agents/                    # تعریفِ ساب‌ایجنت‌ها به‌صورتِ فایلِ YAML (بارگذاری از بیرون)
+config.example.yaml        # نمونهٔ پیکربندی (alias‌ها، providerها، pricing، agents)
 ```
 
 ## قراردادِ مهم
@@ -40,6 +42,23 @@ config.example.yaml        # نمونهٔ پیکربندی (alias‌ها، provi
 - سکرت‌ها فقط از env خوانده می‌شوند؛ هرگز در کد/کانفیگِ ایمیج نوشته نشوند.
 - providerی که env کلیدش خالی باشد خودکار رد می‌شود تا دروازه با زیرمجموعه‌ای از
   providerها هم بالا بیاید.
+
+## ساب‌ایجنت‌ها (agents)
+- **ساب‌ایجنت** = یک دستیارِ نام‌دار: یک **system prompt + پارامترهای پیش‌فرض** که
+  روی یک alias‌ِ موجود سوار می‌شود. کاملاً با **config تعریف می‌شود، بدونِ کد**؛ یا
+  inline زیرِ `agents:` یا — برای «تعریف از بیرون» — هر ایجنت در یک فایلِ YAML
+  داخلِ پوشهٔ `agents_dir`.
+- ایجنت مثلِ یک `model` صدا زده می‌شود (`POST /v1/chat/completions` با
+  `model: "cine-motion-designer"`)، پس هر کلاینتِ سازگارِ OpenAI با **یک درخواست**
+  آن را اجرا می‌کند و از همان زنجیرهٔ fallbackِ router استفاده می‌شود.
+- دروازه system prompt را جلوی پیام‌ها می‌گذارد، پارامترهایی که کاربر نداده را با
+  پیش‌فرضِ ایجنت پر می‌کند (مقدارِ صریحِ کاربر همیشه برنده است)، به `model`ِ زیرین
+  route می‌کند و نامِ ایجنت را در پاسخ و هدرِ `X-Nabu-Agent` برمی‌گرداند. ایجنت‌ها در
+  `/v1/models` هم فهرست می‌شوند و با allow-listِ کلید (مثلِ گلابِ `cine-*`) کنترل
+  می‌شوند. این رفتارِ سازگاریِ OpenAI را نشکن.
+- پوشهٔ `agents/` گروهِ **Cinematic Scrollytelling** را دارد: هفت متخصص برای ساختِ
+  صفحاتِ سینماییِ اسکرول‌محور (کارگردانِ خلاق، طراحِ تعاملی، موشن، سه‌بعدی،
+  فرانت‌اند، محتوا، و مهندسِ کارایی/دسترس‌پذیری).
 
 ## دستورات
 ```bash

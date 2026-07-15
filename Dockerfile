@@ -27,6 +27,9 @@ COPY --from=build /out/nabugate /app/nabugate
 # secrets from their own env vars. Override it by mounting your own file at
 # /app/config.yaml or by setting NABU_CONFIG_YAML (either wins over this default).
 COPY config.default.yaml /app/config.yaml
+# The cinematic-scrollytelling sub-agents; the default config loads them via
+# agents_dir: "/app/agents".
+COPY agents /app/agents
 ENV NABU_CONFIG=/app/config.yaml
 EXPOSE 8080
 

@@ -165,6 +165,12 @@ embeddings:
       - provider: gemini
         model: "text-embedding-004"
 
+# Sub-agents (system prompt + defaults over an alias, addressable as a "model").
+# The Cinematic Scrollytelling squad ships as one YAML file per agent under
+# /app/agents in the image (./agents in the repo). Add your own inline under an
+# `agents:` map or as more files in this directory. Grant with allow: ["cine-*"].
+agents_dir: "/app/agents"
+
 pricing:
   "openai/gpt-4o": { input: 2.5, output: 10 }
   "openai/gpt-4o-mini": { input: 0.15, output: 0.6 }

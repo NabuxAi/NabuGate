@@ -72,7 +72,7 @@ Other endpoints:
 | `POST /v1/images/generations`| Image generation; returns `data[].b64_json`         |
 | `POST /v1/audio/speech`      | Text-to-speech; returns raw audio bytes (wav/mp3)   |
 | `POST /v1/embeddings`        | Text embeddings; `input` may be a string or array   |
-| `GET  /v1/models`            | List aliases **and** passthrough providers' discovered models |
+| `GET  /v1/models`            | List aliases, passthrough providers' discovered models **and** sub-agents |
 | `GET  /v1/usage`             | Accumulated token usage and cost (per project/model)|
 | `GET  /healthz`              | Liveness probe                                      |
 
@@ -195,6 +195,44 @@ code change needed.
 behind one key (`PARSPACK_API_KEY`). Point the alias's `model` at any id from
 `GET https://my.parspack.com/api/aistudio/api/v1/models` to pin a specific
 Parspack model.
+
+## Sub-agents (agents defined from outside, run in one call)
+
+A **sub-agent** is a named assistant = a **system prompt + default parameters**
+layered on top of an existing chat alias. Agents are declared **entirely in
+config — no code** — either inline under `agents:` or, so specialists can be
+authored and dropped in from outside the main config, as one YAML file per agent
+in an `agents_dir`. An agent is addressable as a `model`, so any OpenAI client
+runs it in a single fast call and it rides the router's normal fallback chain.
+
+```yaml
+# config.yaml
+agents_dir: "./agents"          # load every *.yaml in this dir as one agent each
+
+agents:                          # …and/or define them inline
+  cine-motion-designer:
+    model: nabu-smart            # any existing chat alias or "<provider>/<model>"
+    system: "You are a Motion Designer for cinematic scroll-driven pages…"
+    temperature: 0.7             # optional defaults; an explicit request value wins
+```
+
+```bash
+curl -X POST http://localhost:8080/v1/chat/completions \
+  -H "Authorization: Bearer nabu_dev_key_change_me" \
+  -d '{ "model": "cine-motion-designer",
+        "messages": [{ "role": "user", "content": "Storyboard the hero scene." }] }'
+```
+
+NabuGate prepends the agent's system prompt, fills any params the caller left
+unset, routes to the agent's `model`, and echoes the agent name back as `model`
+(plus an `X-Nabu-Agent` header). Agents also appear on `GET /v1/models`, and a
+project key can be granted a group with a glob (`allow: ["cine-*"]`).
+
+The bundled [`agents/`](agents/) directory ships the **Cinematic Scrollytelling
+squad** — seven specialists (creative director, interactive designer, motion
+designer, 3D artist, front-end developer, content strategist, and a
+performance/accessibility engineer) that together design Apple-style,
+scroll-driven product pages. See [`agents/README.md`](agents/README.md).
 
 ## Policy Engine (per-project keys)
 

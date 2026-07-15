@@ -169,6 +169,27 @@ embeddings:
       - provider: gemini
         model: "text-embedding-004"
 
+# Sub-agents: named assistants = a system prompt + default params layered on top
+# of a chat alias, addressable as a "model" (POST /v1/chat/completions with
+# model: "cine-motion-designer"). Two ways to define them, and they compose:
+#
+#   1. Inline, right here under `agents:` (map key = agent name).
+#   2. From outside the main config, as one YAML file per agent in `agents_dir`
+#      (see ./agents for the cinematic-scrollytelling squad). Great for dropping
+#      in a new specialist without touching this file.
+#
+# Grant a project key access with a glob, e.g. allow: ["cine-*"].
+agents_dir: "./agents"
+
+agents:
+  # A minimal inline example. `model` points at any existing chat alias (or a
+  # "<provider>/<model>" passthrough); the router's fallback still applies.
+  nabu-assistant:
+    description: "General helpful assistant on the fast alias."
+    model: nabu-fast
+    system: "You are NabuGate's built-in assistant. Be concise and helpful."
+    temperature: 0.5
+
 pricing:
   "openai/gpt-4o": { input: 2.5, output: 10 }
   "openai/gpt-4o-mini": { input: 0.15, output: 0.6 }

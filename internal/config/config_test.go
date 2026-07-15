@@ -200,6 +200,106 @@ func TestLoadDirectoryError(t *testing.T) {
 	}
 }
 
+func TestBuildAgentsInline(t *testing.T) {
+	const raw = `
+agents:
+  cine-writer:
+    model: nabu-fast
+    system: "You write."
+    temperature: 0.4
+  cine-director:
+    name: cine-creative-director
+    model: nabu-smart
+    system: "You direct."
+  broken:
+    system: "no model here"
+`
+	cfg, err := Parse(raw)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	reg, warnings := cfg.BuildAgents()
+
+	if _, ok := reg.Lookup("cine-writer"); !ok {
+		t.Error("cine-writer should be registered from its map key")
+	}
+	// The `name:` override wins over the map key.
+	if _, ok := reg.Lookup("cine-creative-director"); !ok {
+		t.Error("cine-creative-director (name override) should be registered")
+	}
+	if _, ok := reg.Lookup("cine-director"); ok {
+		t.Error("map key should not register when name overrides it")
+	}
+	// The model-less entry is skipped with a warning, not fatal.
+	if _, ok := reg.Lookup("broken"); ok {
+		t.Error("agent without a model should be skipped")
+	}
+	if !containsSubstr(warnings, "broken") {
+		t.Errorf("expected a warning about the broken agent, got %v", warnings)
+	}
+	w, _ := reg.Lookup("cine-writer")
+	if w.Temperature == nil || *w.Temperature != 0.4 {
+		t.Errorf("cine-writer temperature = %v, want 0.4", w.Temperature)
+	}
+}
+
+func TestBuildAgentsFromDir(t *testing.T) {
+	dir := t.TempDir()
+	files := map[string]string{
+		"motion.yaml": "name: cine-motion-designer\nmodel: nabu-smart\nsystem: |\n  You choreograph motion.\n",
+		"perf.yml":    "model: nabu-fast\nsystem: You optimise.\n", // name falls back to file base
+		"notes.txt":   "model: ignored\n",                          // non-YAML, ignored
+	}
+	for name, body := range files {
+		if err := os.WriteFile(filepath.Join(dir, name), []byte(body), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	cfg := &Config{AgentsDir: dir}
+	reg, warnings := cfg.BuildAgents()
+	if len(warnings) != 0 {
+		t.Errorf("unexpected warnings: %v", warnings)
+	}
+	if _, ok := reg.Lookup("cine-motion-designer"); !ok {
+		t.Error("cine-motion-designer should load from motion.yaml's name field")
+	}
+	if _, ok := reg.Lookup("perf"); !ok {
+		t.Error("perf should load with name derived from perf.yml file base")
+	}
+	if reg.Len() != 2 {
+		t.Errorf("registry size = %d, want 2 (notes.txt ignored)", reg.Len())
+	}
+}
+
+func TestShippedCinematicAgentsLoad(t *testing.T) {
+	cfg := &Config{AgentsDir: "../../agents"}
+	reg, warnings := cfg.BuildAgents()
+	if len(warnings) != 0 {
+		t.Errorf("shipped agents produced warnings: %v", warnings)
+	}
+	for _, name := range []string{
+		"cine-creative-director",
+		"cine-interactive-designer",
+		"cine-motion-designer",
+		"cine-3d-artist",
+		"cine-frontend-developer",
+		"cine-content-strategist",
+		"cine-performance-a11y",
+	} {
+		ag, ok := reg.Lookup(name)
+		if !ok {
+			t.Errorf("shipped agent %q should load from ./agents", name)
+			continue
+		}
+		if strings.TrimSpace(ag.System) == "" {
+			t.Errorf("agent %q has an empty system prompt", name)
+		}
+		if strings.TrimSpace(ag.Model) == "" {
+			t.Errorf("agent %q has no model", name)
+		}
+	}
+}
+
 func containsSubstr(haystack []string, needle string) bool {
 	for _, value := range haystack {
 		if strings.Contains(value, needle) {
