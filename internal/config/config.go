@@ -66,7 +66,7 @@ type ServerConfig struct {
 // ProviderConfig describes one upstream provider.
 type ProviderConfig struct {
 	Enabled   bool   `yaml:"enabled"`
-	Type      string `yaml:"type"` // "openai" | "anthropic" | "gemini"
+	Type      string `yaml:"type"` // "openai" | "anthropic" | "gemini" | "pexels"
 	BaseURL   string `yaml:"base_url"`
 	APIKeyEnv string `yaml:"api_key_env"`
 
@@ -193,6 +193,8 @@ func (c *Config) BuildAdapters() (map[string]provider.Adapter, []string) {
 			adapters[name] = provider.NewAnthropicAdapter(name, p.BaseURL, apiKey)
 		case "gemini":
 			adapters[name] = provider.NewGeminiAdapter(name, p.BaseURL, apiKey)
+		case "pexels":
+			adapters[name] = provider.NewPexelsAdapter(name, p.BaseURL, apiKey)
 		default:
 			warnings = append(warnings, fmt.Sprintf("provider %q has unknown type %q", name, p.Type))
 		}

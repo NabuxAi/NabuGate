@@ -84,6 +84,18 @@ curl -X POST http://localhost:8080/v1/images/generations \
   -d '{ "model": "nabu-image", "prompt": "a calm minimal illustration", "n": 1 }'
 ```
 
+Images come from AI generation (OpenAI / Gemini) **or** real stock photos: the
+`pexels` provider searches [Pexels](https://www.pexels.com/api/) for the prompt
+and returns the photo bytes base64-encoded, exactly like a generated image
+(`data[].b64_json`). Use the `nabu-photo` alias for stock photos only, or rely on
+the Pexels fallback on `nabu-image` when generation providers are unavailable:
+
+```bash
+curl -X POST http://localhost:8080/v1/images/generations \
+  -H "Authorization: Bearer nabu_dev_key_change_me" \
+  -d '{ "model": "nabu-photo", "prompt": "coffee cup, dark moody", "n": 3 }'
+```
+
 Speech example (saves an audio file):
 
 ```bash
@@ -174,7 +186,8 @@ reaching a provider's long tail of models without editing config per model.
 | `nabu-kimi`    | Dahl Kimi-K2.6 → OpenAI 4o (pin Kimi explicitly)            |
 | `nabu-local`   | Ollama (local, on-prem — no fallback so data never leaves)  |
 | `nabu-parspack`| Parspack GPT-5.5 → Claude Sonnet 4.6 → Gemini 2.5 Flash     |
-| `nabu-image`   | OpenAI gpt-image-1 → Gemini 2.5 Flash Image (image gen)     |
+| `nabu-image`   | OpenAI gpt-image-1 → Gemini 2.5 Flash Image → Pexels (image) |
+| `nabu-photo`   | Pexels stock-photo search (real photos, no generation)      |
 | `nabu-voice`   | OpenAI gpt-4o-mini-tts → Gemini 2.5 Flash TTS (speech)      |
 | `nabu-embed`   | OpenAI text-embedding-3-small → Gemini text-embedding-004   |
 

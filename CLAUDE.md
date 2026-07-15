@@ -16,7 +16,7 @@ Gemini/Groq/OpenRouter وصل نمی‌شوند؛ با یک **alias** مثل `na
 cmd/gateway/main.go        # نقطهٔ شروع: load config → adapters → router → server
 internal/server/           # HTTP سازگار با OpenAI (auth/policy/usage)
 internal/router/           # alias → target، fallback چندلایه
-internal/provider/         # آداپتورها: openai (+groq/openrouter)، anthropic، gemini
+internal/provider/         # آداپتورها: openai (+groq/openrouter)، anthropic، gemini، pexels (تصویرِ استوک)
 internal/config/           # خواندن config.yaml و ساختِ آداپتورها
 internal/policy/           # کلیدِ پروژه‌ای: allow-list + rate-limit
 internal/usage/            # شمارشِ توکن و هزینه per-project/per-model
@@ -39,6 +39,11 @@ config.example.yaml        # نمونهٔ پیکربندی (alias‌ها، provi
   می‌شوند و `tool_calls` در پاسخ برمی‌گردد. این رفتار را نشکن.
 - آداپتورهای Anthropic/Gemini سازگارِ wire نیستند؛ پارامترهای typed (temperature,
   top_p, max_tokens, stop) به فرمتِ بومی نگاشت می‌شوند.
+- آداپتورِ `pexels` فقط تصویر است (`ImageAdapter`): برای promptِ کاربر در Pexels
+  جست‌وجو می‌کند، عکس‌ها را دانلود و base64 می‌کند تا مثلِ یک تصویرِ تولیدی
+  (`data[].b64_json`) برگردد. یک alias تصویری (`nabu-photo` یا fallbackِ
+  `nabu-image`) به آن نگاشت می‌شود. `Chat` را پشتیبانی نمی‌کند و فقط باید هدفِ
+  aliasهای تصویری باشد.
 - سکرت‌ها فقط از env خوانده می‌شوند؛ هرگز در کد/کانفیگِ ایمیج نوشته نشوند.
 - providerی که env کلیدش خالی باشد خودکار رد می‌شود تا دروازه با زیرمجموعه‌ای از
   providerها هم بالا بیاید.
