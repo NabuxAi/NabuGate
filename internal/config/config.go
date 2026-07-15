@@ -47,6 +47,17 @@ type ProviderConfig struct {
 	Type      string `yaml:"type"` // "openai" | "anthropic" | "gemini"
 	BaseURL   string `yaml:"base_url"`
 	APIKeyEnv string `yaml:"api_key_env"`
+
+	// Passthrough turns the provider into a first-class multi-model provider:
+	// callers may address any of its models directly as "<provider>/<model>"
+	// (e.g. "parspack/openai/gpt-5.5") with no hand-written alias, and — for
+	// OpenAI-wire providers — the provider's whole catalogue is discovered live
+	// from its /v1/models endpoint and surfaced on the gateway's own /v1/models.
+	Passthrough bool `yaml:"passthrough"`
+	// Models is an optional static catalogue for a passthrough provider. It is
+	// always listed on /v1/models (in addition to anything discovered live), so
+	// providers without a usable /v1/models endpoint can still advertise models.
+	Models []string `yaml:"models"`
 }
 
 // Target points at a concrete provider + upstream model name.
@@ -166,4 +177,23 @@ func (c *Config) BuildAdapters() (map[string]provider.Adapter, []string) {
 	}
 
 	return adapters, warnings
+}
+
+// Passthroughs returns the passthrough-enabled providers (name -> static model
+// catalogue) that actually have a live adapter. Providers marked passthrough
+// but skipped for a missing key are excluded, so the router never advertises or
+// routes to a provider that could not be built. The static list may be empty;
+// live discovery (for OpenAI-wire providers) supplements it at request time.
+func (c *Config) Passthroughs(adapters map[string]provider.Adapter) map[string][]string {
+	out := make(map[string][]string)
+	for name, p := range c.Providers {
+		if !p.Enabled || !p.Passthrough {
+			continue
+		}
+		if _, ok := adapters[name]; !ok {
+			continue
+		}
+		out[name] = p.Models
+	}
+	return out
 }

@@ -39,7 +39,8 @@ func main() {
 		os.Exit(1)
 	}
 
-	r := router.New(adapters, cfg.Models, cfg.Images, cfg.Audio, cfg.Embeddings, log)
+	passthrough := cfg.Passthroughs(adapters)
+	r := router.New(adapters, cfg.Models, cfg.Images, cfg.Audio, cfg.Embeddings, passthrough, log)
 	enforcer := policy.New(cfg.Server.APIKeys, cfg.Server.Keys)
 	tracker := usage.New(cfg.Pricing)
 	srv := server.New(r, enforcer, tracker, log)
@@ -61,10 +62,15 @@ func main() {
 	for name := range adapters {
 		providerNames = append(providerNames, name)
 	}
+	passthroughNames := make([]string, 0, len(passthrough))
+	for name := range passthrough {
+		passthroughNames = append(passthroughNames, name)
+	}
 	log.Info("nabugate starting",
 		"port", cfg.Server.Port,
 		"providers", providerNames,
 		"aliases", r.Aliases(),
+		"passthrough", passthroughNames,
 	)
 
 	httpServer := &http.Server{

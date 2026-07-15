@@ -67,11 +67,12 @@ Other endpoints:
 
 | Method & path                | Description                                          |
 | ---------------------------- | --------------------------------------------------- |
-| `POST /v1/chat/completions`  | Chat completion (alias-routed); supports `stream: true` |
+| `POST /v1/chat/completions`  | Chat completion (alias- or passthrough-routed); supports `stream: true` |
+| `POST /v1/responses`         | OpenAI Responses API, proxied transparently (JSON or SSE) |
 | `POST /v1/images/generations`| Image generation; returns `data[].b64_json`         |
 | `POST /v1/audio/speech`      | Text-to-speech; returns raw audio bytes (wav/mp3)   |
 | `POST /v1/embeddings`        | Text embeddings; `input` may be a string or array   |
-| `GET  /v1/models`            | List available aliases (chat/image/audio/embeddings)|
+| `GET  /v1/models`            | List aliases **and** passthrough providers' discovered models |
 | `GET  /v1/usage`             | Accumulated token usage and cost (per project/model)|
 | `GET  /healthz`              | Liveness probe                                      |
 
@@ -125,6 +126,41 @@ the common typed params (`temperature`, `top_p`, `max_tokens`, `stop`); native
 tool translation for those two is a follow-up. Transient upstream failures
 (network, 429, 5xx) are retried with backoff before the router moves to the next
 fallback target.
+
+### Multi-model providers (passthrough & discovery)
+
+Some upstreams — **Parspack AI Studio**, OpenRouter, Groq — are not a single
+model but a provider hosting dozens. Writing one alias per model does not scale.
+Mark such a provider `passthrough: true` in `config.yaml` and it becomes a
+first-class namespace:
+
+- **Direct routing, no alias.** Address any of its models as
+  `"<provider>/<model>"`. The gateway splits on the **first** `/`, so a
+  vendor-namespaced upstream ID keeps its own slashes:
+
+  ```bash
+  curl -X POST http://localhost:8080/v1/chat/completions \
+    -H "Authorization: Bearer nabu_dev_key_change_me" \
+    -d '{ "model": "parspack/openai/gpt-5.5",
+          "messages": [{ "role": "user", "content": "سلام" }] }'
+  # → provider "parspack", upstream model "openai/gpt-5.5"
+  ```
+
+- **Live discovery.** `GET /v1/models` returns the configured aliases **plus**
+  every model discovered from each passthrough provider's own `/v1/models`
+  (cached ~5 min), as `parspack/…` entries with `owned_by: parspack`. Any
+  static `models:` listed under the provider are advertised too, so a provider
+  without a usable `/v1/models` still shows up. Discovery failures degrade
+  gracefully — the endpoint keeps serving aliases and the last good catalogue.
+
+- **Namespace grants.** A project key allows a whole provider with a wildcard:
+  `allow: ["parspack/*"]` covers `parspack/openai/gpt-5.5` and every other
+  `parspack/<model>` (including nested IDs). `/v1/models` is filtered to what
+  each key may use.
+
+Configured **aliases** still work unchanged and are the recommended default for
+apps (they add multi-provider fallback); passthrough is the escape hatch for
+reaching a provider's long tail of models without editing config per model.
 
 ## Aliases (default config)
 

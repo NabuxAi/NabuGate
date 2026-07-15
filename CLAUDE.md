@@ -24,8 +24,13 @@ config.example.yaml        # نمونهٔ پیکربندی (alias‌ها، provi
 ```
 
 ## قراردادِ مهم
-- API باید **سازگار با OpenAI-wire** بماند (`/v1/chat/completions`، `/v1/embeddings`،
-  `/v1/images/generations`، `/v1/audio/speech`، `/v1/models`، `/v1/usage`).
+- API باید **سازگار با OpenAI-wire** بماند (`/v1/chat/completions`، `/v1/responses`،
+  `/v1/embeddings`، `/v1/images/generations`، `/v1/audio/speech`، `/v1/models`،
+  `/v1/usage`).
+- providerهای چندمدلی (مثل Parspack) را با `passthrough: true` علامت بزن: مدل‌هایشان
+  به‌صورتِ `"<provider>/<model>"` مستقیم route می‌شوند (بدون alias) و کاتالوگشان از
+  `/v1/models` خودِ provider به‌صورت زنده کشف و در `/v1/models` دروازه نمایش داده
+  می‌شود. جداکننده اولین `/` است تا شناسه‌های تودرتو (`openai/gpt-5.5`) سالم بمانند.
 - در چت، بدنهٔ درخواست به‌صورتِ **passthroughِ شفاف** به provider منتقل می‌شود؛ فقط
   `model` (به مدلِ upstream) و پرچم‌های stream بازنویسی می‌شوند. یعنی `tools`,
   `tool_choice`, `response_format`, `top_p`, `stop`, `seed`, penalties و … خودکار رد

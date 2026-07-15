@@ -39,6 +39,13 @@ providers:
     type: openai
     base_url: "https://my.parspack.com/api/aistudio/api/v1"
     api_key_env: "PARSPACK_API_KEY"
+    # Parspack AI Studio is not a single model — it is a provider hosting many.
+    # passthrough lets callers address any of them directly as
+    # "parspack/<model>" (e.g. "parspack/openai/gpt-5.5") with no per-model
+    # alias, and surfaces its whole catalogue on /v1/models via live discovery
+    # of the provider's own /v1/models endpoint. Grant access with
+    # allow: ["parspack/*"] on a project key.
+    passthrough: true
 
   anthropic:
     enabled: true

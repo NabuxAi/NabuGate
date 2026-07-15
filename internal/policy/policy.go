@@ -5,6 +5,7 @@ package policy
 
 import (
 	"path"
+	"strings"
 	"sync"
 	"time"
 )
@@ -32,12 +33,32 @@ func (p Policy) Allows(alias string) bool {
 		return true
 	}
 	for _, pattern := range p.Allow {
-		if pattern == "*" {
+		if matchAlias(pattern, alias) {
 			return true
 		}
-		if ok, err := path.Match(pattern, alias); err == nil && ok {
-			return true
-		}
+	}
+	return false
+}
+
+// matchAlias matches one allow-list pattern against an alias. "*" (or "**")
+// permits everything. A pattern ending in "/*" or "/**" grants a whole
+// passthrough-provider namespace: "parspack/*" matches "parspack/openai/gpt-5.5"
+// too, which path.Match alone would miss because its "*" does not cross the "/"
+// separator (provider model IDs like "openai/gpt-5.5" are themselves nested).
+// Every other pattern keeps path.Match glob semantics, so flat aliases such as
+// "nabu-*" behave exactly as before.
+func matchAlias(pattern, alias string) bool {
+	if pattern == "*" || pattern == "**" {
+		return true
+	}
+	if prefix, ok := strings.CutSuffix(pattern, "/**"); ok {
+		return alias == prefix || strings.HasPrefix(alias, prefix+"/")
+	}
+	if prefix, ok := strings.CutSuffix(pattern, "/*"); ok {
+		return alias == prefix || strings.HasPrefix(alias, prefix+"/")
+	}
+	if ok, err := path.Match(pattern, alias); err == nil && ok {
+		return true
 	}
 	return false
 }
