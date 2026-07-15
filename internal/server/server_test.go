@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"nabugate/internal/agent"
 	"nabugate/internal/config"
 	"nabugate/internal/policy"
 	"nabugate/internal/provider"
@@ -44,7 +45,8 @@ func fakeUpstream(t *testing.T) *httptest.Server {
 
 // newTestServer wires a Server whose only provider is a passthrough-enabled
 // OpenAI adapter pointed at the given upstream, with one alias (nabu-fast).
-func newTestServer(t *testing.T, upstreamURL string, enforcer *policy.Enforcer) *httptest.Server {
+// agents may be nil when the test does not exercise sub-agents.
+func newTestServer(t *testing.T, upstreamURL string, enforcer *policy.Enforcer, agents *agent.Registry) *httptest.Server {
 	t.Helper()
 	adapters := map[string]provider.Adapter{
 		"parspack": provider.NewOpenAIAdapter("parspack", upstreamURL, "k", nil),
@@ -53,7 +55,7 @@ func newTestServer(t *testing.T, upstreamURL string, enforcer *policy.Enforcer) 
 		"nabu-fast": {Primary: config.Target{Provider: "parspack", Model: "openai/gpt-5.5"}},
 	}
 	r := router.New(adapters, models, nil, nil, nil, map[string][]string{"parspack": nil}, discardLogger())
-	srv := New(r, enforcer, usage.New(nil), discardLogger())
+	srv := New(r, enforcer, usage.New(nil), agents, discardLogger())
 	return httptest.NewServer(srv.Handler())
 }
 
@@ -62,7 +64,7 @@ func newTestServer(t *testing.T, upstreamURL string, enforcer *policy.Enforcer) 
 func TestModelsIncludesDiscovered(t *testing.T) {
 	up := fakeUpstream(t)
 	defer up.Close()
-	ts := newTestServer(t, up.URL, policy.New(nil, nil)) // auth disabled
+	ts := newTestServer(t, up.URL, policy.New(nil, nil), nil) // auth disabled
 	defer ts.Close()
 
 	resp, err := http.Get(ts.URL + "/v1/models")
@@ -97,7 +99,7 @@ func TestModelsIncludesDiscovered(t *testing.T) {
 func TestPassthroughChat(t *testing.T) {
 	up := fakeUpstream(t)
 	defer up.Close()
-	ts := newTestServer(t, up.URL, policy.New(nil, nil))
+	ts := newTestServer(t, up.URL, policy.New(nil, nil), nil)
 	defer ts.Close()
 
 	body := `{"model":"parspack/openai/gpt-5.5","messages":[{"role":"user","content":"hi"}]}`
@@ -134,7 +136,7 @@ func TestPassthroughChat(t *testing.T) {
 func TestResponsesPassthrough(t *testing.T) {
 	up := fakeUpstream(t)
 	defer up.Close()
-	ts := newTestServer(t, up.URL, policy.New(nil, nil))
+	ts := newTestServer(t, up.URL, policy.New(nil, nil), nil)
 	defer ts.Close()
 
 	body := `{"model":"parspack/openai/gpt-5.5","input":"hi","reasoning":{"effort":"medium"}}`
@@ -174,7 +176,7 @@ func TestPolicyFiltersPassthroughModels(t *testing.T) {
 		{Key: "wide", Project: "p", Allow: []string{"parspack/*"}},
 		{Key: "narrow", Project: "q", Allow: []string{"nabu-fast"}},
 	})
-	ts := newTestServer(t, up.URL, enforcer)
+	ts := newTestServer(t, up.URL, enforcer, nil)
 	defer ts.Close()
 
 	listFor := func(key string) map[string]bool {

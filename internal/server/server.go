@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"nabugate/internal/agent"
 	"nabugate/internal/policy"
 	"nabugate/internal/provider"
 	"nabugate/internal/router"
@@ -23,18 +24,21 @@ type policyCtxKey struct{}
 // enough for long chat histories and large embedding batches.
 const maxRequestBytes = 16 << 20 // 16 MiB
 
-// Server wires the router, auth, policy and usage tracking into an http.Handler.
+// Server wires the router, auth, policy, usage tracking and sub-agents into an
+// http.Handler.
 type Server struct {
 	router *router.Router
 	policy *policy.Enforcer
 	usage  *usage.Tracker
+	agents *agent.Registry
 	log    *slog.Logger
 }
 
 // New builds a Server. If the enforcer has no keys, authentication is disabled
-// (dev mode) and a warning is logged by the caller.
-func New(r *router.Router, enforcer *policy.Enforcer, tracker *usage.Tracker, log *slog.Logger) *Server {
-	return &Server{router: r, policy: enforcer, usage: tracker, log: log}
+// (dev mode) and a warning is logged by the caller. agents may be nil or empty
+// when no sub-agents are configured.
+func New(r *router.Router, enforcer *policy.Enforcer, tracker *usage.Tracker, agents *agent.Registry, log *slog.Logger) *Server {
+	return &Server{router: r, policy: enforcer, usage: tracker, agents: agents, log: log}
 }
 
 // Handler returns the root http.Handler with routes and middleware applied.
@@ -92,9 +96,13 @@ func (s *Server) handleHealth(w http.ResponseWriter, _ *http.Request) {
 func (s *Server) handleModels(w http.ResponseWriter, r *http.Request) {
 	pol, hasPol := r.Context().Value(policyCtxKey{}).(policy.Policy)
 	// Configured aliases plus every passthrough provider's live-discovered and
-	// statically configured models (e.g. "parspack/openai/gpt-5.5").
+	// statically configured models (e.g. "parspack/openai/gpt-5.5"), plus the
+	// configured sub-agents (addressable as a "model" like anything else).
 	infos := s.router.AliasInfos()
 	infos = append(infos, s.router.CatalogModels(r.Context())...)
+	for _, name := range s.agents.Names() {
+		infos = append(infos, router.AliasInfo{ID: name, Owner: "agent"})
+	}
 
 	data := make([]map[string]string, 0, len(infos))
 	seen := make(map[string]bool, len(infos))
@@ -135,7 +143,17 @@ func (s *Server) handleResponses(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	resp, prov, upstream, err := s.router.Responses(r.Context(), model, raw)
+	// Sub-agent expansion for the Responses API: the agent's system prompt maps
+	// to `instructions` and its defaults fill unset params, then we route to the
+	// agent's underlying model.
+	routeModel := model
+	if ag, ok := s.agents.Lookup(model); ok {
+		applyAgentToResponses(ag, raw)
+		routeModel = ag.Model
+		w.Header().Set("X-Nabu-Agent", ag.Name)
+	}
+
+	resp, prov, upstream, err := s.router.Responses(r.Context(), routeModel, raw)
 	if err != nil {
 		writeError(w, aliasErrStatus(err, "unknown model alias"), err.Error())
 		return
@@ -234,12 +252,22 @@ func (s *Server) handleChat(w http.ResponseWriter, r *http.Request) {
 		Raw:         raw,
 	}
 
+	// Sub-agent expansion: if the requested "model" names a configured agent,
+	// inject its system prompt and default params and route to its underlying
+	// model. The client-facing name (alias) is still echoed back as the model.
+	routeModel := alias
+	if ag, ok := s.agents.Lookup(alias); ok {
+		applyAgentToChat(ag, &chatReq)
+		routeModel = ag.Model
+		w.Header().Set("X-Nabu-Agent", ag.Name)
+	}
+
 	if stream {
-		s.streamChat(w, r, alias, chatReq)
+		s.streamChat(w, r, alias, routeModel, chatReq)
 		return
 	}
 
-	result, err := s.router.Chat(r.Context(), alias, chatReq)
+	result, err := s.router.Chat(r.Context(), routeModel, chatReq)
 	if err != nil {
 		// Unknown alias is a client error; everything else is upstream/bad gateway.
 		status := http.StatusBadGateway
@@ -268,7 +296,7 @@ func (s *Server) handleChat(w http.ResponseWriter, r *http.Request) {
 		"id":             "nabu-" + fmt.Sprint(time.Now().UnixNano()),
 		"object":         "chat.completion",
 		"created":        time.Now().Unix(),
-		"model":          result.Alias,
+		"model":          alias, // echoes the requested alias or agent name
 		"provider":       result.Provider,
 		"upstream_model": result.Model,
 		"choices": []map[string]any{{
@@ -285,11 +313,14 @@ func (s *Server) handleChat(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, resp)
 }
 
-// streamChat streams a chat completion as OpenAI-style SSE chunks. Response
-// headers (including the chosen provider) are written lazily on the first delta
-// so that, if every target fails before producing output, we can still return a
-// normal JSON error with the right status code.
-func (s *Server) streamChat(w http.ResponseWriter, r *http.Request, alias string, req provider.ChatRequest) {
+// streamChat streams a chat completion as OpenAI-style SSE chunks. alias is the
+// client-facing name echoed in each chunk's "model" field (an alias or an agent
+// name); routeModel is the underlying model the router resolves and calls (they
+// differ when alias is a sub-agent). Response headers (including the chosen
+// provider) are written lazily on the first delta so that, if every target fails
+// before producing output, we can still return a normal JSON error with the
+// right status code.
+func (s *Server) streamChat(w http.ResponseWriter, r *http.Request, alias, routeModel string, req provider.ChatRequest) {
 	flusher, ok := w.(http.Flusher)
 	if !ok {
 		writeError(w, http.StatusInternalServerError, "streaming not supported")
@@ -318,7 +349,7 @@ func (s *Server) streamChat(w http.ResponseWriter, r *http.Request, alias string
 		writeSSE(streamChunk(id, created, alias, metaProvider, metaModel, map[string]any{"role": "assistant"}, nil))
 	}
 
-	result, err := s.router.ChatStream(r.Context(), alias, req,
+	result, err := s.router.ChatStream(r.Context(), routeModel, req,
 		func(p, m string) { metaProvider, metaModel = p, m },
 		func(delta string) error {
 			if !headersWritten {
@@ -351,6 +382,73 @@ func (s *Server) streamChat(w http.ResponseWriter, r *http.Request, alias string
 	writeSSE(streamChunk(id, created, alias, result.Provider, result.Model, map[string]any{}, &finish))
 	fmt.Fprint(w, "data: [DONE]\n\n")
 	flusher.Flush()
+}
+
+// applyAgentToChat layers a sub-agent's system prompt and default sampling
+// params onto a chat request. The system prompt is prepended as the first
+// message so it takes effect ahead of the caller's own messages, and defaults
+// fill only parameters the caller left unset. Both the typed request (used by
+// the Anthropic/Gemini adapters) and the raw body (forwarded verbatim by the
+// OpenAI-wire adapters) are updated, so the agent applies on whichever provider
+// the router picks.
+func applyAgentToChat(ag agent.Agent, req *provider.ChatRequest) {
+	if sys := strings.TrimSpace(ag.System); sys != "" {
+		sysMsg := provider.Message{Role: "system", Content: ag.System}
+		req.Messages = append([]provider.Message{sysMsg}, req.Messages...)
+		if req.Raw != nil {
+			var msgs []json.RawMessage
+			_ = json.Unmarshal(req.Raw["messages"], &msgs)
+			sysRaw, _ := json.Marshal(sysMsg)
+			req.Raw["messages"], _ = json.Marshal(append([]json.RawMessage{sysRaw}, msgs...))
+		}
+	}
+	if ag.Temperature != nil && req.Temperature == nil {
+		req.Temperature = ag.Temperature
+		setRawParam(req.Raw, "temperature", *ag.Temperature)
+	}
+	if ag.TopP != nil && req.TopP == nil {
+		req.TopP = ag.TopP
+		setRawParam(req.Raw, "top_p", *ag.TopP)
+	}
+	if ag.MaxTokens != nil && req.MaxTokens == nil {
+		req.MaxTokens = ag.MaxTokens
+		setRawParam(req.Raw, "max_tokens", *ag.MaxTokens)
+	}
+}
+
+// applyAgentToResponses layers a sub-agent onto an OpenAI Responses API body.
+// The system prompt maps to `instructions` and defaults fill unset params; a
+// value the caller already supplied is never overwritten.
+func applyAgentToResponses(ag agent.Agent, raw map[string]json.RawMessage) {
+	if raw == nil {
+		return
+	}
+	if sys := strings.TrimSpace(ag.System); sys != "" {
+		if _, has := raw["instructions"]; !has {
+			raw["instructions"], _ = json.Marshal(ag.System)
+		}
+	}
+	if ag.Temperature != nil {
+		setRawParam(raw, "temperature", *ag.Temperature)
+	}
+	if ag.TopP != nil {
+		setRawParam(raw, "top_p", *ag.TopP)
+	}
+}
+
+// setRawParam writes v under key in the raw body only if the caller did not
+// already set that key, so an explicit request value always wins over an agent
+// default.
+func setRawParam(raw map[string]json.RawMessage, key string, v any) {
+	if raw == nil {
+		return
+	}
+	if _, exists := raw[key]; exists {
+		return
+	}
+	if b, err := json.Marshal(v); err == nil {
+		raw[key] = b
+	}
 }
 
 // streamChunk builds one OpenAI-style chat.completion.chunk object.
