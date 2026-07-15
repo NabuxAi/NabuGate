@@ -59,6 +59,15 @@ providers:
     base_url: "https://generativelanguage.googleapis.com/v1beta"
     api_key_env: "GEMINI_API_KEY"
 
+  # Pexels stock photos as an image source. An image alias pointed here searches
+  # Pexels for the prompt and returns real photos. Skipped when PEXELS_API_KEY
+  # is unset, like any other keyed provider.
+  pexels:
+    enabled: true
+    type: pexels
+    base_url: "https://api.pexels.com/v1"
+    api_key_env: "PEXELS_API_KEY"
+
   ollama:
     enabled: true
     type: openai
@@ -146,6 +155,14 @@ images:
     fallback:
       - provider: gemini
         model: "gemini-2.5-flash-image"
+      - provider: pexels
+        model: "search"
+
+  # Stock photos only: search Pexels for the prompt (empty prompt → curated).
+  nabu-photo:
+    primary:
+      provider: pexels
+      model: "search"
 
 audio:
   nabu-voice:

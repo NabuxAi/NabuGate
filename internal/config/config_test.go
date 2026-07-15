@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"nabugate/internal/provider"
 )
 
 const miniConfig = `
@@ -176,6 +178,37 @@ func TestBuildAdaptersKeylessProvider(t *testing.T) {
 	}
 	if !containsSubstr(warnings, "api_key_env") {
 		t.Errorf("expected an api_key_env warning, got %v", warnings)
+	}
+}
+
+func TestBuildAdaptersPexels(t *testing.T) {
+	cfg := &Config{Providers: map[string]ProviderConfig{
+		"pexels": {
+			Enabled:   true,
+			Type:      "pexels",
+			BaseURL:   "https://api.pexels.com/v1",
+			APIKeyEnv: "PEXELS_API_KEY",
+		},
+	}}
+
+	// No key → skipped with a warning (like any other keyed provider).
+	adapters, warnings := cfg.BuildAdapters()
+	if _, ok := adapters["pexels"]; ok {
+		t.Error("pexels should be skipped when PEXELS_API_KEY is empty")
+	}
+	if !containsSubstr(warnings, "PEXELS_API_KEY") {
+		t.Errorf("expected a missing-key warning, got %v", warnings)
+	}
+
+	// Key set → built.
+	t.Setenv("PEXELS_API_KEY", "pk-test")
+	adapters, _ = cfg.BuildAdapters()
+	ad, ok := adapters["pexels"]
+	if !ok {
+		t.Fatal("pexels adapter should be built when its key is set")
+	}
+	if _, ok := ad.(provider.ImageAdapter); !ok {
+		t.Error("pexels adapter should implement ImageAdapter")
 	}
 }
 
