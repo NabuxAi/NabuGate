@@ -7,7 +7,9 @@ server:
   keys:
     - key: "crm_prod_key_change_me"
       project: "crm"
-      allow: ["nabu-fast", "nabu-embed"]
+      # Aliases and a whole passthrough provider namespace ("parspack/*" covers
+      # every parspack/<model>, including nested IDs like parspack/openai/gpt-5.5).
+      allow: ["nabu-fast", "nabu-embed", "parspack/*"]
       rate_limit: 120
 
 providers:
@@ -40,6 +42,14 @@ providers:
     type: openai
     base_url: "https://my.parspack.com/api/aistudio/api/v1"
     api_key_env: "PARSPACK_API_KEY"
+    # Parspack is a multi-model provider: passthrough exposes its whole
+    # catalogue via live /v1/models discovery and lets callers route straight
+    # to "parspack/<model>" (e.g. "parspack/openai/gpt-5.5") without an alias.
+    passthrough: true
+    # Optional: advertise a curated set even if live discovery is unavailable.
+    # models:
+    #   - "openai/gpt-5.5"
+    #   - "anthropic/claude-sonnet-4.6"
 
   anthropic:
     enabled: true

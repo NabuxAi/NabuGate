@@ -126,6 +126,25 @@ type EmbeddingAdapter interface {
 	Embed(ctx context.Context, req EmbeddingRequest) (EmbeddingResponse, error)
 }
 
+// ModelLister is implemented by providers that can enumerate their available
+// models (the OpenAI-wire GET /v1/models endpoint). Aggregator providers such
+// as Parspack, OpenRouter, Groq and Dahl expose dozens of models this way, so
+// the gateway can discover and surface a provider's whole catalogue live —
+// without a hand-written alias per model.
+type ModelLister interface {
+	ListModels(ctx context.Context) ([]string, error)
+}
+
+// ResponsesAdapter is implemented by OpenAI-wire providers that expose the
+// Responses API (POST /v1/responses). The gateway proxies the request body
+// verbatim (only "model" is rewritten to the resolved upstream model) and
+// streams the upstream response — JSON or SSE — straight back to the caller,
+// so it never has to parse the Responses schema. The caller MUST close the
+// returned response body.
+type ResponsesAdapter interface {
+	Responses(ctx context.Context, body []byte) (*http.Response, error)
+}
+
 // userAgent is the product User-Agent sent on every outbound provider request.
 // Go's net/http default ("Go-http-client/1.1") is treated as a bot signature by
 // some upstream WAFs (e.g. Parspack AI Studio), which then answer with a 403

@@ -43,6 +43,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /healthz", s.handleHealth)
 	mux.HandleFunc("GET /v1/models", s.auth(s.handleModels))
 	mux.HandleFunc("POST /v1/chat/completions", s.auth(s.handleChat))
+	mux.HandleFunc("POST /v1/responses", s.auth(s.handleResponses))
 	mux.HandleFunc("POST /v1/images/generations", s.auth(s.handleImages))
 	mux.HandleFunc("POST /v1/audio/speech", s.auth(s.handleSpeech))
 	mux.HandleFunc("POST /v1/embeddings", s.auth(s.handleEmbeddings))
@@ -90,14 +91,89 @@ func (s *Server) handleHealth(w http.ResponseWriter, _ *http.Request) {
 
 func (s *Server) handleModels(w http.ResponseWriter, r *http.Request) {
 	pol, hasPol := r.Context().Value(policyCtxKey{}).(policy.Policy)
-	data := make([]map[string]string, 0)
-	for _, a := range s.router.AliasInfos() {
-		if s.policy.Enabled() && hasPol && !pol.Allows(a.ID) {
-			continue // hide aliases this key may not use
+	// Configured aliases plus every passthrough provider's live-discovered and
+	// statically configured models (e.g. "parspack/openai/gpt-5.5").
+	infos := s.router.AliasInfos()
+	infos = append(infos, s.router.CatalogModels(r.Context())...)
+
+	data := make([]map[string]string, 0, len(infos))
+	seen := make(map[string]bool, len(infos))
+	for _, a := range infos {
+		if seen[a.ID] {
+			continue
 		}
+		if s.policy.Enabled() && hasPol && !pol.Allows(a.ID) {
+			continue // hide models this key may not use
+		}
+		seen[a.ID] = true
 		data = append(data, map[string]string{"id": a.ID, "object": "model", "owned_by": a.Owner})
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"object": "list", "data": data})
+}
+
+// handleResponses proxies the OpenAI Responses API (POST /v1/responses). Like
+// chat, only "model" (a NabuGate alias or a "<provider>/<model>" passthrough)
+// is inspected and rewritten to the upstream model; the rest of the body is
+// forwarded verbatim, and the upstream response — JSON or streaming SSE — is
+// copied straight back. Token usage is not metered here (the gateway does not
+// parse the Responses schema); observability comes from the router's logs.
+func (s *Server) handleResponses(w http.ResponseWriter, r *http.Request) {
+	var raw map[string]json.RawMessage
+	if err := json.NewDecoder(r.Body).Decode(&raw); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid JSON body")
+		return
+	}
+	var model string
+	if len(raw["model"]) > 0 {
+		_ = json.Unmarshal(raw["model"], &model)
+	}
+	if model == "" {
+		writeError(w, http.StatusBadRequest, "field 'model' (alias) is required")
+		return
+	}
+	if !s.aliasAllowed(w, r, model) {
+		return
+	}
+
+	resp, prov, upstream, err := s.router.Responses(r.Context(), model, raw)
+	if err != nil {
+		writeError(w, aliasErrStatus(err, "unknown model alias"), err.Error())
+		return
+	}
+	defer resp.Body.Close()
+
+	ct := resp.Header.Get("Content-Type")
+	if ct == "" {
+		ct = "application/json"
+	}
+	w.Header().Set("Content-Type", ct)
+	w.Header().Set("X-Nabu-Provider", prov)
+	w.Header().Set("X-Nabu-Model", upstream)
+	if strings.HasPrefix(ct, "text/event-stream") {
+		w.Header().Set("Cache-Control", "no-cache")
+		w.Header().Set("Connection", "keep-alive")
+		w.Header().Set("X-Accel-Buffering", "no")
+	}
+	w.WriteHeader(resp.StatusCode)
+
+	// Stream the upstream body through, flushing so SSE deltas reach the client
+	// as they arrive instead of buffering until the response completes.
+	flusher, _ := w.(http.Flusher)
+	buf := make([]byte, 16<<10)
+	for {
+		n, rerr := resp.Body.Read(buf)
+		if n > 0 {
+			if _, werr := w.Write(buf[:n]); werr != nil {
+				return
+			}
+			if flusher != nil {
+				flusher.Flush()
+			}
+		}
+		if rerr != nil {
+			return
+		}
+	}
 }
 
 // handleChat accepts the full OpenAI-compatible chat body. Only "model" (a
