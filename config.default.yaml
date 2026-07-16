@@ -47,6 +47,44 @@ providers:
     # allow: ["parspack/*"] on a project key.
     passthrough: true
 
+  # AvalAI (avalai.ir) — OpenAI-wire aggregator (GPT / Claude / Gemini / Qwen /
+  # Llama / Mistral / Grok / DeepSeek / …) with rial billing. Fully OpenAI
+  # compatible, so passthrough discovery surfaces its catalogue as "avalai/*".
+  # Skipped automatically when AVALAI_API_KEY is unset.
+  avalai:
+    enabled: true
+    type: openai
+    base_url: "https://api.avalai.ir/v1"
+    api_key_env: "AVALAI_API_KEY"
+    passthrough: true
+
+  # GapGPT (gapgpt.app) — OpenAI-wire aggregator, rial billing. passthrough
+  # exposes its catalogue as "gapgpt/*"; the static models are a curated
+  # fallback for /v1/models. Skipped when GAPGPT_API_KEY is unset.
+  gapgpt:
+    enabled: true
+    type: openai
+    base_url: "https://api.gapgpt.app/v1"
+    api_key_env: "GAPGPT_API_KEY"
+    passthrough: true
+    models:
+      - "gpt-5.6-sol"
+      - "gpt-5.6-luna"
+      - "claude-sonnet-5"
+      - "gemini-3.1-pro-preview"
+      - "deepseek-v4-pro"
+
+  # ArvanCloud AIaaS (arvancloud.ir) — private per-model endpoint on Iranian
+  # infra. OpenAI-wire chat body, but auth is "apikey <key>" not "Bearer", hence
+  # auth_scheme. Set ARVAN_AIAAS_ENDPOINT to your endpoint URL and ARVAN_API_KEY
+  # to its access key; skipped when either is unset. Not passthrough (one model).
+  arvan:
+    enabled: true
+    type: openai
+    base_url: "${ARVAN_AIAAS_ENDPOINT}"
+    api_key_env: "ARVAN_API_KEY"
+    auth_scheme: "apikey"
+
   anthropic:
     enabled: true
     type: anthropic
@@ -146,6 +184,27 @@ models:
         model: "anthropic/claude-sonnet-4.6"
       - provider: parspack
         model: "google/gemini-2.5-flash"
+
+  nabu-avalai:
+    primary:
+      provider: avalai
+      model: "gpt-5.5"
+    fallback:
+      - provider: avalai
+        model: "gemini-2.5-flash"
+
+  nabu-gap:
+    primary:
+      provider: gapgpt
+      model: "gpt-5.6-luna"
+    fallback:
+      - provider: gapgpt
+        model: "claude-sonnet-5"
+
+  nabu-arvan:
+    primary:
+      provider: arvan
+      model: "DeepSeek-R1-qwen-7b-awq"
 
 images:
   nabu-image:

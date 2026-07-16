@@ -7,9 +7,10 @@ server:
   keys:
     - key: "crm_prod_key_change_me"
       project: "crm"
-      # Aliases and a whole passthrough provider namespace ("parspack/*" covers
-      # every parspack/<model>, including nested IDs like parspack/openai/gpt-5.5).
-      allow: ["nabu-fast", "nabu-embed", "parspack/*"]
+      # Aliases and whole passthrough provider namespaces ("parspack/*" covers
+      # every parspack/<model>, including nested IDs like parspack/openai/gpt-5.5;
+      # "avalai/*" and "gapgpt/*" do the same for those aggregators).
+      allow: ["nabu-fast", "nabu-embed", "parspack/*", "avalai/*", "gapgpt/*", "nabu-avalai", "nabu-gap", "nabu-arvan"]
       rate_limit: 120
 
 providers:
@@ -50,6 +51,53 @@ providers:
     # models:
     #   - "openai/gpt-5.5"
     #   - "anthropic/claude-sonnet-4.6"
+
+  # AvalAI (avalai.ir) — Iranian OpenAI-wire aggregator with rial billing and
+  # Persian docs, fronting GPT, Claude, Gemini, Qwen, Llama, Mistral, Grok,
+  # DeepSeek, FLUX, ElevenLabs, MiniMax … behind one key. Fully OpenAI compatible
+  # (chat, responses, images, embeddings, audio, /v1/models), so passthrough
+  # discovery works: address any model directly as "avalai/<model>".
+  avalai:
+    enabled: true
+    type: openai
+    base_url: "https://api.avalai.ir/v1"
+    api_key_env: "AVALAI_API_KEY"
+    passthrough: true
+
+  # GapGPT (gapgpt.app) — Iranian OpenAI-wire aggregator, rial billing. Multi-
+  # model: GPT-5.6 (Sol/Terra/Luna), Claude, Gemini, Grok, DeepSeek, Qwen plus
+  # image (GPT-Image / DALL·E / Imagen / FLUX), Whisper STT, TTS and embeddings.
+  # passthrough → address any model as "gapgpt/<model>". The static `models`
+  # below is just a curated advertisement; live /v1/models discovery supplements
+  # it. External CDN mirror base_url: https://api.gapapi.com/v1
+  gapgpt:
+    enabled: true
+    type: openai
+    base_url: "https://api.gapgpt.app/v1"
+    api_key_env: "GAPGPT_API_KEY"
+    passthrough: true
+    models:
+      - "gpt-5.6-sol"
+      - "gpt-5.6-luna"
+      - "claude-sonnet-5"
+      - "claude-opus-4-8"
+      - "gemini-3.1-pro-preview"
+      - "deepseek-v4-pro"
+      - "gapgpt-qwen-3.6"
+
+  # ArvanCloud AIaaS (arvancloud.ir) — private per-model endpoints on Iranian
+  # infra. Each endpoint you create in the panel gets its own URL + access key
+  # and serves ONE hosted model (e.g. DeepSeek-R1). The chat/completions body is
+  # OpenAI-wire, but auth uses the "apikey <key>" scheme (NOT "Bearer"), so set
+  # auth_scheme. Point base_url at the endpoint URL (no trailing /v1) and route
+  # to it with the nabu-arvan alias below. Not passthrough — one endpoint is one
+  # model, and there is no /v1/models to discover.
+  arvan:
+    enabled: true
+    type: openai
+    base_url: "${ARVAN_AIAAS_ENDPOINT}"   # the per-endpoint URL from the ArvanCloud panel
+    api_key_env: "ARVAN_API_KEY"
+    auth_scheme: "apikey"
 
   anthropic:
     enabled: true
@@ -151,6 +199,34 @@ models:
       - provider: parspack
         model: "google/gemini-2.5-flash"
 
+  # AvalAI-backed chat alias. Edit the model IDs to any AvalAI catalogue id
+  # (or address them directly as "avalai/<model>" thanks to passthrough).
+  nabu-avalai:
+    primary:
+      provider: avalai
+      model: "gpt-5.5"
+    fallback:
+      - provider: avalai
+        model: "gemini-2.5-flash"
+
+  # GapGPT-backed chat alias (or call "gapgpt/<model>" directly via passthrough).
+  nabu-gap:
+    primary:
+      provider: gapgpt
+      model: "gpt-5.6-luna"
+    fallback:
+      - provider: gapgpt
+        model: "claude-sonnet-5"
+      - provider: gapgpt
+        model: "gemini-3.1-flash-lite"
+
+  # ArvanCloud AIaaS-backed chat alias. Set the model to whatever your endpoint
+  # serves; base_url + apikey auth come from the `arvan` provider above.
+  nabu-arvan:
+    primary:
+      provider: arvan
+      model: "DeepSeek-R1-qwen-7b-awq"
+
 images:
   nabu-image:
     primary:
@@ -218,3 +294,7 @@ pricing:
   "anthropic/claude-3-5-haiku-latest": { input: 0.8, output: 4 }
   "gemini/gemini-1.5-pro": { input: 1.25, output: 5 }
   "groq/llama-3.1-70b-versatile": { input: 0.59, output: 0.79 }
+  # GapGPT list prices (USD per 1M tokens), keyed by provider/model.
+  "gapgpt/gpt-5.6-sol": { input: 5, output: 30 }
+  "gapgpt/gpt-5.6-luna": { input: 1, output: 6 }
+  "gapgpt/claude-sonnet-5": { input: 2, output: 10 }
