@@ -1,6 +1,9 @@
 package config
 
 import (
+	"context"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
@@ -209,6 +212,59 @@ func TestBuildAdaptersPexels(t *testing.T) {
 	}
 	if _, ok := ad.(provider.ImageAdapter); !ok {
 		t.Error("pexels adapter should implement ImageAdapter")
+	}
+}
+
+func TestBuildAdaptersAuthScheme(t *testing.T) {
+	// auth_scheme: apikey makes the OpenAI adapter send "Authorization: apikey
+	// <key>" instead of a bearer token, as ArvanCloud AIaaS endpoints require.
+	var gotAuth string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotAuth = r.Header.Get("Authorization")
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`{"choices":[{"message":{"content":"ok"},"finish_reason":"stop"}],"usage":{}}`))
+	}))
+	defer srv.Close()
+
+	t.Setenv("ARVAN_API_KEY", "mu-secret")
+	cfg := &Config{Providers: map[string]ProviderConfig{
+		"arvan": {
+			Enabled:    true,
+			Type:       "openai",
+			BaseURL:    srv.URL,
+			APIKeyEnv:  "ARVAN_API_KEY",
+			AuthScheme: "apikey",
+		},
+	}}
+	adapters, warnings := cfg.BuildAdapters()
+	ad, ok := adapters["arvan"]
+	if !ok {
+		t.Fatalf("arvan adapter should be built, got warnings %v", warnings)
+	}
+	if _, err := ad.Chat(context.Background(), provider.ChatRequest{
+		Model:    "DeepSeek-R1-qwen-7b-awq",
+		Messages: []provider.Message{{Role: "user", Content: "hi"}},
+	}); err != nil {
+		t.Fatalf("Chat: %v", err)
+	}
+	if gotAuth != "apikey mu-secret" {
+		t.Errorf("Authorization = %q, want %q", gotAuth, "apikey mu-secret")
+	}
+}
+
+func TestBuildAdaptersOpenAINeedsBaseURL(t *testing.T) {
+	// A keyed OpenAI-wire provider whose base_url is empty (e.g. an ArvanCloud
+	// endpoint left unconfigured) is skipped with a warning, not built broken.
+	t.Setenv("ARVAN_API_KEY", "k")
+	cfg := &Config{Providers: map[string]ProviderConfig{
+		"arvan": {Enabled: true, Type: "openai", APIKeyEnv: "ARVAN_API_KEY"},
+	}}
+	adapters, warnings := cfg.BuildAdapters()
+	if _, ok := adapters["arvan"]; ok {
+		t.Error("keyed openai provider without base_url should be skipped")
+	}
+	if !containsSubstr(warnings, "base_url") {
+		t.Errorf("expected a base_url warning, got %v", warnings)
 	}
 }
 

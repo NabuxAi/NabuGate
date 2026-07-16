@@ -73,8 +73,17 @@ Other endpoints:
 | `POST /v1/audio/speech`      | Text-to-speech; returns raw audio bytes (wav/mp3)   |
 | `POST /v1/embeddings`        | Text embeddings; `input` may be a string or array   |
 | `GET  /v1/models`            | List aliases, passthrough providers' discovered models **and** sub-agents |
+| `GET  /v1/photos/search`     | Stock-photo search (Pexels proxy); the Pexels key stays a gateway secret |
 | `GET  /v1/usage`             | Accumulated token usage and cost (per project/model)|
 | `GET  /healthz`              | Liveness probe                                      |
+
+Photo search example (enabled by setting `PEXELS_API_KEY`; optional params:
+`orientation` = `portrait|landscape|square`, `per_page` 1–80, `page`, `locale`):
+
+```bash
+curl "http://localhost:8080/v1/photos/search?query=sunset+beach&orientation=portrait&per_page=3" \
+  -H "Authorization: Bearer nabu_dev_key_change_me"
+```
 
 Image example:
 
@@ -141,10 +150,10 @@ fallback target.
 
 ### Multi-model providers (passthrough & discovery)
 
-Some upstreams — **Parspack AI Studio**, OpenRouter, Groq — are not a single
-model but a provider hosting dozens. Writing one alias per model does not scale.
-Mark such a provider `passthrough: true` in `config.yaml` and it becomes a
-first-class namespace:
+Some upstreams — **Parspack AI Studio**, **AvalAI**, **GapGPT**, OpenRouter,
+Groq — are not a single model but a provider hosting dozens. Writing one alias
+per model does not scale. Mark such a provider `passthrough: true` in
+`config.yaml` and it becomes a first-class namespace:
 
 - **Direct routing, no alias.** Address any of its models as
   `"<provider>/<model>"`. The gateway splits on the **first** `/`, so a
@@ -186,6 +195,9 @@ reaching a provider's long tail of models without editing config per model.
 | `nabu-kimi`    | Dahl Kimi-K2.6 → OpenAI 4o (pin Kimi explicitly)            |
 | `nabu-local`   | Ollama (local, on-prem — no fallback so data never leaves)  |
 | `nabu-parspack`| Parspack GPT-5.5 → Claude Sonnet 4.6 → Gemini 2.5 Flash     |
+| `nabu-avalai`  | AvalAI GPT-5.5 → Gemini 2.5 Flash (rial-billed aggregator)  |
+| `nabu-gap`     | GapGPT GPT-5.6 Luna → Claude Sonnet 5 → Gemini 3.1 Flash    |
+| `nabu-arvan`   | ArvanCloud AIaaS private endpoint (one hosted model)        |
 | `nabu-image`   | OpenAI gpt-image-1 → Gemini 2.5 Flash Image → Pexels (image) |
 | `nabu-photo`   | Pexels stock-photo search (real photos, no generation)      |
 | `nabu-voice`   | OpenAI gpt-4o-mini-tts → Gemini 2.5 Flash TTS (speech)      |
@@ -208,6 +220,33 @@ code change needed.
 behind one key (`PARSPACK_API_KEY`). Point the alias's `model` at any id from
 `GET https://my.parspack.com/api/aistudio/api/v1/models` to pin a specific
 Parspack model.
+
+### Iranian gateways (AvalAI, GapGPT, ArvanCloud)
+
+Three domestic providers with rial billing and Persian docs ship pre-wired
+(each skipped until its key is set):
+
+- **AvalAI** (`avalai.ir`, `AVALAI_API_KEY`) — a faithful OpenAI-wire aggregator
+  (chat, responses, images, embeddings, audio, `/v1/models`) fronting GPT,
+  Claude, Gemini, Qwen, Llama, Mistral, Grok, DeepSeek, FLUX, ElevenLabs and
+  more. `passthrough: true`, so its whole catalogue is reachable as
+  `avalai/<model>` and the `nabu-avalai` alias is just a convenience default.
+- **GapGPT** (`gapgpt.app`, `GAPGPT_API_KEY`) — an OpenAI-wire aggregator with
+  GPT-5.6 (Sol/Terra/Luna), Claude, Gemini, Grok, DeepSeek, Qwen plus image,
+  Whisper STT, TTS and embedding models. `passthrough: true` → `gapgpt/<model>`
+  (or the `nabu-gap` alias). External CDN mirror: `https://api.gapapi.com/v1`.
+- **ArvanCloud AIaaS** (`arvancloud.ir`, `ARVAN_API_KEY` +
+  `ARVAN_AIAAS_ENDPOINT`) — you create a **private per-model endpoint** in the
+  panel; each serves one hosted model (e.g. DeepSeek-R1) on its own URL. The
+  chat body is OpenAI-wire, but auth uses `Authorization: apikey <key>` instead
+  of a bearer token, so its provider sets **`auth_scheme: "apikey"`** (see
+  below). It is *not* passthrough — an endpoint is a single model, reached via
+  the `nabu-arvan` alias.
+
+**`auth_scheme`** is a per-provider knob on OpenAI-wire providers: it overrides
+the `Authorization` header scheme (default `Bearer`). Set `auth_scheme: "apikey"`
+for gateways like ArvanCloud that expect `Authorization: apikey <key>`. No new
+adapter is needed — the OpenAI adapter just sends the alternate scheme.
 
 ## Sub-agents (agents defined from outside, run in one call)
 

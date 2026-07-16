@@ -70,6 +70,13 @@ type ProviderConfig struct {
 	BaseURL   string `yaml:"base_url"`
 	APIKeyEnv string `yaml:"api_key_env"`
 
+	// AuthScheme overrides the Authorization header scheme for an OpenAI-wire
+	// provider. It defaults to "Bearer" (empty or "bearer" keeps that default);
+	// set it to e.g. "apikey" for gateways that expect "Authorization: apikey
+	// <key>" instead of a bearer token (ArvanCloud AIaaS does). Ignored by the
+	// non-OpenAI adapters.
+	AuthScheme string `yaml:"auth_scheme"`
+
 	// Passthrough turns the provider into a first-class multi-model provider:
 	// callers may address any of its models directly as "<provider>/<model>"
 	// (e.g. "parspack/openai/gpt-5.5") with no hand-written alias, and — for
@@ -186,9 +193,19 @@ func (c *Config) BuildAdapters() (map[string]provider.Adapter, []string) {
 
 		switch p.Type {
 		case "openai":
-			var extra map[string]string
-			// OpenRouter recommends (but does not require) attribution headers.
-			adapters[name] = provider.NewOpenAIAdapter(name, p.BaseURL, apiKey, extra)
+			// Every OpenAI-wire provider needs a base_url (keyless ones were
+			// already checked above; keyed ones — e.g. an ArvanCloud endpoint
+			// whose ${ARVAN_AIAAS_ENDPOINT} was left unset — are checked here so
+			// they are skipped with a clear warning instead of building an
+			// adapter that would fail every request against an empty URL).
+			if strings.TrimSpace(p.BaseURL) == "" {
+				warnings = append(warnings, fmt.Sprintf("provider %q disabled: openai providers need a base_url", name))
+				continue
+			}
+			// authHeaderOverride is non-nil only when the provider asks for a
+			// non-Bearer Authorization scheme; the adapter applies these extra
+			// headers over its Bearer default across every endpoint it calls.
+			adapters[name] = provider.NewOpenAIAdapter(name, p.BaseURL, apiKey, authHeaderOverride(p.AuthScheme, apiKey))
 		case "anthropic":
 			adapters[name] = provider.NewAnthropicAdapter(name, p.BaseURL, apiKey)
 		case "gemini":
@@ -201,6 +218,19 @@ func (c *Config) BuildAdapters() (map[string]provider.Adapter, []string) {
 	}
 
 	return adapters, warnings
+}
+
+// authHeaderOverride returns the extra headers that make the OpenAI adapter use
+// a non-Bearer Authorization scheme, or nil to keep its "Bearer <key>" default.
+// Some OpenAI-wire gateways expect a different scheme — ArvanCloud AIaaS wants
+// "Authorization: apikey <key>" — which the adapter honours because it applies
+// caller-supplied headers over the default Authorization on every request.
+func authHeaderOverride(scheme, apiKey string) map[string]string {
+	scheme = strings.TrimSpace(scheme)
+	if scheme == "" || strings.EqualFold(scheme, "bearer") {
+		return nil
+	}
+	return map[string]string{"Authorization": scheme + " " + apiKey}
 }
 
 // BuildAgents assembles the sub-agent registry from the inline `agents:` map and,

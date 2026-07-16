@@ -29,6 +29,11 @@ config.example.yaml        # نمونهٔ پیکربندی (alias‌ها، provi
 - API باید **سازگار با OpenAI-wire** بماند (`/v1/chat/completions`، `/v1/responses`،
   `/v1/embeddings`، `/v1/images/generations`، `/v1/audio/speech`، `/v1/models`،
   `/v1/usage`).
+- providerهای ایرانیِ سازگارِ OpenAI بدونِ کدِ جدید اضافه شده‌اند: **AvalAI** و
+  **GapGPT** (هر دو `passthrough`) و **ArvanCloud AIaaS**. Arvan هدرِ auth‌اش
+  `Authorization: apikey <key>` است نه Bearer؛ برای همین فیلدِ `auth_scheme` روی
+  providerهای openai اضافه شد (پیش‌فرض `Bearer`؛ مقدارِ `apikey` هدر را عوض
+  می‌کند، بدونِ آداپتورِ تازه). base_url برای هر providerِ openai اجباری است.
 - providerهای چندمدلی (مثل Parspack) را با `passthrough: true` علامت بزن: مدل‌هایشان
   به‌صورتِ `"<provider>/<model>"` مستقیم route می‌شوند (بدون alias) و کاتالوگشان از
   `/v1/models` خودِ provider به‌صورت زنده کشف و در `/v1/models` دروازه نمایش داده
