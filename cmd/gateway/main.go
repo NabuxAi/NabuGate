@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"nabugate/internal/config"
+	"nabugate/internal/photos"
 	"nabugate/internal/policy"
 	"nabugate/internal/router"
 	"nabugate/internal/server"
@@ -48,6 +49,15 @@ func main() {
 		log.Warn(w)
 	}
 	srv := server.New(r, enforcer, tracker, agents, log)
+
+	// Stock-photo proxy (Pexels): enabled purely by PEXELS_API_KEY, so photos
+	// ride the same gateway key/policy as every other capability.
+	if photoClient := photos.New(os.Getenv("PEXELS_API_KEY"), os.Getenv("PEXELS_BASE_URL")); photoClient != nil {
+		srv.WithPhotos(photoClient)
+		log.Info("photo proxy enabled (pexels)")
+	} else {
+		log.Info("photo proxy disabled (PEXELS_API_KEY not set)")
+	}
 
 	if !enforcer.Enabled() {
 		// A gateway that holds provider secrets and spends money must not come up

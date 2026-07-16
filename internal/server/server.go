@@ -7,10 +7,12 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
 	"nabugate/internal/agent"
+	"nabugate/internal/photos"
 	"nabugate/internal/policy"
 	"nabugate/internal/provider"
 	"nabugate/internal/router"
@@ -31,6 +33,7 @@ type Server struct {
 	policy *policy.Enforcer
 	usage  *usage.Tracker
 	agents *agent.Registry
+	photos *photos.Client // nil = photo proxy disabled
 	log    *slog.Logger
 }
 
@@ -39,6 +42,13 @@ type Server struct {
 // when no sub-agents are configured.
 func New(r *router.Router, enforcer *policy.Enforcer, tracker *usage.Tracker, agents *agent.Registry, log *slog.Logger) *Server {
 	return &Server{router: r, policy: enforcer, usage: tracker, agents: agents, log: log}
+}
+
+// WithPhotos enables the stock-photo proxy (GET /v1/photos/search). A nil
+// client leaves the endpoint responding 503.
+func (s *Server) WithPhotos(c *photos.Client) *Server {
+	s.photos = c
+	return s
 }
 
 // Handler returns the root http.Handler with routes and middleware applied.
@@ -52,6 +62,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /v1/audio/speech", s.auth(s.handleSpeech))
 	mux.HandleFunc("POST /v1/embeddings", s.auth(s.handleEmbeddings))
 	mux.HandleFunc("GET /v1/usage", s.auth(s.handleUsage))
+	mux.HandleFunc("GET /v1/photos/search", s.auth(s.handlePhotoSearch))
 	return mux
 }
 
@@ -620,6 +631,37 @@ func (s *Server) handleEmbeddings(w http.ResponseWriter, r *http.Request) {
 			"total_tokens":  result.Usage.TotalTokens,
 		},
 	})
+}
+
+// handlePhotoSearch proxies stock-photo search to Pexels. The Pexels API key
+// stays inside the gateway; callers authenticate with their normal NabuGate
+// key. Disabled (503) when PEXELS_API_KEY is not configured.
+func (s *Server) handlePhotoSearch(w http.ResponseWriter, r *http.Request) {
+	if s.photos == nil {
+		writeError(w, http.StatusServiceUnavailable, "photo proxy is not configured (set PEXELS_API_KEY)")
+		return
+	}
+	q := r.URL.Query()
+	// An empty query serves the curated feed (default gallery content).
+	query := strings.TrimSpace(q.Get("query"))
+	perPage, _ := strconv.Atoi(q.Get("per_page"))
+	page, _ := strconv.Atoi(q.Get("page"))
+
+	result, err := s.photos.Search(r.Context(), photos.SearchParams{
+		Query:       query,
+		Orientation: strings.TrimSpace(q.Get("orientation")),
+		Size:        strings.TrimSpace(q.Get("size")),
+		PerPage:     perPage,
+		Page:        page,
+		Locale:      strings.TrimSpace(q.Get("locale")),
+	})
+	if err != nil {
+		s.log.Warn("photo search failed", "project", s.project(r), "query", query, "error", err)
+		writeError(w, http.StatusBadGateway, err.Error())
+		return
+	}
+	s.log.Info("photos served", "project", s.project(r), "query", query, "results", len(result.Photos))
+	writeJSON(w, http.StatusOK, result)
 }
 
 // aliasErrStatus maps an unknown-alias error to 400 and everything else to 502.
