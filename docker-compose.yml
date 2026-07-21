@@ -32,6 +32,11 @@ services:
       # http://ollama:11434/v1. Left empty, the ollama provider is skipped.
       - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-}
       - PARSPACK_API_KEY=${PARSPACK_API_KEY}
+      # 9Router — the self-hosted `ninerouter` service below. Points the 9router
+      # provider (and its "9router/*" passthrough) at it over the internal Docker
+      # network. Blank it to disable, or override with a tunnel URL if 9Router
+      # runs elsewhere.
+      - NINEROUTER_BASE_URL=${NINEROUTER_BASE_URL:-http://ninerouter:20128/v1}
     # Coolify's reverse proxy reaches the gateway over the internal Docker
     # network, so the port only needs to be EXPOSEd, not published to the host.
     # Publishing to a random host port (`ports: - "8080"`) does NOT make the
@@ -52,3 +57,35 @@ services:
     healthcheck:
       test: ["CMD", "/app/nabugate", "-config", "/dev/null"]
       disable: true # distroless has no shell; rely on the platform's HTTP check on /healthz
+
+  # 9Router — self-hosted OpenAI-compatible smart router (60+ providers, 3-tier
+  # fallback) that backs NabuGate's "9router/*" passthrough and nabu-9router
+  # alias. Official image; connected providers, keys and quota persist in the
+  # ninerouter-data volume (SQLite at /app/data/db/data.sqlite) so they survive
+  # redeploys. NabuGate calls it at http://ninerouter:20128/v1 (see
+  # NINEROUTER_BASE_URL above); one-time provider hookup is done in its dashboard.
+  ninerouter:
+    image: decolua/9router:latest
+    environment:
+      - DATA_DIR=/app/data
+      - PORT=20128
+      - HOSTNAME=0.0.0.0        # bind all interfaces so the nabugate container can reach it
+      # SECURITY: the 9Router dashboard has NO built-in auth and holds your
+      # provider OAuth tokens / API keys. This Coolify magic var assigns a PUBLIC
+      # domain routed to port 20128 so you can open the dashboard and connect
+      # providers — but anyone with the URL then controls the router. Protect it
+      # in Coolify (service → Basic Auth or an IP allow-list), or comment this out
+      # and reach the dashboard over an SSH tunnel / Tailscale instead. Once
+      # providers are connected it runs headless and NabuGate uses it internally.
+      - SERVICE_FQDN_NINEROUTER_20128
+    # Reached by nabugate over the internal Docker network; only EXPOSE it (the
+    # Coolify proxy routes the domain above to this port, like the gateway does).
+    expose:
+      - "20128"
+    volumes:
+      - ninerouter-data:/app/data
+    restart: unless-stopped
+
+volumes:
+  ninerouter-data:
+    name: ninerouter-data
