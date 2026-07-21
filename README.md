@@ -150,10 +150,11 @@ fallback target.
 
 ### Multi-model providers (passthrough & discovery)
 
-Some upstreams — **Parspack AI Studio**, **AvalAI**, **GapGPT**, OpenRouter,
-Groq — are not a single model but a provider hosting dozens. Writing one alias
-per model does not scale. Mark such a provider `passthrough: true` in
-`config.yaml` and it becomes a first-class namespace:
+Some upstreams — **Parspack AI Studio**, **AvalAI**, **GapGPT**, **Cloudflare
+Workers AI**, **TokenRouter**, OpenRouter, Groq — are not a single model but a
+provider hosting dozens. Writing one alias per model does not scale. Mark such a
+provider `passthrough: true` in `config.yaml` and it becomes a first-class
+namespace:
 
 - **Direct routing, no alias.** Address any of its models as
   `"<provider>/<model>"`. The gateway splits on the **first** `/`, so a
@@ -198,6 +199,8 @@ reaching a provider's long tail of models without editing config per model.
 | `nabu-avalai`  | AvalAI GPT-5.5 → Gemini 2.5 Flash (rial-billed aggregator)  |
 | `nabu-gap`     | GapGPT GPT-5.6 Luna → Claude Sonnet 5 → Gemini 3.1 Flash    |
 | `nabu-arvan`   | ArvanCloud AIaaS private endpoint (one hosted model)        |
+| `nabu-cloudflare` | Cloudflare Workers AI Llama 3.3 70B → Llama 3.1 8B → gpt-oss-120b |
+| `nabu-tokenrouter` | TokenRouter `auto:balance` → GPT-4o → Claude Sonnet (300+ models) |
 | `nabu-image`   | OpenAI gpt-image-1 → Gemini 2.5 Flash Image → Pexels (image) |
 | `nabu-photo`   | Pexels stock-photo search (real photos, no generation)      |
 | `nabu-voice`   | OpenAI gpt-4o-mini-tts → Gemini 2.5 Flash TTS (speech)      |
@@ -247,6 +250,27 @@ Three domestic providers with rial billing and Persian docs ship pre-wired
 the `Authorization` header scheme (default `Bearer`). Set `auth_scheme: "apikey"`
 for gateways like ArvanCloud that expect `Authorization: apikey <key>`. No new
 adapter is needed — the OpenAI adapter just sends the alternate scheme.
+
+### Cloudflare Workers AI & TokenRouter
+
+Two more OpenAI-wire providers ship pre-wired (each skipped until its key is set),
+both `passthrough: true` — see the full guide in
+[`docs/cloudflare-and-tokenrouter.md`](docs/cloudflare-and-tokenrouter.md):
+
+- **Cloudflare Workers AI** (`developers.cloudflare.com/workers-ai`,
+  `CLOUDFLARE_API_KEY` + `CLOUDFLARE_ACCOUNT_ID`) — serverless edge inference over
+  Llama, OpenAI `gpt-oss`, Qwen, Mistral, DeepSeek and BAAI `bge` embeddings. The
+  account id is templated into `base_url`; auth is a normal Bearer token. Model
+  IDs use the `@cf/<author>/<model>` form, reachable as
+  `cloudflare/@cf/<author>/<model>` or via the `nabu-cloudflare` alias. Workers AI
+  has no OpenAI `/v1/models`, so its catalogue is advertised from the provider's
+  static `models:` list; it also backs a `bge` fallback on `nabu-embed`.
+- **TokenRouter** (`tokenrouter.com`, API `api.tokenrouter.io`,
+  `TOKENROUTER_API_KEY`) — an OpenAI-wire router fronting 300+ verified models
+  (OpenAI, Claude, Gemini, Llama, DeepSeek, GLM …) with smart `auto:*` routing.
+  Address any model as `tokenrouter/<id>` (e.g. `tokenrouter/glm-5.2`,
+  `tokenrouter/auto:balance`, `tokenrouter/anthropic:claude-3-5-sonnet-20241022`)
+  or use the `nabu-tokenrouter` alias. Its `/v1/models` feeds live discovery.
 
 ## Sub-agents (agents defined from outside, run in one call)
 

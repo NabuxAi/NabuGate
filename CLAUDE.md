@@ -34,6 +34,13 @@ config.example.yaml        # نمونهٔ پیکربندی (alias‌ها، provi
   `Authorization: apikey <key>` است نه Bearer؛ برای همین فیلدِ `auth_scheme` روی
   providerهای openai اضافه شد (پیش‌فرض `Bearer`؛ مقدارِ `apikey` هدر را عوض
   می‌کند، بدونِ آداپتورِ تازه). base_url برای هر providerِ openai اجباری است.
+- دو providerِ جهانیِ سازگارِ OpenAI هم بدونِ کدِ جدید و هر دو `passthrough` اضافه
+  شده‌اند: **Cloudflare Workers AI** و **TokenRouter**. Cloudflare با Bearer کار
+  می‌کند ولی `account_id` داخلِ URL است، پس `base_url` از `${CLOUDFLARE_ACCOUNT_ID}`
+  ساخته می‌شود، مدل‌ها فرمتِ `@cf/<author>/<model>` دارند و چون `/v1/models` ندارد
+  کاتالوگش فقط از فهرستِ ثابتِ `models:` می‌آید. TokenRouter روترِ +۳۰۰ مدل با
+  مسیریابیِ `auto:*` است، `/v1/models` دارد (کشفِ زنده) و مدل‌ها را با `:` جدا
+  می‌کند نه `/`. راهنمای کامل: `docs/cloudflare-and-tokenrouter.md`.
 - providerهای چندمدلی (مثل Parspack) را با `passthrough: true` علامت بزن: مدل‌هایشان
   به‌صورتِ `"<provider>/<model>"` مستقیم route می‌شوند (بدون alias) و کاتالوگشان از
   `/v1/models` خودِ provider به‌صورت زنده کشف و در `/v1/models` دروازه نمایش داده

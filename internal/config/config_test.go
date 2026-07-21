@@ -141,6 +141,72 @@ func TestDefaultConfigParses(t *testing.T) {
 	}
 }
 
+// TestDefaultConfigHasCloudflareAndTokenRouter guards the wiring of the two
+// OpenAI-wire passthrough providers added to the baked default config: Cloudflare
+// Workers AI and TokenRouter. Both are config-only (no dedicated adapter), so this
+// asserts they parse, build, and register as passthrough namespaces.
+func TestDefaultConfigHasCloudflareAndTokenRouter(t *testing.T) {
+	t.Setenv("NABU_API_KEY", "admin-from-env")
+
+	raw, err := os.ReadFile("../../config.default.yaml")
+	if err != nil {
+		t.Fatalf("read config.default.yaml: %v", err)
+	}
+	cfg, err := Parse(string(raw))
+	if err != nil {
+		t.Fatalf("parse config.default.yaml: %v", err)
+	}
+
+	// Both are OpenAI-wire passthrough providers.
+	for _, name := range []string{"cloudflare", "tokenrouter"} {
+		p, ok := cfg.Providers[name]
+		if !ok {
+			t.Fatalf("default config should define provider %q", name)
+		}
+		if p.Type != "openai" {
+			t.Errorf("provider %q type = %q, want openai", name, p.Type)
+		}
+		if !p.Passthrough {
+			t.Errorf("provider %q should be passthrough", name)
+		}
+	}
+
+	// Cloudflare advertises a static catalogue (it has no OpenAI /v1/models
+	// endpoint), keyed off CLOUDFLARE_API_KEY.
+	if cf := cfg.Providers["cloudflare"]; len(cf.Models) == 0 || cf.APIKeyEnv != "CLOUDFLARE_API_KEY" {
+		t.Errorf("cloudflare provider = %+v, want CLOUDFLARE_API_KEY + static models", cf)
+	}
+
+	// Chat aliases route to the new providers.
+	if r := cfg.Models["nabu-cloudflare"]; r.Primary.Provider != "cloudflare" {
+		t.Errorf("nabu-cloudflare primary provider = %q, want cloudflare", r.Primary.Provider)
+	}
+	if tr := cfg.Models["nabu-tokenrouter"]; tr.Primary.Provider != "tokenrouter" || tr.Primary.Model != "auto:balance" {
+		t.Errorf("nabu-tokenrouter primary = %+v, want tokenrouter/auto:balance", tr.Primary)
+	}
+
+	// With keys set, both adapters build and register as passthrough namespaces.
+	t.Setenv("CLOUDFLARE_ACCOUNT_ID", "acct-123")
+	t.Setenv("CLOUDFLARE_API_KEY", "cf-test")
+	t.Setenv("TOKENROUTER_API_KEY", "tr-test")
+	cfg, err = Parse(string(raw)) // re-parse so ${CLOUDFLARE_ACCOUNT_ID} expands
+	if err != nil {
+		t.Fatalf("re-parse: %v", err)
+	}
+	adapters, warnings := cfg.BuildAdapters()
+	for _, name := range []string{"cloudflare", "tokenrouter"} {
+		if _, ok := adapters[name]; !ok {
+			t.Errorf("BuildAdapters should build %q when its key is set (warnings: %v)", name, warnings)
+		}
+	}
+	pass := cfg.Passthroughs(adapters)
+	for _, name := range []string{"cloudflare", "tokenrouter"} {
+		if _, ok := pass[name]; !ok {
+			t.Errorf("%q should be registered as a passthrough namespace", name)
+		}
+	}
+}
+
 func TestBuildAdaptersKeylessProvider(t *testing.T) {
 	withBase := &Config{Providers: map[string]ProviderConfig{
 		"ollama": {

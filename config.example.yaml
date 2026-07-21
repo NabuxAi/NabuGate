@@ -10,7 +10,7 @@ server:
       # Aliases and whole passthrough provider namespaces ("parspack/*" covers
       # every parspack/<model>, including nested IDs like parspack/openai/gpt-5.5;
       # "avalai/*" and "gapgpt/*" do the same for those aggregators).
-      allow: ["nabu-fast", "nabu-embed", "parspack/*", "avalai/*", "gapgpt/*", "nabu-avalai", "nabu-gap", "nabu-arvan"]
+      allow: ["nabu-fast", "nabu-embed", "parspack/*", "avalai/*", "gapgpt/*", "9router/*", "cloudflare/*", "tokenrouter/*", "nabu-avalai", "nabu-gap", "nabu-arvan", "nabu-9router", "nabu-cloudflare", "nabu-tokenrouter"]
       rate_limit: 120
 
 providers:
@@ -31,6 +31,54 @@ providers:
     type: openai
     base_url: "https://openrouter.ai/api/v1"
     api_key_env: "OPENROUTER_API_KEY"
+
+  # Cloudflare Workers AI (developers.cloudflare.com/workers-ai) — serverless
+  # inference on Cloudflare's edge network, hosting Meta Llama, OpenAI gpt-oss,
+  # Qwen, Mistral, DeepSeek and BAAI bge embeddings behind one API token. It
+  # exposes an OpenAI-compatible surface (/chat/completions, /embeddings,
+  # /responses), so no new adapter is needed. The Cloudflare account id is part
+  # of the URL, so base_url is templated from ${CLOUDFLARE_ACCOUNT_ID}; auth is a
+  # normal Bearer token (CLOUDFLARE_API_KEY). Both env vars are required; the
+  # provider is skipped automatically when CLOUDFLARE_API_KEY is unset. Model ids
+  # use the "@cf/<author>/<model>" form.
+  #
+  # passthrough → address any model directly as "cloudflare/@cf/<author>/<model>"
+  # (the router splits on the FIRST "/", so the "@cf/…" id keeps its own slashes).
+  # Workers AI has no OpenAI-style /v1/models endpoint, so live discovery is a
+  # no-op here — the static `models:` list below is what /v1/models advertises.
+  cloudflare:
+    enabled: true
+    type: openai
+    base_url: "https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/ai/v1"
+    api_key_env: "CLOUDFLARE_API_KEY"
+    passthrough: true
+    models:
+      - "@cf/meta/llama-3.3-70b-instruct-fp8-fast"
+      - "@cf/meta/llama-3.1-8b-instruct"
+      - "@cf/openai/gpt-oss-120b"
+      - "@cf/openai/gpt-oss-20b"
+      - "@cf/baai/bge-large-en-v1.5"
+      - "@cf/baai/bge-m3"
+
+  # TokenRouter (tokenrouter.com, API at api.tokenrouter.io) — an OpenAI-wire
+  # aggregator/router fronting 300+ verified models (OpenAI, Claude, Gemini,
+  # Llama, Mistral, DeepSeek, GLM …) behind one key, with smart "auto:*" routing.
+  # base_url is the fixed api.tokenrouter.io/v1; auth is a Bearer token
+  # (TOKENROUTER_API_KEY). Skipped automatically when that key is unset.
+  #
+  # passthrough → address any catalogue model directly as "tokenrouter/<model>":
+  #   • plain OpenAI id:          tokenrouter/gpt-4o
+  #   • provider-pinned (colon):  tokenrouter/anthropic:claude-3-5-sonnet-20241022
+  #   • other vendors, e.g. GLM:  tokenrouter/glm-5.2   (exact id from the models page)
+  #   • auto-routing modes:       tokenrouter/auto:balance | auto:fast | auto:cost | auto:quality
+  # TokenRouter uses ":" (not "/") inside model ids, so the first-"/" split stays
+  # clean. Its /v1/models feeds the gateway's own /v1/models via live discovery.
+  tokenrouter:
+    enabled: true
+    type: openai
+    base_url: "https://api.tokenrouter.io/v1"
+    api_key_env: "TOKENROUTER_API_KEY"
+    passthrough: true
 
   dahl:
     enabled: true
@@ -98,6 +146,29 @@ providers:
     base_url: "${ARVAN_AIAAS_ENDPOINT}"   # the per-endpoint URL from the ArvanCloud panel
     api_key_env: "ARVAN_API_KEY"
     auth_scheme: "apikey"
+
+  # 9Router (9router.com) — an OpenAI-compatible smart router you self-host
+  # (`npm install -g 9router && 9router`), fronting 60+ AI providers (Claude Code,
+  # Codex, Gemini, GLM, MiniMax, Kimi, OpenRouter, Qwen…) with 3-tier auto-
+  # fallback. Run `9router` once on the box, open the dashboard it prints
+  # (http://localhost:20128/dashboard) and connect providers via OAuth/API key;
+  # it then serves an OpenAI-wire API on the fixed port 20128.
+  #
+  # base_url comes from env because "localhost" is wrong once NabuGate runs in a
+  # container — inside the distroless image localhost is the gateway itself, not
+  # the 9Router process. Set NINEROUTER_BASE_URL per deploy:
+  #   • same host, no container:  http://localhost:20128/v1
+  #   • gateway in Docker on same host:  http://host.docker.internal:20128/v1
+  #   • remote box, via the dashboard's Cloud Sync tunnel:  https://<your>.trycloudflare.com/v1
+  # Unset → provider auto-skipped (like ollama), so the gateway still boots.
+  # Keyless (local endpoint ignores the adapter's placeholder bearer). Multi-model
+  # + OpenAI-wire ⇒ passthrough: address any model as "9router/<model>" and its
+  # catalogue is discovered live from /v1/models.
+  9router:
+    enabled: true
+    type: openai
+    base_url: "${NINEROUTER_BASE_URL}"
+    passthrough: true
 
   anthropic:
     enabled: true
@@ -227,6 +298,42 @@ models:
       provider: arvan
       model: "DeepSeek-R1-qwen-7b-awq"
 
+  # 9Router-backed chat alias (or call "9router/<model>" directly via passthrough).
+  # Model IDs are whatever your local 9Router dashboard exposes for the providers
+  # you connected — edit to match. Router already does its own 3-tier fallback,
+  # so a single primary is usually enough.
+  nabu-9router:
+    primary:
+      provider: 9router
+      model: "claude-sonnet-5"
+
+  # Cloudflare Workers AI-backed chat alias (or call
+  # "cloudflare/@cf/<author>/<model>" directly via passthrough). Swap the ids for
+  # any Workers AI model from https://developers.cloudflare.com/workers-ai/models.
+  nabu-cloudflare:
+    primary:
+      provider: cloudflare
+      model: "@cf/meta/llama-3.3-70b-instruct-fp8-fast"
+    fallback:
+      - provider: cloudflare
+        model: "@cf/meta/llama-3.1-8b-instruct"
+      - provider: cloudflare
+        model: "@cf/openai/gpt-oss-120b"
+
+  # TokenRouter-backed chat alias. Primary uses TokenRouter's own smart routing
+  # ("auto:balance"); the fallbacks pin concrete models. You can also skip the
+  # alias and call "tokenrouter/<model>" directly via passthrough, e.g.
+  # "tokenrouter/glm-5.2".
+  nabu-tokenrouter:
+    primary:
+      provider: tokenrouter
+      model: "auto:balance"
+    fallback:
+      - provider: tokenrouter
+        model: "gpt-4o"
+      - provider: tokenrouter
+        model: "anthropic:claude-3-5-sonnet-20241022"
+
 images:
   nabu-image:
     primary:
@@ -264,6 +371,10 @@ embeddings:
     fallback:
       - provider: gemini
         model: "text-embedding-004"
+      # Cloudflare Workers AI BAAI bge as a last-resort embedding fallback
+      # (different vector dimension, like the Gemini fallback above).
+      - provider: cloudflare
+        model: "@cf/baai/bge-large-en-v1.5"
 
 # Sub-agents: named assistants = a system prompt + default params layered on top
 # of a chat alias, addressable as a "model" (POST /v1/chat/completions with

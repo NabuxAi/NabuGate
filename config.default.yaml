@@ -28,6 +28,36 @@ providers:
     base_url: "https://openrouter.ai/api/v1"
     api_key_env: "OPENROUTER_API_KEY"
 
+  # Cloudflare Workers AI (developers.cloudflare.com/workers-ai) — OpenAI-wire
+  # serverless inference (Llama / gpt-oss / Qwen / Mistral / DeepSeek / bge). The
+  # account id is templated into base_url; auth is a Bearer token. Both
+  # CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_KEY are required — skipped when the
+  # key is unset. passthrough exposes "cloudflare/@cf/<author>/<model>"; Workers
+  # AI has no /v1/models, so the static list below is what /v1/models advertises.
+  cloudflare:
+    enabled: true
+    type: openai
+    base_url: "https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/ai/v1"
+    api_key_env: "CLOUDFLARE_API_KEY"
+    passthrough: true
+    models:
+      - "@cf/meta/llama-3.3-70b-instruct-fp8-fast"
+      - "@cf/meta/llama-3.1-8b-instruct"
+      - "@cf/openai/gpt-oss-120b"
+      - "@cf/baai/bge-large-en-v1.5"
+
+  # TokenRouter (api.tokenrouter.io) — OpenAI-wire router fronting 300+ models
+  # (OpenAI / Claude / Gemini / Llama / DeepSeek / GLM …) with "auto:*" routing.
+  # passthrough exposes "tokenrouter/<model>" (e.g. tokenrouter/glm-5.2,
+  # tokenrouter/auto:balance); its /v1/models feeds live discovery. Skipped when
+  # TOKENROUTER_API_KEY is unset.
+  tokenrouter:
+    enabled: true
+    type: openai
+    base_url: "https://api.tokenrouter.io/v1"
+    api_key_env: "TOKENROUTER_API_KEY"
+    passthrough: true
+
   dahl:
     enabled: true
     type: openai
@@ -206,6 +236,26 @@ models:
       provider: arvan
       model: "DeepSeek-R1-qwen-7b-awq"
 
+  # Cloudflare Workers AI-backed chat alias (or call the passthrough directly:
+  # "cloudflare/@cf/<author>/<model>").
+  nabu-cloudflare:
+    primary:
+      provider: cloudflare
+      model: "@cf/meta/llama-3.3-70b-instruct-fp8-fast"
+    fallback:
+      - provider: cloudflare
+        model: "@cf/meta/llama-3.1-8b-instruct"
+
+  # TokenRouter-backed chat alias using its smart "auto:balance" routing (or call
+  # "tokenrouter/<model>" directly via passthrough, e.g. "tokenrouter/glm-5.2").
+  nabu-tokenrouter:
+    primary:
+      provider: tokenrouter
+      model: "auto:balance"
+    fallback:
+      - provider: tokenrouter
+        model: "gpt-4o"
+
 images:
   nabu-image:
     primary:
@@ -240,6 +290,8 @@ embeddings:
     fallback:
       - provider: gemini
         model: "text-embedding-004"
+      - provider: cloudflare
+        model: "@cf/baai/bge-large-en-v1.5"
 
 # Sub-agents (system prompt + defaults over an alias, addressable as a "model").
 # The Cinematic Scrollytelling squad ships as one YAML file per agent under
