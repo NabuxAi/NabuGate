@@ -1,0 +1,79 @@
+/*
+ * NabuGate console design tokens.
+ *
+ * Distilled from the NabuDesk design system (indigo→violet brand, slate
+ * neutrals, emerald/amber/rose/sky statuses, Inter+Vazirmatn, RTL-first) and
+ * tuned to the NabuGate console mockup, which leads with a blue accent (#2563eb)
+ * over the slate base. Keep values here; components reference the vars.
+ */
+:root {
+  /* Brand / accent */
+  --ng-accent: #2563eb;
+  --ng-accent-strong: #1d4ed8;
+  --ng-accent-soft: #eff6ff;
+  --ng-accent-border: #bfdbfe;
+  --ng-brand-grad: linear-gradient(135deg, #4338ca 0%, #2563eb 100%);
+
+  /* Surfaces & lines */
+  --ng-bg: #f5f7fb;
+  --ng-bg-veil: linear-gradient(180deg, rgba(37, 99, 235, 0.08), transparent 240px);
+  --ng-surface: #ffffff;
+  --ng-surface-soft: #f8fafc;
+  --ng-surface-softer: #fbfcfe;
+  --ng-border: #e6ecf5;
+  --ng-border-card: #dde6f0;
+  --ng-border-faint: #eef2f8;
+  --ng-divider: #f1f5fb;
+
+  /* Text */
+  --ng-text: #172033;
+  --ng-heading: #111827;
+  --ng-heading-ink: #0f172a;
+  --ng-muted: #637083;
+  --ng-subtle: #94a3b8;
+  --ng-slate-600: #475569;
+  --ng-slate-700: #334155;
+
+  /* Status — success (emerald) */
+  --ng-ok: #10b981;
+  --ng-ok-text: #0f766e;
+  --ng-ok-surface: #ecfdf9;
+  --ng-ok-border: #b7e4dc;
+  /* Status — warn (amber) */
+  --ng-warn-text: #92400e;
+  --ng-warn-surface: #fffbeb;
+  --ng-warn-border: #fde68a;
+  /* Accent chip (info / primary target) */
+  --ng-info-text: #1d4ed8;
+  --ng-info-surface: #eff6ff;
+  --ng-info-border: #bfdbfe;
+  /* Passthrough (violet) */
+  --ng-pass-text: #6d28d9;
+  --ng-pass-surface: #f5f3ff;
+  --ng-pass-border: #ddd6fe;
+  /* Idle dot */
+  --ng-idle: #cbd5e1;
+
+  /* Shape */
+  --ng-radius-sm: 6px;
+  --ng-radius: 8px;
+  --ng-radius-pill: 999px;
+
+  /* Elevation */
+  --ng-shadow-xs: 0 1px 2px rgba(15, 23, 42, 0.05);
+  --ng-shadow-stat: 0 8px 22px rgba(15, 23, 42, 0.05);
+  --ng-shadow-card: 0 10px 28px rgba(15, 23, 42, 0.07);
+  --ng-shadow-brand: 0 12px 28px rgba(67, 56, 202, 0.28);
+  --ng-shadow-btn: 0 12px 24px rgba(37, 99, 235, 0.2);
+
+  /* Type */
+  --ng-font: 'Vazirmatn', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --ng-mono: ui-monospace, 'SFMono-Regular', 'Menlo', monospace;
+
+  /* Motion */
+  --ng-ease: cubic-bezier(0.16, 1, 0.3, 1);
+  --ng-dur: 200ms;
+
+  --ng-sidebar-w: 250px;
+  --ng-topbar-h: 64px;
+}
