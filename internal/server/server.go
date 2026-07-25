@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io/fs"
 	"log/slog"
 	"net/http"
 	"strconv"
@@ -17,6 +18,7 @@ import (
 	"nabugate/internal/provider"
 	"nabugate/internal/router"
 	"nabugate/internal/usage"
+	"nabugate/web"
 )
 
 type policyCtxKey struct{}
@@ -63,7 +65,47 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /v1/embeddings", s.auth(s.handleEmbeddings))
 	mux.HandleFunc("GET /v1/usage", s.auth(s.handleUsage))
 	mux.HandleFunc("GET /v1/photos/search", s.auth(s.handlePhotoSearch))
+	s.mountConsole(mux)
 	return mux
+}
+
+// mountConsole serves the embedded admin console (web/dist) under /admin/ when
+// the bundle is built into the binary. It's the static SPA shell only — every
+// piece of sensitive gateway data still comes from the auth-guarded /v1/*
+// endpoints — so the shell itself is served without a key, and the browser
+// carries the admin token when it calls those APIs. If the bundle wasn't built,
+// mounting is skipped and the gateway behaves exactly as before.
+func (s *Server) mountConsole(mux *http.ServeMux) {
+	assets, ok := web.Assets()
+	if !ok {
+		return
+	}
+	fileServer := http.FileServer(http.FS(assets))
+	mux.Handle("GET /admin/", http.StripPrefix("/admin/", spaFileServer(assets, fileServer)))
+	// Bare /admin → /admin/ so the SPA's relative asset URLs resolve correctly.
+	mux.HandleFunc("GET /admin", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "/admin/", http.StatusMovedPermanently)
+	})
+}
+
+// spaFileServer serves static files from the console bundle and falls back to
+// index.html for paths that don't map to a file, so client-side navigation
+// (and a refresh on a deep link) keeps working.
+func spaFileServer(assets fs.FS, fileServer http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		p := strings.TrimPrefix(r.URL.Path, "/")
+		if p == "" {
+			fileServer.ServeHTTP(w, r)
+			return
+		}
+		if _, err := fs.Stat(assets, p); err != nil {
+			r = r.Clone(r.Context())
+			r.URL.Path = "/"
+			fileServer.ServeHTTP(w, r)
+			return
+		}
+		fileServer.ServeHTTP(w, r)
+	})
 }
 
 // project returns the calling key's project (or a placeholder in dev mode).
