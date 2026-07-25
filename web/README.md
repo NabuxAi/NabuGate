@@ -38,6 +38,28 @@ The bundle is static (`base: './'`), so it can be served by the gateway, a
 static host, or Coolify. Fonts (Vazirmatn) load from Google Fonts, matching the
 design; self-host under `public/` if an offline build is required.
 
+## Served by the gateway (`/admin/`)
+
+The built bundle is committed to `web/dist/` and embedded into the gateway
+binary (`web/embed.go`, `//go:embed all:dist`), so a running gateway serves the
+console at **`/admin/`** with no extra process:
+
+```bash
+go run ./cmd/gateway -config config.yaml   # then open http://localhost:8080/admin/
+```
+
+Only the static shell is served openly; every piece of live gateway data still
+comes from the auth-guarded `/v1/*` endpoints, so the console carries the admin
+key when it calls them. If `web/dist/` is missing (bundle not built), the
+gateway simply skips mounting `/admin/` and behaves exactly as before.
+
+**After changing the console sources, rebuild and re-commit the bundle** so the
+embedded copy stays in sync:
+
+```bash
+cd web && npm run build   # regenerates web/dist/ (committed)
+```
+
 ## Stack
 
 React 18 + Vite 5, no router (lightweight `useState` view switch), no UI

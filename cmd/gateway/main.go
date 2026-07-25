@@ -16,6 +16,7 @@ import (
 	"nabugate/internal/router"
 	"nabugate/internal/server"
 	"nabugate/internal/usage"
+	"nabugate/web"
 )
 
 func main() {
@@ -87,6 +88,9 @@ func main() {
 		"passthrough", passthroughNames,
 		"agents", agents.Names(),
 	)
+	if _, ok := web.Assets(); ok {
+		log.Info("admin console available", "path", "/admin/")
+	}
 
 	httpServer := &http.Server{
 		Addr:              fmt.Sprintf(":%d", cfg.Server.Port),

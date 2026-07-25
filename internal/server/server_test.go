@@ -221,3 +221,58 @@ func TestPolicyFiltersPassthroughModels(t *testing.T) {
 		t.Fatalf("narrow key chat status = %d, want 403", resp.StatusCode)
 	}
 }
+
+// TestConsoleServed verifies the embedded admin console is reachable under
+// /admin/ (static shell), that bare /admin redirects to it, and that unknown
+// sub-paths fall back to the SPA shell — without touching the /v1 API surface.
+func TestConsoleServed(t *testing.T) {
+	up := fakeUpstream(t)
+	defer up.Close()
+	ts := newTestServer(t, up.URL, policy.New(nil, nil), nil)
+	defer ts.Close()
+
+	// no-redirect client so we can assert the 301 on bare /admin
+	client := &http.Client{CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
+
+	resp, err := client.Get(ts.URL + "/admin/")
+	if err != nil {
+		t.Fatalf("GET /admin/: %v", err)
+	}
+	body, _ := io.ReadAll(resp.Body)
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("GET /admin/ status = %d, want 200", resp.StatusCode)
+	}
+	if !strings.Contains(string(body), `id="root"`) {
+		t.Fatalf("GET /admin/ did not serve the console shell; body = %q", truncateForTest(string(body)))
+	}
+
+	redir, err := client.Get(ts.URL + "/admin")
+	if err != nil {
+		t.Fatalf("GET /admin: %v", err)
+	}
+	redir.Body.Close()
+	if redir.StatusCode != http.StatusMovedPermanently {
+		t.Fatalf("GET /admin status = %d, want 301", redir.StatusCode)
+	}
+	if loc := redir.Header.Get("Location"); loc != "/admin/" {
+		t.Fatalf("GET /admin Location = %q, want /admin/", loc)
+	}
+
+	// SPA fallback: an unknown deep path still serves the shell (200), not 404.
+	deep, err := client.Get(ts.URL + "/admin/does/not/exist")
+	if err != nil {
+		t.Fatalf("GET /admin/deep: %v", err)
+	}
+	deep.Body.Close()
+	if deep.StatusCode != http.StatusOK {
+		t.Fatalf("GET /admin/does/not/exist status = %d, want 200 (SPA fallback)", deep.StatusCode)
+	}
+}
+
+func truncateForTest(s string) string {
+	if len(s) > 200 {
+		return s[:200] + "…"
+	}
+	return s
+}
