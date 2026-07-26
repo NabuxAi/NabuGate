@@ -61,3 +61,20 @@ pages — the storyboard, the motion, the code, the words, and the polish:
 | `cine-performance-a11y`    | Smooth on weak phones + accessible, real reduced-motion path |
 
 Grant a project key the whole squad with a glob: `allow: ["cine-*"]`.
+
+## Product agents
+
+| Agent | Role |
+|-------|------|
+| `nabusu-night-companion` | Sits with someone who cannot sleep at 3am — short, level, never promises sleep |
+
+`nabusu-night-companion` backs the chat in
+[NabuSu](https://github.com/NabuxAi/NabuSu), a night companion for people who
+cannot sleep and for people tapering off benzodiazepines under medical
+supervision.
+
+Its `system` block is not tone guidance. It carries hard limits — never a dose,
+a schedule or a rate of reduction, and an immediate hand-off to emergency care
+when someone reports a seizure or hallucinations. The app repeats those limits
+on its own side, and drops any reply containing dosing language. Treat edits to
+that file as changes to a safety contract, not copywriting.
