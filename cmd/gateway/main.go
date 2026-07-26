@@ -2,6 +2,7 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"flag"
 	"fmt"
@@ -9,7 +10,9 @@ import (
 	"nabugate/internal/adminstore"
 	"net/http"
 	"os"
+	"os/signal"
 	"path/filepath"
+	"syscall"
 	"time"
 
 	"nabugate/internal/config"
@@ -64,6 +67,7 @@ func main() {
 	}
 	adminState, err := adminstore.Open(filepath.Join(stateDir, "console.json"))
 	if err != nil {
+		adminState = nil
 		// Not fatal: the gateway's own routing does not depend on it, and
 		// refusing to serve traffic because a console cannot start would be the
 		// wrong trade.
@@ -135,9 +139,34 @@ func main() {
 		// intentionally no WriteTimeout, which would sever long SSE streams.
 		ReadTimeout: 60 * time.Second,
 	}
-	if err := httpServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-		log.Error("server stopped", "error", err)
-		os.Exit(1)
+	// Graceful shutdown. Without it, SIGTERM killed the process outright — which
+	// cut in-flight streams and, once usage became persistent, dropped up to a
+	// full flush interval of counters on every redeploy. That is exactly the
+	// "the numbers are not real" symptom the console had.
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+
+	go func() {
+		if err := httpServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			log.Error("server stopped", "error", err)
+			os.Exit(1)
+		}
+	}()
+
+	<-ctx.Done()
+	log.Info("shutting down")
+
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	if err := httpServer.Shutdown(shutdownCtx); err != nil {
+		log.Warn("shutdown", "error", err)
+	}
+	if adminState != nil {
+		// Last write, after the listener has stopped, so nothing is still
+		// incrementing the counters we are about to persist.
+		if err := adminState.Persist(); err != nil {
+			log.Warn("persist console usage on shutdown", "error", err)
+		}
 	}
 }
 

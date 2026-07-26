@@ -374,3 +374,48 @@ button { font-family: inherit; }
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; }
 }
+
+/* ── sign-in gate ─────────────────────────────────────────────────────────── */
+
+.app-boot { display: grid; place-items: center; min-height: 100vh; color: var(--ng-muted); }
+
+.signin { display: grid; place-items: center; min-height: 100vh; padding: 2rem 1rem; }
+
+.signin-card { width: 100%; max-width: 23rem; padding: 2rem; }
+
+.signin-brand { margin-bottom: 1.5rem; font-size: 1.3rem; font-weight: 800; text-align: center; color: var(--ng-heading); }
+.signin-brand span { display: block; margin-top: 0.25rem; font-size: 0.72rem; font-weight: 400; color: var(--ng-muted); }
+
+.signin-note { margin: 0 0 1rem; font-size: 0.78rem; line-height: 1.9; color: var(--ng-muted); }
+
+.signin-field { display: block; margin-bottom: 0.95rem; font-size: 0.78rem; color: var(--ng-muted); }
+.signin-field input {
+  display: block; width: 100%; margin-top: 0.35rem; padding: 0.55rem 0.7rem;
+  font: inherit; font-size: 0.9rem;
+  color: var(--ng-heading); background: var(--ng-bg, #fff);
+  border: 1px solid var(--ng-border, #e3e3e3); border-radius: 8px;
+}
+.signin-hint { display: block; margin-top: 0.3rem; font-size: 0.7rem; line-height: 1.8; color: var(--ng-muted); }
+.signin-error { margin: 0 0 0.9rem; font-size: 0.8rem; color: #c53030; }
+.signin-submit { width: 100%; }
+
+/* ── modals ───────────────────────────────────────────────────────────────── */
+
+.modal-backdrop {
+  position: fixed; inset: 0; z-index: 60;
+  display: grid; place-items: center; padding: 2rem 1rem;
+  background: rgba(0, 0, 0, 0.45); overflow-y: auto;
+}
+.modal { width: 100%; max-width: 30rem; padding: 1.75rem; }
+.modal h3 { margin: 0 0 0.75rem; }
+.modal-actions { display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 1.25rem; }
+
+/* The secret is shown once, so it has to be readable and selectable at a
+   glance rather than truncated into a neat row. */
+.token-secret {
+  margin: 0.75rem 0 0; padding: 0.85rem;
+  font-size: 0.85rem; word-break: break-all; white-space: pre-wrap;
+  background: var(--ng-faint, #f4f4f5); border-radius: 8px;
+}
+
+.banner-error { margin-bottom: 14px; padding: 12px 14px; color: #c53030; }

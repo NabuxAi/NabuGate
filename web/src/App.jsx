@@ -1,5 +1,8 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
+import * as api from './api.js';
+import SignIn from './views/SignIn.jsx';
+import Tokens from './views/Tokens.jsx';
 import Sidebar from './components/Sidebar.jsx';
 import Dashboard from './views/Dashboard.jsx';
 import Providers from './views/Providers.jsx';
@@ -13,6 +16,7 @@ const VIEWS = {
   providers: () => <Providers />,
   models: () => <Models />,
   keys: () => <Keys />,
+  tokens: () => <Tokens />,
   usage: () => <Usage />,
   agents: () => (
     <Placeholder
@@ -34,6 +38,23 @@ const VIEWS = {
 
 export default function App() {
   const [view, setView] = useState('dashboard');
+  // null while we ask the gateway; the console must not flash its shell before
+  // we know whether this visitor is allowed to see it.
+  const [session, setSession] = useState(null);
+
+  const refresh = () =>
+    api
+      .status()
+      .then(setSession)
+      .catch(() => setSession({ authenticated: false, needs_setup: false }));
+
+  useEffect(refresh, []);
+
+  if (session === null) return <div className="app-boot">…</div>;
+  if (!session.authenticated) {
+    return <SignIn needsSetup={session.needs_setup} onAuthenticated={refresh} />;
+  }
+
   const render = VIEWS[view] || VIEWS.dashboard;
   return (
     <div className="app">

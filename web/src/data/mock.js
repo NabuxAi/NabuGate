@@ -101,6 +101,7 @@ export const nav = [
   { id: 'providers', label: 'پرووایدرها', icon: '◉' },
   { id: 'models', label: 'مدل‌ها و آلیاس‌ها', icon: '✦' },
   { id: 'keys', label: 'کلیدهای پروژه', icon: '▣' },
+  { id: 'tokens', label: 'توکن هر اپ', icon: '⚿' },
   { id: 'usage', label: 'مصرف و هزینه', icon: '▤' },
   { id: 'agents', label: 'ساب‌اجنت‌ها', icon: '◈' },
   { id: 'logs', label: 'لاگ‌ها', icon: '➤' },

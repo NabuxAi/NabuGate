@@ -1,68 +1,98 @@
+import { useEffect, useState } from 'react';
+
 import Layout from '../components/Layout.jsx';
-import { usageByModel, pricing, totalToday, faInt, faDigits } from '../data/mock.js';
+import * as api from '../api.js';
+import { faInt, faDigits } from '../data/mock.js';
 
+/*
+ * Real per-project usage.
+ *
+ * This view used to render from src/data/mock.js — invented numbers that looked
+ * like a working gateway. These come from the persisted counters, so they also
+ * survive a redeploy; the in-memory tracker behind /v1/usage resets to zero
+ * every time the container restarts.
+ */
 export default function Usage() {
-  return (
-    <Layout title="مصرف و هزینه" subtitle="مصرف تفکیک‌شده بر اساس مدل و جدول قیمت‌گذاری">
-      <div className="grid grid-2-keys">
-        <div className="card">
-          <div className="card-head">
-            <h3>مصرف بر اساس مدل</h3>
-            <span className="pill ltr">GET /v1/usage</span>
-          </div>
-          <table className="tbl">
-            <thead>
-              <tr>
-                <th>مدل</th>
-                <th style={{ width: 80 }}>درخواست</th>
-                <th style={{ width: 70 }}>توکن</th>
-                <th style={{ width: 80 }}>هزینه</th>
-              </tr>
-            </thead>
-            <tbody>
-              {usageByModel.map((u) => (
-                <tr key={u.model}>
-                  <td className="mono ltr" style={{ fontSize: 11.5, color: 'var(--ng-heading)' }}>
-                    {u.model}
-                  </td>
-                  <td style={{ fontSize: 12, color: 'var(--ng-slate-700)' }}>{faInt(u.requests)}</td>
-                  <td style={{ fontSize: 12, color: 'var(--ng-slate-700)' }}>{faDigits(u.tokens)}</td>
-                  <td>
-                    {u.cost ? (
-                      <span className="ltr" style={{ fontSize: 12, color: 'var(--ng-ok-text)', fontWeight: 700 }}>
-                        {faDigits(u.cost)}
-                      </span>
-                    ) : (
-                      <span style={{ fontSize: 12, color: 'var(--ng-subtle)' }}>بدون قیمت</span>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+  const [byProject, setByProject] = useState({});
+  const [error, setError] = useState(null);
 
-        <div className="card">
-          <h3 style={{ marginBottom: 4 }}>جدول قیمت‌گذاری</h3>
-          <p className="card-sub">USD به‌ازای هر ۱M توکن (ورودی / خروجی)</p>
-          <div style={{ display: 'grid', gap: 8 }}>
-            {pricing.map((p) => (
-              <div className="price-row" key={p.model}>
-                <span className="ltr">{p.model}</span>
-                <strong className="ltr">{faDigits(p.price)}</strong>
-              </div>
-            ))}
-          </div>
-          <div className="total-row">
-            <span className="lbl">هزینهٔ کل امروز</span>
-            <strong className="amt ltr">{faDigits(totalToday)}</strong>
-          </div>
-        </div>
+  const load = () =>
+    api
+      .usage()
+      .then((r) => setByProject(r.by_project || {}))
+      .catch((e) => setError(e.message));
+
+  useEffect(load, []);
+
+  const rows = Object.entries(byProject).sort((a, b) => (b[1].requests || 0) - (a[1].requests || 0));
+  const total = rows.reduce(
+    (acc, [, v]) => ({
+      requests: acc.requests + (v.requests || 0),
+      tokens: acc.tokens + (v.prompt_tokens || 0) + (v.completion_tokens || 0),
+      cost: acc.cost + (v.cost_usd || 0),
+      denied: acc.denied + (v.denied || 0),
+    }),
+    { requests: 0, tokens: 0, cost: 0, denied: 0 }
+  );
+
+  return (
+    <Layout
+      title="مصرف و هزینه"
+      subtitle="شمارنده‌های واقعی، به تفکیک اپ — ماندگار بین ری‌دیپلوی‌ها"
+      actions={
+        <button
+          className="btn"
+          onClick={async () => {
+            if (!confirm('همهٔ شمارنده‌ها صفر شوند؟')) return;
+            await api.resetUsage();
+            load();
+          }}
+        >
+          صفر کردن
+        </button>
+      }
+    >
+      {error && <div className="card banner-error">{error}</div>}
+
+      <div className="stats">
+        <div className="stat"><div className="stat-label">کل درخواست</div><div className="stat-value">{faInt(total.requests)}</div></div>
+        <div className="stat"><div className="stat-label">کل توکن</div><div className="stat-value">{faInt(total.tokens)}</div></div>
+        <div className="stat"><div className="stat-label">هزینه</div><div className="stat-value ltr">{faDigits('$' + total.cost.toFixed(2))}</div></div>
+        <div className="stat"><div className="stat-label">ردشده</div><div className="stat-value">{faInt(total.denied)}</div></div>
       </div>
 
-      <div className="demo-banner">
-        اعداد این صفحه <strong>نمونه</strong> هستند. برای داده‌های زنده، این نما به{' '}
-        <span className="mono ltr">GET /v1/usage</span> دروازه وصل می‌شود (مصرف و هزینه per-project/per-model).
+      <div className="card" style={{ marginTop: 16 }}>
+        <table className="tbl">
+          <thead>
+            <tr>
+              <th>اپ</th>
+              <th style={{ width: 110 }}>درخواست</th>
+              <th style={{ width: 120 }}>توکن ورودی</th>
+              <th style={{ width: 120 }}>توکن خروجی</th>
+              <th style={{ width: 100 }}>هزینه</th>
+              <th style={{ width: 90 }}>ردشده</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.length === 0 && (
+              <tr>
+                <td colSpan={6} style={{ color: 'var(--ng-muted)', padding: 18 }}>
+                  هنوز درخواستی ثبت نشده.
+                </td>
+              </tr>
+            )}
+            {rows.map(([name, v]) => (
+              <tr key={name}>
+                <td style={{ fontWeight: 700, color: 'var(--ng-heading)' }}>{name}</td>
+                <td className="mono">{faInt(v.requests || 0)}</td>
+                <td className="mono">{faInt(v.prompt_tokens || 0)}</td>
+                <td className="mono">{faInt(v.completion_tokens || 0)}</td>
+                <td className="mono ltr">{faDigits('$' + (v.cost_usd || 0).toFixed(3))}</td>
+                <td className="mono">{faInt(v.denied || 0)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
     </Layout>
   );
