@@ -8,6 +8,14 @@ server:
   port: 8080
   api_keys:
     - "${NABU_API_KEY}"
+  keys:
+    # NabuWrite. One glob covers its three write-* agents and the write-embed
+    # alias, so the project key cannot reach any other model on the gateway.
+    # Skipped automatically when NABUWRITE_KEY is unset.
+    - key: "${NABUWRITE_KEY}"
+      project: "nabuwrite"
+      allow: ["write-*"]
+      rate_limit: 120
 
 providers:
   openai:
@@ -283,6 +291,9 @@ audio:
         model: "gemini-2.5-flash-preview-tts"
 
 embeddings:
+  # General-purpose embedding alias. The fallback chain deliberately crosses
+  # vector widths (1536 → 768 → 1024): fine for search performed at query time,
+  # wrong for anything that stores the vectors — see write-embed below.
   nabu-embed:
     primary:
       provider: openai
@@ -292,6 +303,22 @@ embeddings:
         model: "text-embedding-004"
       - provider: cloudflare
         model: "@cf/baai/bge-large-en-v1.5"
+
+  # NabuWrite's Style RAG index.
+  #
+  # No fallback, deliberately. NabuWrite stores these vectors in a fixed-width
+  # pgvector column. A fallback of a different width would either fail the
+  # insert or — worse — split the corpus across two incompatible embedding
+  # spaces with no error at all. A failed embed is a retryable error; a
+  # wrong-width vector is a corrupt index.
+  #
+  # Routed through Parspack because it is the provider actually keyed on this
+  # deployment, and text-embedding-3-small is natively 1536-wide, so the
+  # client's requested `dimensions` and the model's default agree.
+  write-embed:
+    primary:
+      provider: parspack
+      model: "openai/text-embedding-3-small"
 
 # Sub-agents (system prompt + defaults over an alias, addressable as a "model").
 # The Cinematic Scrollytelling squad ships as one YAML file per agent under
