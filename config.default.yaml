@@ -22,6 +22,12 @@ server:
     # on purpose — but it is a project key, not the admin key: usage is
     # attributed to "dadebaran" in /v1/usage and a leak cannot administer the
     # gateway. Skipped automatically when DADEBARAN_KEY is unset.
+    # NabuDesk. desk-* covers its width-stable embedding alias.
+    - key: "${NABUDESK_KEY}"
+      project: "nabudesk"
+      allow: ["nabu-*", "desk-*"]
+      rate_limit: 240
+
     # NabuGen. Its chat goes through app/core/ai_gateway.py, which prefers
     # NABUGATE_API_KEY over the legacy OPENAI_* variables.
     - key: "${NABUGEN_KEY}"
@@ -615,6 +621,19 @@ embeddings:
         model: "text-embedding-004"
       - provider: cloudflare
         model: "@cf/baai/bge-large-en-v1.5"
+
+  # NabuDesk's knowledge + conversation index, 1536 wide.
+  #
+  # Its EmbeddingService checks the returned width and logs a mismatch, which is
+  # better than most callers manage — but a warning does not stop the insert, so
+  # the alias still must not change width. Same-width fallback only.
+  desk-embed:
+    primary:
+      provider: parspack
+      model: "openai/text-embedding-3-small"
+    fallback:
+      - provider: gemini
+        model: "gemini-embedding-001"
 
   # NabuGen's content memory — 1024 wide, matching the column its schema
   # already declares, so enabling the feature needs no re-index.
