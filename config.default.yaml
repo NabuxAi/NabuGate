@@ -133,6 +133,33 @@ providers:
     api_key_env: "ARVAN_API_KEY"
     auth_scheme: "apikey"
 
+  # 9Router — an OpenAI-compatible smart router you SELF-HOST, fronting 60+
+  # providers (Claude Code, Codex, Gemini, GLM, MiniMax, Kimi, Qwen, …) with its
+  # own 3-tier fallback. It is software, not a SaaS, which is why NabuGate's
+  # compose bundles it as a `ninerouter` service rather than just naming a URL.
+  #
+  # Two separate steps, and only the first is automated:
+  #   1. run it            — the compose service does this
+  #   2. connect providers — a ONE-TIME manual step in its dashboard, which
+  #                          holds OAuth tokens and API keys. Until that is
+  #                          done every model answers "No active credentials".
+  #
+  # base_url comes from env because "localhost" is wrong once NabuGate runs in a
+  # container: inside the distroless image localhost is the gateway itself.
+  #   • bundled service:            http://ninerouter:20128/v1
+  #   • same host, no container:    http://localhost:20128/v1
+  #   • gateway in Docker on host:  http://host.docker.internal:20128/v1
+  # Unset → provider auto-skipped, so the gateway still boots without it.
+  #
+  # Keyless: the local endpoint ignores the adapter's placeholder bearer.
+  # Multi-model + OpenAI-wire ⇒ passthrough, addressable as "9router/<model>"
+  # with its catalogue discovered live from /v1/models.
+  9router:
+    enabled: true
+    type: openai
+    base_url: "${NINEROUTER_BASE_URL}"
+    passthrough: true
+
   anthropic:
     enabled: true
     type: anthropic
@@ -453,6 +480,14 @@ audio:
     fallback:
       - provider: gemini
         model: "gemini-2.5-flash-preview-tts"
+
+  # 9Router-backed alias. 9Router runs its own 3-tier fallback internally, so a
+  # single target is usually enough; the model id must match something its
+  # dashboard actually exposes for a connected provider.
+  nabu-9router:
+    primary:
+      provider: 9router
+      model: "anthropic/claude-3-5-sonnet-20241022"
 
 embeddings:
   # General-purpose embedding alias. The fallback chain deliberately crosses
