@@ -31,6 +31,12 @@ server:
       allow: ["nabusu-night-companion"]
       rate_limit: 120
 
+    # NabuVoice. Voice turns are short and frequent, hence the higher ceiling.
+    - key: "${NABUVOICE_KEY}"
+      project: "nabuvoice"
+      allow: ["nabu-*"]
+      rate_limit: 300
+
     # NabuDesk. desk-* covers its width-stable embedding alias.
     - key: "${NABUDESK_KEY}"
       project: "nabudesk"
