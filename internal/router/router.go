@@ -36,6 +36,10 @@ type Router struct {
 	// routing (and live discovery) legal for that provider.
 	passthrough map[string][]string
 
+	// registry maps a logical model name to the providers that can serve it.
+	// A target naming a model with no provider expands through this.
+	registry map[string]config.ModelEntry
+
 	// catalog caches each passthrough provider's live-discovered model list.
 	catMu   sync.Mutex
 	catalog map[string]catalogEntry
@@ -87,16 +91,67 @@ func (r *Router) resolvePassthrough(model string) (config.Target, bool) {
 	return config.Target{Provider: prov, Model: upstream}, true
 }
 
+// SetRegistry installs the logical-model registry. Separate from New so the
+// existing call sites and their tests keep working unchanged.
+func (r *Router) SetRegistry(reg map[string]config.ModelEntry) { r.registry = reg }
+
+// expand turns one configured target into the concrete attempts it stands for.
+//
+// A target with a provider is already concrete. A target naming only a model
+// expands into one attempt per provider that serves it, in the registry's
+// order — which is what makes a provider outage invisible: the caller named a
+// model, and the next provider serving that same model is tried automatically.
+//
+// Providers with no live adapter are dropped here rather than attempted, so a
+// registry listing five providers on a gateway keyed for two costs nothing.
+func (r *Router) expand(t config.Target) []config.Target {
+	if t.Provider != "" {
+		return []config.Target{t}
+	}
+	entry, ok := r.registry[t.Model]
+	if !ok {
+		return nil
+	}
+
+	out := make([]config.Target, 0, len(entry.Serves))
+	for _, s := range entry.Serves {
+		if _, live := r.adapters[s.Provider]; !live {
+			continue
+		}
+		// Most specific wins: the serving entry knows about provider-specific
+		// wrapping, the registry entry knows the model, the target is the
+		// caller's explicit override.
+		style := entry.ParamStyle
+		if s.ParamStyle != "" {
+			style = s.ParamStyle
+		}
+		if t.ParamStyle != "" {
+			style = t.ParamStyle
+		}
+		out = append(out, config.Target{Provider: s.Provider, Model: s.Model, ParamStyle: style})
+	}
+	return out
+}
+
 // resolveChatTargets returns the ordered upstream targets for a public chat
-// model name: a configured alias expands to its primary + fallbacks, while an
-// unknown "<provider>/<model>" name resolves to a single direct passthrough
-// target. ok is false when the name matches neither.
+// model name: a configured alias expands to its primary + fallbacks, an
+// unknown "<provider>/<model>" name resolves to a direct passthrough target,
+// and a bare registry model name resolves to every provider serving it.
 func (r *Router) resolveChatTargets(model string) ([]config.Target, bool) {
 	if route, ok := r.models[model]; ok {
-		return append([]config.Target{route.Primary}, route.Fallback...), true
+		var out []config.Target
+		for _, t := range append([]config.Target{route.Primary}, route.Fallback...) {
+			out = append(out, r.expand(t)...)
+		}
+		return out, len(out) > 0
 	}
 	if t, ok := r.resolvePassthrough(model); ok {
 		return []config.Target{t}, true
+	}
+	// A model named directly, e.g. {"model": "gpt-5.5"}: try every provider
+	// that serves it.
+	if out := r.expand(config.Target{Model: model}); len(out) > 0 {
+		return out, true
 	}
 	return nil, false
 }

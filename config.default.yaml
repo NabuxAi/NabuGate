@@ -149,67 +149,123 @@ providers:
     type: openai
     base_url: "${OLLAMA_BASE_URL}"
 
+# Model registry — a model is an identity, not a provider coordinate.
+#
+# "gpt-5.5" is the same model whether Parspack, AvalAI or GapGPT serves it, and
+# each spells the upstream name differently. Declaring it once here means an
+# alias can name the model alone: the router expands it into one attempt per
+# serving provider, in this order, skipping any provider without a live key.
+#
+# The effect is that a provider going down switches to the next one serving the
+# same model, silently — the caller asked for a model and gets that model.
+#
+# param_style belongs to the model, so it is declared once and inherited by
+# every provider serving it.
+model_registry:
+  gpt-5.5:
+    param_style: reasoning
+    serves:
+      - provider: parspack
+        model: "openai/gpt-5.5"
+      - provider: avalai
+        model: "gpt-5.5"
+      - provider: gapgpt
+        model: "gpt-5.5"
+      - provider: openai
+        model: "gpt-5.5"
+
+  gpt-4o-mini:
+    serves:
+      - provider: parspack
+        model: "openai/gpt-4o-mini"
+      - provider: avalai
+        model: "gpt-4o-mini"
+      - provider: gapgpt
+        model: "gpt-4o-mini"
+      - provider: openai
+        model: "gpt-4o-mini"
+
+  gpt-4o:
+    serves:
+      - provider: parspack
+        model: "openai/gpt-4o-2024-11-20"
+      - provider: avalai
+        model: "gpt-4o"
+      - provider: openai
+        model: "gpt-4o"
+
+  gpt-4.1-mini:
+    serves:
+      - provider: parspack
+        model: "openai/gpt-4.1-mini"
+      - provider: avalai
+        model: "gpt-4.1-mini"
+
+  gpt-4.1-nano:
+    serves:
+      - provider: parspack
+        model: "openai/gpt-4.1-nano"
+
+  deepseek-v4-pro:
+    serves:
+      - provider: parspack
+        model: "deepseek/deepseek-v4-pro"
+      - provider: gapgpt
+        model: "deepseek-v4-pro"
+
+  kimi-k2.6:
+    serves:
+      - provider: dahl
+        model: "moonshotai/Kimi-K2.6"
+      - provider: parspack
+        model: "moonshotai/kimi-k2.6"
+
+  minimax-m2.7:
+    serves:
+      - provider: dahl
+        model: "MiniMaxAI/MiniMax-M2.7"
+      - provider: parspack
+        model: "minimax/minimax-m2.7"
+
+  glm-5.2:
+    serves:
+      - provider: parspack
+        model: "z-ai/glm-5.2"
+      - provider: tokenrouter
+        model: "glm-5.2"
+
+  gpt-oss-20b:
+    serves:
+      - provider: parspack
+        model: "openai/gpt-oss-20b"
+      - provider: cloudflare
+        model: "@cf/openai/gpt-oss-120b"
+
+
 models:
   nabu-fast:
     primary:
-      provider: dahl
-      model: "MiniMaxAI/MiniMax-M2.7"
+      model: minimax-m2.7
     fallback:
-      - provider: groq
-        model: "llama-3.1-70b-versatile"
-      - provider: openai
-        model: "gpt-4o-mini"
-      - provider: anthropic
-        model: "claude-3-5-haiku-latest"
-      # Parspack rungs, all verified answering and all classic-dialect, so the
-      # temperature/max_tokens an agent supplies reach them unchanged.
-      - provider: parspack
-        model: "openai/gpt-4o-mini"
-      - provider: parspack
-        model: "openai/gpt-4.1-mini"
-      - provider: parspack
-        model: "minimax/minimax-m2.7"
+      - model: gpt-4o-mini
+      - model: gpt-4.1-mini
 
 
   nabu-smart:
     primary:
-      provider: dahl
-      model: "moonshotai/Kimi-K2.6"
+      model: kimi-k2.6
     fallback:
-      - provider: openai
-        model: "gpt-4o"
-      - provider: anthropic
-        model: "claude-3-5-sonnet-latest"
-      - provider: gemini
-        model: "gemini-1.5-pro"
-      # gpt-5.5 is the strongest verified model here but speaks the reasoning
-      # dialect; the classic rungs below it accept temperature/max_tokens as-is.
-      - provider: parspack
-        model: "openai/gpt-5.5"
-        param_style: reasoning
-      - provider: parspack
-        model: "openai/gpt-4o-2024-11-20"
-      - provider: parspack
-        model: "deepseek/deepseek-v4-pro"
-      - provider: parspack
-        model: "moonshotai/kimi-k2.6"
+      - model: gpt-5.5
+      - model: gpt-4o
+      - model: deepseek-v4-pro
 
 
   nabu-cheap:
     primary:
-      provider: openrouter
-      model: "meta-llama/llama-3.1-8b-instruct"
+      model: gpt-4.1-nano
     fallback:
-      - provider: groq
-        model: "llama-3.1-8b-instant"
-      - provider: dahl
-        model: "MiniMaxAI/MiniMax-M2.7"
-      - provider: parspack
-        model: "openai/gpt-4.1-nano"
-      - provider: parspack
-        model: "openai/gpt-4o-mini"
-      - provider: parspack
-        model: "openai/gpt-oss-20b"
+      - model: gpt-4o-mini
+      - model: gpt-oss-20b
 
 
   nabu-vision:

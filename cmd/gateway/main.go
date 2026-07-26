@@ -43,6 +43,7 @@ func main() {
 
 	passthrough := cfg.Passthroughs(adapters)
 	r := router.New(adapters, cfg.Models, cfg.Images, cfg.Audio, cfg.Embeddings, passthrough, log)
+	r.SetRegistry(cfg.Registry)
 	enforcer := policy.New(cfg.Server.APIKeys, cfg.Server.Keys)
 	tracker := usage.New(cfg.Pricing)
 	agents, agentWarnings := cfg.BuildAgents()

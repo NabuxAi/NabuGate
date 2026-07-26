@@ -34,6 +34,11 @@ type Config struct {
 	Embeddings map[string]ModelRoute     `yaml:"embeddings"` // text-embedding aliases
 	Pricing    map[string]usage.Price    `yaml:"pricing"`    // USD per 1M tokens, keyed by "provider/model"
 
+	// Registry maps a logical model name to the providers that can serve it.
+	// A target naming a model with no provider expands through this, so one
+	// provider going down switches to the next without the caller noticing.
+	Registry map[string]ModelEntry `yaml:"model_registry"`
+
 	// Agents are named sub-agents (system prompt + defaults over a chat alias),
 	// addressable as a "model". They may be declared inline here or, so they can
 	// be authored and dropped in from outside the main config, as one-file-each
@@ -89,7 +94,11 @@ type ProviderConfig struct {
 	Models []string `yaml:"models"`
 }
 
-// Target points at a concrete provider + upstream model name.
+// Target points at an upstream model.
+//
+// With Provider set it is a concrete coordinate. With Provider empty, Model
+// names an entry in the model registry and the router expands it into one
+// target per serving provider.
 type Target struct {
 	Provider string `yaml:"provider"`
 	Model    string `yaml:"model"`
@@ -104,6 +113,36 @@ type Target struct {
 	// a JSON error — which reads as an empty completion and is very hard to
 	// trace back. Absorbing that difference is the gateway's job; a caller
 	// should not have to know which dialect a model behind an alias speaks.
+	ParamStyle string `yaml:"param_style"`
+}
+
+// ModelEntry describes one logical model and every provider that can serve it,
+// in preference order.
+//
+// A model is an identity, not a provider coordinate: "gpt-5.5" is the same
+// model whether Parspack, AvalAI or GapGPT is serving it. Without this, every
+// alias has to repeat the provider list by hand, and when one provider breaks
+// the fix has to be applied in each place it was copied to.
+//
+// A target may then name a model without a provider, and the router expands it
+// into one attempt per serving provider — so a provider failing mid-chain is
+// absorbed silently and the caller never learns it happened.
+type ModelEntry struct {
+	// ParamStyle is a property of the model, not of who serves it, so it is
+	// declared once here. A Serving entry may still override it for a provider
+	// that wraps the model unusually.
+	ParamStyle string `yaml:"param_style"`
+
+	// Serves lists the providers that can serve this model, best first.
+	Serves []Serving `yaml:"serves"`
+}
+
+// Serving is one provider's coordinate for a logical model.
+type Serving struct {
+	Provider string `yaml:"provider"`
+	// Model is the upstream name, which differs per provider: the same model is
+	// "openai/gpt-5.5" on Parspack and "gpt-5.5" on AvalAI.
+	Model      string `yaml:"model"`
 	ParamStyle string `yaml:"param_style"`
 }
 
