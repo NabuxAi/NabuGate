@@ -17,6 +17,16 @@ server:
       allow: ["write-*"]
       rate_limit: 120
 
+    # Dadebaran (dadebaran.ir) presents the gateway catalogue as its model
+    # picker, so its allow-list is what its users can choose from. It is broad
+    # on purpose — but it is a project key, not the admin key: usage is
+    # attributed to "dadebaran" in /v1/usage and a leak cannot administer the
+    # gateway. Skipped automatically when DADEBARAN_KEY is unset.
+    - key: "${DADEBARAN_KEY}"
+      project: "dadebaran"
+      allow: ["nabu-*", "parspack/*", "avalai/*", "gapgpt/*", "gpt-*", "o1", "o3", "o3-mini", "o4-mini", "deepseek-*", "kimi-*", "minimax-*", "glm-*"]
+      rate_limit: 240
+
 providers:
   openai:
     enabled: true
@@ -240,6 +250,72 @@ model_registry:
         model: "openai/gpt-oss-20b"
       - provider: cloudflare
         model: "@cf/openai/gpt-oss-120b"
+
+
+  # The remaining reasoning-dialect models found by probing the catalogue. They
+  # are listed so their dialect is declared: a client that sends max_tokens —
+  # which most do — otherwise gets an HTML 502 from the provider and no useful
+  # error. The dialect is not guessable from the name, which is why every one of
+  # these was verified by probe, including both search-preview models.
+  gpt-5:
+    param_style: reasoning
+    serves:
+      - provider: parspack
+        model: "openai/gpt-5"
+      - provider: avalai
+        model: "gpt-5"
+
+  gpt-5-mini:
+    param_style: reasoning
+    serves:
+      - provider: parspack
+        model: "openai/gpt-5-mini"
+
+  gpt-5.3-chat:
+    param_style: reasoning
+    serves:
+      - provider: parspack
+        model: "openai/gpt-5.3-chat"
+
+  o1:
+    param_style: reasoning
+    serves:
+      - provider: parspack
+        model: "openai/o1"
+      - provider: avalai
+        model: "o1"
+
+  o3:
+    param_style: reasoning
+    serves:
+      - provider: parspack
+        model: "openai/o3"
+      - provider: avalai
+        model: "o3"
+
+  o3-mini:
+    param_style: reasoning
+    serves:
+      - provider: parspack
+        model: "openai/o3-mini"
+
+  o4-mini:
+    param_style: reasoning
+    serves:
+      - provider: parspack
+        model: "openai/o4-mini"
+
+  gpt-4o-search-preview:
+    param_style: reasoning
+    serves:
+      - provider: parspack
+        model: "openai/gpt-4o-search-preview"
+
+  gpt-4o-mini-search-preview:
+    param_style: reasoning
+    serves:
+      - provider: parspack
+        model: "openai/gpt-4o-mini-search-preview"
 
 
 models:
