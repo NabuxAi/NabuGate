@@ -12,6 +12,7 @@ COPY go.mod go.sum* ./
 RUN go mod download
 
 COPY . .
+RUN mkdir -p /data
 RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /out/nabugate ./cmd/gateway
 
 ############################
@@ -19,7 +20,14 @@ RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /out/nabugate ./cmd/ga
 ############################
 FROM gcr.io/distroless/static-debian12:nonroot
 
+# The console state directory, created at build time and owned by the nonroot
+# user the image runs as. A volume mounted here inherits the mount point's
+# ownership, so without this the very first write fails with permission denied
+# and the console silently disables itself — the image has no shell to chown it
+# at runtime, which is the point of distroless.
+
 WORKDIR /app
+COPY --from=build --chown=65532:65532 /data /data
 COPY --from=build /out/nabugate /app/nabugate
 
 # A secret-free default config is baked in so the gateway boots out of the box:
