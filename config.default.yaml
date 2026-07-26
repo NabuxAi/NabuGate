@@ -173,6 +173,16 @@ providers:
   # Quotas below were the published figures in mid-2026 and providers change
   # them often — treat them as orientation, not contract.
 
+  # A second OpenRouter account. Two accounts are two independent quota pools,
+  # which is the property a fallback actually needs — the same key twice is one
+  # target wearing two hats. Skipped while OPENROUTER_API_KEY_2 is unset.
+  openrouter2:
+    enabled: true
+    type: openai
+    base_url: "https://openrouter.ai/api/v1"
+    api_key_env: "OPENROUTER_API_KEY_2"
+    passthrough: true
+
   # Cerebras — ~1M tokens/day free, no card. Fastest inference of the group.
   cerebras:
     enabled: true
@@ -459,10 +469,14 @@ model_registry:
     serves:
       - provider: openrouter
         model: "inclusionai/ling-3.0-flash:free"
+      - provider: openrouter2
+        model: "inclusionai/ling-3.0-flash:free"
 
   nemotron-3-ultra:
     serves:
       - provider: openrouter
+        model: "nvidia/nemotron-3-ultra-550b-a55b:free"
+      - provider: openrouter2
         model: "nvidia/nemotron-3-ultra-550b-a55b:free"
       - provider: parspack
         model: "nvidia/nemotron-3-ultra-preview"
@@ -470,6 +484,8 @@ model_registry:
   laguna-m:
     serves:
       - provider: openrouter
+        model: "poolside/laguna-m.1:free"
+      - provider: openrouter2
         model: "poolside/laguna-m.1:free"
       - provider: parspack
         model: "poolside/laguna-m.1"
