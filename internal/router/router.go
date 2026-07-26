@@ -218,6 +218,18 @@ func (r *Router) ChatStream(ctx context.Context, alias string, req provider.Chat
 			}
 			continue
 		}
+		// A clean close having emitted nothing is a failure, not a success.
+		// Some upstreams answer a stream with a role delta and a stop and no
+		// content at all, while the same model returns text non-streaming.
+		// Treating that as success ends the chain on an empty response and the
+		// remaining targets are never tried. Nothing reached the client yet —
+		// that is what `started` guarantees — so falling back is safe.
+		if !started {
+			lastErr = fmt.Errorf("%s: stream produced no content", t.Provider)
+			r.log.Warn("upstream produced an empty stream", attrs...)
+			continue
+		}
+
 		r.log.Info("upstream ok", append(attrs, "total_tokens", usage.TotalTokens)...)
 		return StreamResult{Provider: t.Provider, Model: t.Model, Usage: usage}, nil
 	}
