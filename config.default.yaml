@@ -161,19 +161,15 @@ models:
         model: "gpt-4o-mini"
       - provider: anthropic
         model: "claude-3-5-haiku-latest"
-      # Last rungs: a different vendor entirely, so a quota or outage that
-      # takes out the rungs above cannot take these with it. More than one
-      # parspack model on purpose — its per-model availability fluctuates, and
-      # a single rung there fails as often as it succeeds.
+      # Parspack rungs, all verified answering and all classic-dialect, so the
+      # temperature/max_tokens an agent supplies reach them unchanged.
       - provider: parspack
-        model: "anthropic/claude-haiku-4.5"
+        model: "openai/gpt-4o-mini"
       - provider: parspack
-        model: "google/gemini-2.5-flash"
+        model: "openai/gpt-4.1-mini"
       - provider: parspack
-        model: "openai/gpt-5.5"
-        param_style: reasoning
-      - provider: parspack
-        model: "anthropic/claude-sonnet-4.6"
+        model: "minimax/minimax-m2.7"
+
 
   nabu-smart:
     primary:
@@ -186,13 +182,18 @@ models:
         model: "claude-3-5-sonnet-latest"
       - provider: gemini
         model: "gemini-1.5-pro"
+      # gpt-5.5 is the strongest verified model here but speaks the reasoning
+      # dialect; the classic rungs below it accept temperature/max_tokens as-is.
       - provider: parspack
         model: "openai/gpt-5.5"
         param_style: reasoning
       - provider: parspack
-        model: "anthropic/claude-sonnet-4.6"
+        model: "openai/gpt-4o-2024-11-20"
       - provider: parspack
-        model: "google/gemini-2.5-flash"
+        model: "deepseek/deepseek-v4-pro"
+      - provider: parspack
+        model: "moonshotai/kimi-k2.6"
+
 
   nabu-cheap:
     primary:
@@ -204,12 +205,12 @@ models:
       - provider: dahl
         model: "MiniMaxAI/MiniMax-M2.7"
       - provider: parspack
-        model: "google/gemini-3.1-flash-lite-preview"
+        model: "openai/gpt-4.1-nano"
       - provider: parspack
-        model: "google/gemini-2.5-flash"
+        model: "openai/gpt-4o-mini"
       - provider: parspack
-        model: "openai/gpt-5.5"
-        param_style: reasoning
+        model: "openai/gpt-oss-20b"
+
 
   nabu-vision:
     primary:
@@ -247,9 +248,12 @@ models:
       param_style: reasoning
     fallback:
       - provider: parspack
-        model: "anthropic/claude-sonnet-4.6"
+        model: "openai/gpt-4o-2024-11-20"
       - provider: parspack
-        model: "google/gemini-2.5-flash"
+        model: "deepseek/deepseek-v4-pro"
+      - provider: parspack
+        model: "z-ai/glm-5.2"
+
 
   nabu-avalai:
     primary:
