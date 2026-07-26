@@ -35,6 +35,7 @@ func (s *Server) mountConsoleAPI(mux *http.ServeMux) {
 	mux.Handle("DELETE /admin/api/tokens/{name}", s.consoleAuth(s.deleteToken))
 	mux.Handle("PATCH /admin/api/tokens/{name}", s.consoleAuth(s.patchToken))
 
+	mux.Handle("GET /admin/api/overview", s.consoleAuth(s.consoleOverview))
 	mux.Handle("GET /admin/api/usage", s.consoleAuth(s.consoleUsage))
 	mux.Handle("POST /admin/api/usage/reset", s.consoleAuth(s.resetUsage))
 }
@@ -284,4 +285,39 @@ func cleanList(in []string) []string {
 		}
 	}
 	return out
+}
+
+// consoleOverview reports what the gateway is actually running: which providers
+// came up, which aliases and agents exist, and the config-declared keys.
+//
+// The console used to render all of this from a mock file, so it described a
+// gateway that did not exist — providers that were never keyed, aliases that had
+// been renamed. Everything here is read from the live router.
+func (s *Server) consoleOverview(w http.ResponseWriter, r *http.Request) {
+	type providerInfo struct {
+		Name        string `json:"name"`
+		Passthrough bool   `json:"passthrough"`
+	}
+
+	providers := make([]providerInfo, 0)
+	for _, name := range s.router.ProviderNames() {
+		providers = append(providers, providerInfo{Name: name, Passthrough: s.router.IsPassthrough(name)})
+	}
+
+	aliases := make([]map[string]any, 0)
+	for _, a := range s.router.AliasInfos() {
+		aliases = append(aliases, map[string]any{"id": a.ID, "owner": a.Owner})
+	}
+
+	// Config-declared keys are listed by project name only. Their secrets live
+	// in the deployment's environment and the gateway never sees them in a form
+	// worth showing — and a console that displayed keys would be a console worth
+	// stealing.
+	writeJSON(w, http.StatusOK, map[string]any{
+		"providers":   providers,
+		"aliases":     aliases,
+		"agents":      s.agents.Names(),
+		"config_keys": s.policy.Projects(),
+		"usage":       s.admin.Usage(),
+	})
 }

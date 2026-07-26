@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -611,4 +612,22 @@ func (r *Router) Responses(ctx context.Context, model string, body map[string]js
 		return resp, t.Provider, t.Model, nil
 	}
 	return nil, "", "", fmt.Errorf("all targets failed for %q: %w", model, lastErr)
+}
+
+// ProviderNames returns the providers that actually came up, sorted. A provider
+// whose key env was empty is skipped at startup and does not appear here — which
+// is the distinction the console needs: configured is not the same as running.
+func (r *Router) ProviderNames() []string {
+	out := make([]string, 0, len(r.adapters))
+	for name := range r.adapters {
+		out = append(out, name)
+	}
+	sort.Strings(out)
+	return out
+}
+
+// IsPassthrough reports whether a provider accepts "<provider>/<model>" routing.
+func (r *Router) IsPassthrough(name string) bool {
+	_, ok := r.passthrough[name]
+	return ok
 }

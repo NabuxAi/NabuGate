@@ -1,54 +1,60 @@
+import { useEffect, useState } from 'react';
+
 import Layout from '../components/Layout.jsx';
-import { providers } from '../data/mock.js';
+import * as api from '../api.js';
 
-const tagClass = (kind) =>
-  kind === 'default' ? 'badge badge-info' : kind === 'pass' ? 'badge badge-pass' : 'badge badge-muted';
-
+/*
+ * Providers that actually came up.
+ *
+ * This listed a fixed set from a mock file, including several that had no key
+ * and were skipped at startup — so the console showed a gateway with twelve
+ * live providers when it had two. A provider is listed here only if its adapter
+ * exists, which is the same test the router applies when routing.
+ */
 export default function Providers() {
-  const active = providers.filter((p) => p.on).length;
+  const [providers, setProviders] = useState(null);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    api.overview().then((d) => setProviders(d.providers || [])).catch((e) => setError(e.message));
+  }, []);
+
   return (
-    <Layout
-      title="پرووایدرها"
-      subtitle="پرووایدرهای بالادست از config.yaml — سکرت‌ها فقط از env خوانده می‌شوند"
-      actions={<span className="pill">{active} فعال · {providers.length - active} خاموش</span>}
-    >
+    <Layout title="پرووایدرها" subtitle="فقط آن‌هایی که واقعاً بالا آمده‌اند — بی‌کلید‌ها در استارتاپ رد می‌شوند">
+      {error && <div className="card banner-error">{error}</div>}
       <div className="card">
         <table className="tbl">
           <thead>
             <tr>
-              <th style={{ width: 160 }}>پرووایدر</th>
-              <th style={{ width: 130 }}>نوع</th>
-              <th>base_url</th>
-              <th style={{ width: 90 }}>وضعیت</th>
+              <th>پرووایدر</th>
+              <th style={{ width: 160 }}>مسیر مستقیم</th>
             </tr>
           </thead>
           <tbody>
-            {providers.map((p) => (
+            {providers === null && (
+              <tr><td colSpan={2} style={{ color: 'var(--ng-muted)', padding: 18 }}>…</td></tr>
+            )}
+            {providers?.length === 0 && (
+              <tr>
+                <td colSpan={2} style={{ color: 'var(--ng-muted)', padding: 18 }}>
+                  هیچ پرووایدری بالا نیامده. یعنی هیچ کلیدی ست نشده.
+                </td>
+              </tr>
+            )}
+            {providers?.map((p) => (
               <tr key={p.name}>
+                <td style={{ fontWeight: 700, color: 'var(--ng-heading)' }}>{p.name}</td>
                 <td>
-                  <strong className="alias">{p.name}</strong>
-                </td>
-                <td>
-                  <span className={tagClass(p.tagKind)}>{p.tag}</span>
-                </td>
-                <td>
-                  <span className={/[a-zA-Z]/.test(p.url) ? 'mono ltr' : ''} style={{ fontSize: 12, color: 'var(--ng-slate-700)' }}>
-                    {p.url}
-                  </span>
-                </td>
-                <td>
-                  <span className={'badge ' + (p.on ? 'badge-ok' : 'badge-warn')}>{p.on ? 'فعال' : 'خاموش'}</span>
+                  {p.passthrough ? (
+                    <span className="tag ltr tag-pass">{p.name}/*</span>
+                  ) : (
+                    <span style={{ color: 'var(--ng-muted)', fontSize: 12 }}>—</span>
+                  )}
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
-      </div>
-
-      <div className="note">
-        پرووایدری که env کلیدش خالی باشد خودکار رد می‌شود تا دروازه با زیرمجموعه‌ای از پرووایدرها هم بالا بیاید.
-        پرووایدرهای <strong>passthrough</strong> کل کاتالوگ خود را زنده روی{' '}
-        <span className="mono ltr">GET /v1/models</span> عرضه می‌کنند.
       </div>
     </Layout>
   );

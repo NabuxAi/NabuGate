@@ -78,6 +78,8 @@ export const setTokenOrigins = (name, allowedOrigins) =>
     body: JSON.stringify({ allowed_origins: allowedOrigins }),
   });
 
+export const overview = () => req('/overview');
+
 // ---- usage ------------------------------------------------------------------
 
 export const usage = () => req('/usage');

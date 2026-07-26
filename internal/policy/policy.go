@@ -5,6 +5,7 @@ package policy
 
 import (
 	"path"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -143,4 +144,29 @@ func (b *bucket) allow(now time.Time) bool {
 		return true
 	}
 	return false
+}
+
+// Projects returns the project names of the configured rich keys, sorted.
+//
+// Names only, never the keys themselves: those live in the deployment's
+// environment, and a console that displayed them would be a console worth
+// stealing.
+func (e *Enforcer) Projects() []string {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+
+	seen := make(map[string]struct{}, len(e.policies))
+	out := make([]string, 0, len(e.policies))
+	for _, p := range e.policies {
+		if p.Project == "" {
+			continue
+		}
+		if _, dup := seen[p.Project]; dup {
+			continue
+		}
+		seen[p.Project] = struct{}{}
+		out = append(out, p.Project)
+	}
+	sort.Strings(out)
+	return out
 }
