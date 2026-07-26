@@ -14,6 +14,7 @@ import (
 
 	"nabugate/internal/adminstore"
 	"nabugate/internal/agent"
+	"nabugate/internal/memory"
 	"nabugate/internal/photos"
 	"nabugate/internal/policy"
 	"nabugate/internal/provider"
@@ -44,7 +45,14 @@ type Server struct {
 	// which case the console API is not mounted and the gateway behaves exactly
 	// as it did before.
 	admin *adminstore.Store
+
+	// memory is the conversation store. nil disables the feature entirely and
+	// every request behaves exactly as it did before.
+	memory *memory.Store
 }
+
+// SetMemory attaches the conversation store.
+func (s *Server) SetMemory(m *memory.Store) { s.memory = m }
 
 // SetAdminStore attaches the console state. Separate from New so existing
 // callers and their tests keep compiling.
@@ -78,6 +86,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /v1/photos/search", s.auth(s.handlePhotoSearch))
 	s.mountConsole(mux)
 	s.mountConsoleAPI(mux)
+	s.mountConversationAPI(mux)
 	return mux
 }
 
@@ -343,8 +352,21 @@ func (s *Server) handleChat(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("X-Nabu-Agent", ag.Name)
 	}
 
+	// Conversation memory. The turns arriving in this request are captured
+	// before history is prepended, so only they get stored — replaying and then
+	// re-storing would double the conversation on every call.
+	convID := conversationID(raw)
+	newTurns := append([]provider.Message(nil), chatReq.Messages...)
+	if convID != "" {
+		if _, err := s.loadHistory(r, convID, &chatReq); err != nil {
+			writeError(w, http.StatusBadRequest, err.Error())
+			return
+		}
+		w.Header().Set("X-Nabu-Conversation", convID)
+	}
+
 	if stream {
-		s.streamChat(w, r, alias, routeModel, chatReq)
+		s.streamChat(w, r, alias, routeModel, chatReq, convID, newTurns)
 		return
 	}
 
@@ -360,6 +382,7 @@ func (s *Server) handleChat(w http.ResponseWriter, r *http.Request) {
 	}
 
 	s.record(r, result.Provider, result.Model, result.Response.Usage)
+	s.saveTurn(r, convID, newTurns, result.Response.Content)
 
 	w.Header().Set("X-Nabu-Provider", result.Provider)
 	w.Header().Set("X-Nabu-Model", result.Model)
@@ -401,7 +424,7 @@ func (s *Server) handleChat(w http.ResponseWriter, r *http.Request) {
 // provider) are written lazily on the first delta so that, if every target fails
 // before producing output, we can still return a normal JSON error with the
 // right status code.
-func (s *Server) streamChat(w http.ResponseWriter, r *http.Request, alias, routeModel string, req provider.ChatRequest) {
+func (s *Server) streamChat(w http.ResponseWriter, r *http.Request, alias, routeModel string, req provider.ChatRequest, convID string, newTurns []provider.Message) {
 	flusher, ok := w.(http.Flusher)
 	if !ok {
 		writeError(w, http.StatusInternalServerError, "streaming not supported")
@@ -412,6 +435,9 @@ func (s *Server) streamChat(w http.ResponseWriter, r *http.Request, alias, route
 	created := time.Now().Unix()
 	var metaProvider, metaModel string
 	headersWritten := false
+
+	// The assembled reply, so the conversation store gets what the user got.
+	var replyBuf strings.Builder
 
 	writeSSE := func(v any) {
 		payload, _ := json.Marshal(v)
@@ -436,6 +462,7 @@ func (s *Server) streamChat(w http.ResponseWriter, r *http.Request, alias, route
 			if !headersWritten {
 				startHeaders()
 			}
+			replyBuf.WriteString(delta)
 			writeSSE(streamChunk(id, created, alias, metaProvider, metaModel, map[string]any{"content": delta}, nil))
 			return nil
 		},
@@ -454,6 +481,10 @@ func (s *Server) streamChat(w http.ResponseWriter, r *http.Request, alias, route
 	// per-project request/usage counters.
 	if err == nil {
 		s.record(r, result.Provider, result.Model, result.Usage)
+		// Store only a stream that produced something. A failed or empty
+		// generation is not a turn, and persisting it would replay an empty
+		// assistant message into every later call.
+		s.saveTurn(r, convID, newTurns, replyBuf.String())
 	}
 
 	finish := "stop"

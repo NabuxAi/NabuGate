@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log/slog"
 	"nabugate/internal/adminstore"
+	"nabugate/internal/memory"
 	"net/http"
 	"os"
 	"os/signal"
@@ -64,6 +65,15 @@ func main() {
 	stateDir := os.Getenv("NABU_STATE_DIR")
 	if stateDir == "" {
 		stateDir = "/data"
+	}
+
+	// Conversation memory: a project sends conversation_id and the gateway
+	// replays that conversation's history. Same volume as the console state.
+	if mem, err := memory.Open(filepath.Join(stateDir, "conversations")); err != nil {
+		log.Warn("conversation memory unavailable", "error", err)
+	} else {
+		srv.SetMemory(mem)
+		log.Info("conversation memory enabled", "dir", filepath.Join(stateDir, "conversations"))
 	}
 	adminState, err := adminstore.Open(filepath.Join(stateDir, "console.json"))
 	if err != nil {
