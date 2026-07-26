@@ -356,6 +356,9 @@ model_registry:
     serves:
       - provider: parspack
         model: "openai/gpt-oss-20b"
+      # Free floor: reaching here costs nothing rather than returning an error.
+      - model: ling-3.0-flash
+      - model: nemotron-3-ultra
       - provider: cloudflare
         model: "@cf/openai/gpt-oss-120b"
 
@@ -424,6 +427,28 @@ model_registry:
     serves:
       - provider: parspack
         model: "openai/gpt-4o-mini-search-preview"
+
+  # OpenRouter free tier — verified answering on the harvested key. These cost
+  # nothing, so they belong at the end of chains as a floor rather than a
+  # failure.
+  ling-3.0-flash:
+    serves:
+      - provider: openrouter
+        model: "inclusionai/ling-3.0-flash:free"
+
+  nemotron-3-ultra:
+    serves:
+      - provider: openrouter
+        model: "nvidia/nemotron-3-ultra-550b-a55b:free"
+      - provider: parspack
+        model: "nvidia/nemotron-3-ultra-preview"
+
+  laguna-m:
+    serves:
+      - provider: openrouter
+        model: "poolside/laguna-m.1:free"
+      - provider: parspack
+        model: "poolside/laguna-m.1"
 
 
 models:
@@ -594,6 +619,15 @@ embeddings:
     primary:
       provider: parspack
       model: "openai/text-embedding-3-small"
+    fallback:
+      # Same width, which is the whole point. The no-fallback rule existed to
+      # stop a fallback CHANGING the vector width, not to forbid fallback: a
+      # rung that is also 1536 is strictly better than none. gemini-embedding-001
+      # defaults to 3072, so this is only safe because the gateway forwards the
+      # client's `dimensions` and NabuWrite/NabuChat both send 1536 — verified
+      # against this key returning exactly 1536.
+      - provider: gemini
+        model: "gemini-embedding-001"
 
   # NabuWrite's Style RAG index.
   #
@@ -610,6 +644,10 @@ embeddings:
     primary:
       provider: parspack
       model: "openai/text-embedding-3-small"
+    fallback:
+      # Same-width rung; see chat-embed above for why this is safe.
+      - provider: gemini
+        model: "gemini-embedding-001"
 
 # Sub-agents (system prompt + defaults over an alias, addressable as a "model").
 # The Cinematic Scrollytelling squad ships as one YAML file per agent under
