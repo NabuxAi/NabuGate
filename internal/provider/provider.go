@@ -28,6 +28,11 @@ type ChatRequest struct {
 	MaxTokens   *int
 	Stop        json.RawMessage // OpenAI "stop": string or []string
 
+	// ParamStyle is the target's parameter dialect ("" or "reasoning"); see
+	// config.Target.ParamStyle. Set by the router per attempt, because two
+	// rungs of one fallback chain can speak different dialects.
+	ParamStyle string
+
 	// Raw is the original OpenAI-style request body, field by field. OpenAI-wire
 	// adapters forward it verbatim (overriding only model/stream) so any
 	// parameter — tools, tool_choice, response_format, seed, penalties, … —

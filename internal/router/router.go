@@ -138,6 +138,7 @@ func (r *Router) Chat(ctx context.Context, alias string, req provider.ChatReques
 		}
 
 		req.Model = t.Model
+		req.ParamStyle = t.ParamStyle
 		start := time.Now()
 		resp, err := adapter.Chat(ctx, req)
 		latency := time.Since(start)
@@ -202,6 +203,7 @@ func (r *Router) ChatStream(ctx context.Context, alias string, req provider.Chat
 
 		onMeta(t.Provider, t.Model)
 		req.Model = t.Model
+		req.ParamStyle = t.ParamStyle
 		started := false
 		start := time.Now()
 		usage, err := streamer.ChatStream(ctx, req, func(delta string) error {

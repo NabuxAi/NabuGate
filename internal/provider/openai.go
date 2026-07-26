@@ -79,6 +79,10 @@ func (a *OpenAIAdapter) buildBody(req ChatRequest, stream bool) ([]byte, error) 
 			out["stop"] = req.Stop
 		}
 	}
+	if req.ParamStyle == ParamStyleReasoning {
+		applyReasoningDialect(out)
+	}
+
 	out["model"], _ = json.Marshal(req.Model)
 	if stream {
 		out["stream"] = json.RawMessage("true")
@@ -88,6 +92,31 @@ func (a *OpenAIAdapter) buildBody(req ChatRequest, stream bool) ([]byte, error) 
 		delete(out, "stream_options")
 	}
 	return json.Marshal(out)
+}
+
+// ParamStyleReasoning is the gpt-5.x / o-series parameter contract.
+const ParamStyleReasoning = "reasoning"
+
+// applyReasoningDialect rewrites a classic OpenAI chat body into the form
+// reasoning models accept: max_tokens becomes max_completion_tokens, and
+// temperature/top_p are dropped unless they already hold the only value those
+// models allow.
+//
+// Dropping rather than clamping is deliberate: a caller asking for temperature
+// 0.2 wants determinism the model cannot give, and silently sending 1 would
+// look like it complied.
+func applyReasoningDialect(out map[string]json.RawMessage) {
+	if v, ok := out["max_tokens"]; ok {
+		delete(out, "max_tokens")
+		if _, exists := out["max_completion_tokens"]; !exists {
+			out["max_completion_tokens"] = v
+		}
+	}
+	for _, k := range []string{"temperature", "top_p"} {
+		if v, ok := out[k]; ok && strings.TrimSpace(string(v)) != "1" {
+			delete(out, k)
+		}
+	}
 }
 
 func (a *OpenAIAdapter) headers() map[string]string {

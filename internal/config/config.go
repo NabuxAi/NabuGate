@@ -93,6 +93,18 @@ type ProviderConfig struct {
 type Target struct {
 	Provider string `yaml:"provider"`
 	Model    string `yaml:"model"`
+
+	// ParamStyle names the parameter dialect this model speaks. Empty is the
+	// classic OpenAI chat contract. "reasoning" is the gpt-5.x / o-series
+	// contract: max_tokens was replaced by max_completion_tokens, and
+	// temperature/top_p accept only their default of 1.
+	//
+	// Sending the classic parameters to a reasoning model is rejected upstream,
+	// and some proxies surface that rejection as an HTML error page rather than
+	// a JSON error — which reads as an empty completion and is very hard to
+	// trace back. Absorbing that difference is the gateway's job; a caller
+	// should not have to know which dialect a model behind an alias speaks.
+	ParamStyle string `yaml:"param_style"`
 }
 
 // ModelRoute maps a public alias (e.g. "nabu-fast") to a primary target and an

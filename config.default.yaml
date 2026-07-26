@@ -171,6 +171,7 @@ models:
         model: "google/gemini-2.5-flash"
       - provider: parspack
         model: "openai/gpt-5.5"
+        param_style: reasoning
       - provider: parspack
         model: "anthropic/claude-sonnet-4.6"
 
@@ -187,6 +188,7 @@ models:
         model: "gemini-1.5-pro"
       - provider: parspack
         model: "openai/gpt-5.5"
+        param_style: reasoning
       - provider: parspack
         model: "anthropic/claude-sonnet-4.6"
       - provider: parspack
@@ -207,6 +209,7 @@ models:
         model: "google/gemini-2.5-flash"
       - provider: parspack
         model: "openai/gpt-5.5"
+        param_style: reasoning
 
   nabu-vision:
     primary:
@@ -241,6 +244,7 @@ models:
     primary:
       provider: parspack
       model: "openai/gpt-5.5"
+      param_style: reasoning
     fallback:
       - provider: parspack
         model: "anthropic/claude-sonnet-4.6"
