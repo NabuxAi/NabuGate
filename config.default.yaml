@@ -22,6 +22,13 @@ server:
     # on purpose — but it is a project key, not the admin key: usage is
     # attributed to "dadebaran" in /v1/usage and a leak cannot administer the
     # gateway. Skipped automatically when DADEBARAN_KEY is unset.
+    # NabuGen. Its chat goes through app/core/ai_gateway.py, which prefers
+    # NABUGATE_API_KEY over the legacy OPENAI_* variables.
+    - key: "${NABUGEN_KEY}"
+      project: "nabugen"
+      allow: ["nabu-*", "gen-*", "openrouter/*"]
+      rate_limit: 240
+
     # NabuChat. chat-* covers its no-fallback embedding alias.
     - key: "${NABUCHAT_KEY}"
       project: "nabuchat"
@@ -608,6 +615,18 @@ embeddings:
         model: "text-embedding-004"
       - provider: cloudflare
         model: "@cf/baai/bge-large-en-v1.5"
+
+  # NabuGen's content memory — 1024 wide, matching the column its schema
+  # already declares, so enabling the feature needs no re-index.
+  #
+  # gemini-embedding-001 emits any requested width, so the CALLER MUST SEND
+  # `dimensions: 1024`. Without it the provider returns 3072 and the insert
+  # fails. NabuGen currently has this feature disabled (no embedding key), so
+  # this alias is ready rather than in use.
+  gen-embed:
+    primary:
+      provider: gemini
+      model: "gemini-embedding-001"
 
   # NabuChat's Qdrant index.
   #
