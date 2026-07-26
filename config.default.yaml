@@ -353,6 +353,8 @@ model_registry:
       - provider: gapgpt
         model: "deepseek-v4-pro"
 
+  # Leaks its chain of thought into `content` on Parspack; keep it out of
+  # user-facing aliases.
   kimi-k2.6:
     serves:
       - provider: dahl
@@ -483,12 +485,16 @@ models:
 
 
   nabu-smart:
+    # kimi-k2.6 is deliberately NOT here. On Parspack it returns its reasoning
+    # inline as `content` — no separate reasoning field and no delimiter to strip
+    # — so a caller gets "The user says ... the persona is ..." instead of an
+    # answer. It stays reachable as nabu-kimi for anyone who wants it knowingly.
     primary:
-      model: kimi-k2.6
+      model: gpt-5.5
     fallback:
-      - model: gpt-5.5
       - model: gpt-4o
       - model: deepseek-v4-pro
+      - model: gpt-4.1-mini
 
 
   nabu-cheap:
