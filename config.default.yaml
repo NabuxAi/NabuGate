@@ -22,6 +22,15 @@ server:
     # on purpose — but it is a project key, not the admin key: usage is
     # attributed to "dadebaran" in /v1/usage and a leak cannot administer the
     # gateway. Skipped automatically when DADEBARAN_KEY is unset.
+    # NabuSu. Deliberately the narrowest key here: only its own agent, which
+    # carries the night-companion safety limits. This is a health-adjacent app
+    # and a broader glob would let a tampered client reach a plain alias with no
+    # limits attached.
+    - key: "${NABUSU_KEY}"
+      project: "nabusu"
+      allow: ["nabusu-night-companion"]
+      rate_limit: 120
+
     # NabuDesk. desk-* covers its width-stable embedding alias.
     - key: "${NABUDESK_KEY}"
       project: "nabudesk"
