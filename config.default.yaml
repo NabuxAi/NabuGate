@@ -22,6 +22,12 @@ server:
     # on purpose — but it is a project key, not the admin key: usage is
     # attributed to "dadebaran" in /v1/usage and a leak cannot administer the
     # gateway. Skipped automatically when DADEBARAN_KEY is unset.
+    # NabuChat. chat-* covers its no-fallback embedding alias.
+    - key: "${NABUCHAT_KEY}"
+      project: "nabuchat"
+      allow: ["nabu-*", "chat-*"]
+      rate_limit: 240
+
     - key: "${DADEBARAN_KEY}"
       project: "dadebaran"
       allow: ["nabu-*", "parspack/*", "avalai/*", "gapgpt/*", "gpt-*", "o1", "o3", "o3-mini", "o4-mini", "deepseek-*", "kimi-*", "minimax-*", "glm-*"]
@@ -577,6 +583,17 @@ embeddings:
         model: "text-embedding-004"
       - provider: cloudflare
         model: "@cf/baai/bge-large-en-v1.5"
+
+  # NabuChat's Qdrant index.
+  #
+  # No fallback, for the same reason as write-embed below: its Qdrant collection
+  # is created at 1536 and a fallback of another width would corrupt it rather
+  # than fail loudly. NabuChat's own code notes the 1536 constraint and then
+  # defaults to nabu-embed, which does cross widths — hence this alias.
+  chat-embed:
+    primary:
+      provider: parspack
+      model: "openai/text-embedding-3-small"
 
   # NabuWrite's Style RAG index.
   #
