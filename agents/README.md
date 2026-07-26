@@ -78,3 +78,35 @@ a schedule or a rate of reduction, and an immediate hand-off to emergency care
 when someone reports a seizure or hallucinations. The app repeats those limits
 on its own side, and drops any reply containing dosing language. Treat edits to
 that file as changes to a safety contract, not copywriting.
+
+## Squads in this directory
+
+| prefix | purpose | source of truth |
+|---|---|---|
+| `cine-*` | cinematic scrollytelling: creative direction, motion, 3D, frontend, content, perf/a11y | this repo |
+| `nabusu-*` | NabuSu companion | this repo |
+| `write-*` | NabuWrite: composer, inline editor, edit classifier | **`NabuxAi/NabuWrite`** |
+
+### Agents owned by another repo
+
+`write-*` is authored in NabuWrite and copied here. It has to live in both
+places: the image bakes this directory at build time (`COPY agents /app/agents`),
+so an agent that exists only in the consuming project never reaches the gateway
+— and the consuming project needs it in its own tree to be a complete product.
+
+Each such file carries a header naming its origin. Edit it there, copy across,
+and expect a change made only here to be overwritten by the next sync.
+
+The same applies to any future project: bring its agents in, and give its
+project key a matching glob under `server.keys`, e.g.
+
+```yaml
+keys:
+  - key: "${MYPROJECT_KEY}"
+    project: "myproject"
+    allow: ["myproject-*"]
+    rate_limit: 120
+```
+
+An entry whose key env is empty is skipped by the policy builder, so it stays
+inert until the variable is set.
