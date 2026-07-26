@@ -6,8 +6,10 @@ import (
 	"flag"
 	"fmt"
 	"log/slog"
+	"nabugate/internal/adminstore"
 	"net/http"
 	"os"
+	"path/filepath"
 	"time"
 
 	"nabugate/internal/config"
@@ -51,6 +53,38 @@ func main() {
 		log.Warn(w)
 	}
 	srv := server.New(r, enforcer, tracker, agents, log)
+
+	// Console state: accounts, console-minted project tokens, and usage that
+	// survives a restart. Mount a volume at NABU_STATE_DIR to keep it — without
+	// one the file lives in the container and every redeploy loses the admin
+	// account and the tokens minted from the console.
+	stateDir := os.Getenv("NABU_STATE_DIR")
+	if stateDir == "" {
+		stateDir = "/data"
+	}
+	adminState, err := adminstore.Open(filepath.Join(stateDir, "console.json"))
+	if err != nil {
+		// Not fatal: the gateway's own routing does not depend on it, and
+		// refusing to serve traffic because a console cannot start would be the
+		// wrong trade.
+		log.Warn("console state unavailable; admin console disabled", "error", err)
+	} else {
+		srv.SetAdminStore(adminState)
+		if adminState.NeedsSetup() {
+			log.Info("admin console has no account yet; create one at /admin/")
+		}
+		// Usage is accumulated in memory and flushed here, because a disk write
+		// per request would cost more than a cheap completion does.
+		go func() {
+			t := time.NewTicker(30 * time.Second)
+			defer t.Stop()
+			for range t.C {
+				if err := adminState.Persist(); err != nil {
+					log.Warn("persist console usage", "error", err)
+				}
+			}
+		}()
+	}
 
 	// Stock-photo proxy (Pexels): enabled purely by PEXELS_API_KEY, so photos
 	// ride the same gateway key/policy as every other capability.

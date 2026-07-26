@@ -37,12 +37,20 @@ services:
       # network. Blank it to disable, or override with a tunnel URL if 9Router
       # runs elsewhere.
       - NINEROUTER_BASE_URL=${NINEROUTER_BASE_URL:-http://ninerouter:20128/v1}
+      # Console state: the admin account, tokens minted from the console, and
+      # usage counters. It lives on the volume below — without one, every
+      # redeploy loses the account and every console-minted token with it.
+      - NABU_STATE_DIR=/data
     # Coolify's reverse proxy reaches the gateway over the internal Docker
     # network, so the port only needs to be EXPOSEd, not published to the host.
     # Publishing to a random host port (`ports: - "8080"`) does NOT make the
     # proxy route to it — that is why the domain returned nothing before.
     expose:
       - "8080"
+    volumes:
+      # Must outlive the container: it holds the console admin account and the
+      # project tokens, whose secrets exist nowhere else.
+      - nabugate-state:/data
     # For a plain local `docker compose up` (no proxy), publish to the host
     # instead by uncommenting:
     # ports:
@@ -87,5 +95,7 @@ services:
     restart: unless-stopped
 
 volumes:
+  nabugate-state:
+    name: nabugate-state
   ninerouter-data:
     name: ninerouter-data

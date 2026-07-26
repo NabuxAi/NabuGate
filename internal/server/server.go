@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"nabugate/internal/adminstore"
 	"nabugate/internal/agent"
 	"nabugate/internal/photos"
 	"nabugate/internal/policy"
@@ -37,7 +38,17 @@ type Server struct {
 	agents *agent.Registry
 	photos *photos.Client // nil = photo proxy disabled
 	log    *slog.Logger
+
+	// admin is the persisted console state: accounts, console-minted tokens and
+	// usage that survives a restart. nil when no state path is configured, in
+	// which case the console API is not mounted and the gateway behaves exactly
+	// as it did before.
+	admin *adminstore.Store
 }
+
+// SetAdminStore attaches the console state. Separate from New so existing
+// callers and their tests keep compiling.
+func (s *Server) SetAdminStore(st *adminstore.Store) { s.admin = st }
 
 // New builds a Server. If the enforcer has no keys, authentication is disabled
 // (dev mode) and a warning is logged by the caller. agents may be nil or empty
@@ -66,15 +77,18 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /v1/usage", s.auth(s.handleUsage))
 	mux.HandleFunc("GET /v1/photos/search", s.auth(s.handlePhotoSearch))
 	s.mountConsole(mux)
+	s.mountConsoleAPI(mux)
 	return mux
 }
 
 // mountConsole serves the embedded admin console (web/dist) under /admin/ when
-// the bundle is built into the binary. It's the static SPA shell only — every
-// piece of sensitive gateway data still comes from the auth-guarded /v1/*
-// endpoints — so the shell itself is served without a key, and the browser
-// carries the admin token when it calls those APIs. If the bundle wasn't built,
-// mounting is skipped and the gateway behaves exactly as before.
+// the bundle is built into the binary.
+//
+// The shell is served without a session because it has to be: it contains the
+// login form. Everything it can actually show comes from /admin/api/*, which
+// requires one. What the shell must never do is carry a gateway key — it used
+// to be described as safe because the data lived behind /v1/*, but that put the
+// admin key in a browser and handed the console to anyone who found the URL.
 func (s *Server) mountConsole(mux *http.ServeMux) {
 	assets, ok := web.Assets()
 	if !ok {
@@ -117,9 +131,23 @@ func (s *Server) project(r *http.Request) string {
 }
 
 // record attributes a call's usage to the project/model and logs the cost.
+// lookupConsoleToken resolves a console-minted token, if the console state is
+// attached at all.
+func (s *Server) lookupConsoleToken(token string) (adminstore.Token, bool) {
+	if s.admin == nil {
+		return adminstore.Token{}, false
+	}
+	return s.admin.Lookup(token)
+}
+
 func (s *Server) record(r *http.Request, prov, model string, u provider.Usage) {
 	project := s.project(r)
 	cost := s.usage.Record(project, prov, model, u)
+	// Also accumulate into the persisted counters, so the console's numbers are
+	// real across restarts rather than resetting to zero on every redeploy.
+	if s.admin != nil {
+		s.admin.RecordUsage(project, int64(u.PromptTokens), int64(u.CompletionTokens), cost)
+	}
 	s.log.Info("billed", "project", project, "provider", prov, "model", model,
 		"total_tokens", u.TotalTokens, "cost_usd", cost)
 }
@@ -730,8 +758,28 @@ func (s *Server) auth(next http.HandlerFunc) http.HandlerFunc {
 			return
 		}
 		token := strings.TrimSpace(strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer "))
+
 		pol, ok := s.policy.Lookup(token)
 		if !ok {
+			// Not in the baked config — try the tokens minted from the console.
+			// Config keys are checked first so a deployment's declared keys can
+			// never be shadowed by something added at runtime.
+			if t, found := s.lookupConsoleToken(token); found {
+				if !originAllowed(t.AllowedOrigins, r) {
+					s.admin.RecordDenied(t.Name)
+					s.log.Warn("origin refused", "project", t.Name,
+						"origin", requestOriginHost(r), "allowed", t.AllowedOrigins)
+					writeError(w, http.StatusForbidden, "this key is not permitted from this origin")
+					return
+				}
+				pol = policy.Policy{Project: t.Name, Allow: t.Allow, RateLimit: t.RateLimit}
+				ok = true
+			}
+		}
+		if !ok {
+			if s.admin != nil {
+				s.admin.RecordDenied("(unknown)")
+			}
 			writeError(w, http.StatusUnauthorized, "invalid or missing API key")
 			return
 		}
