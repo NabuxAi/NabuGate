@@ -40,6 +40,10 @@ type Router struct {
 	// A target naming a model with no provider expands through this.
 	registry map[string]config.ModelEntry
 
+	// logicalOf is the reverse index: "provider/upstreamModel" -> logical name.
+	// It is what lets a pinned coordinate find the same model elsewhere.
+	logicalOf map[string]string
+
 	// catalog caches each passthrough provider's live-discovered model list.
 	catMu   sync.Mutex
 	catalog map[string]catalogEntry
@@ -91,9 +95,49 @@ func (r *Router) resolvePassthrough(model string) (config.Target, bool) {
 	return config.Target{Provider: prov, Model: upstream}, true
 }
 
-// SetRegistry installs the logical-model registry. Separate from New so the
-// existing call sites and their tests keep working unchanged.
-func (r *Router) SetRegistry(reg map[string]config.ModelEntry) { r.registry = reg }
+// SetRegistry installs the logical-model registry and builds the reverse index
+// used to recover a logical model from a concrete provider coordinate.
+// Separate from New so the existing call sites and their tests keep working.
+func (r *Router) SetRegistry(reg map[string]config.ModelEntry) {
+	r.registry = reg
+	r.logicalOf = make(map[string]string, len(reg))
+	for name, entry := range reg {
+		for _, sv := range entry.Serves {
+			r.logicalOf[sv.Provider+"/"+sv.Model] = name
+		}
+	}
+}
+
+// siblings returns the other providers serving the same logical model as t,
+// in registry order, excluding t's own provider.
+//
+// This is what keeps a retry on the model the caller actually asked for. A
+// request naming "parspack/openai/gpt-5.5" pins a provider, but the caller
+// wanted gpt-5.5 — so when Parspack fails, the same model on AvalAI is the
+// correct next attempt, and a different model would not be.
+func (r *Router) siblings(t config.Target) []config.Target {
+	name, ok := r.logicalOf[t.Provider+"/"+t.Model]
+	if !ok {
+		return nil
+	}
+	entry := r.registry[name]
+
+	out := make([]config.Target, 0, len(entry.Serves))
+	for _, sv := range entry.Serves {
+		if sv.Provider == t.Provider {
+			continue
+		}
+		if _, live := r.adapters[sv.Provider]; !live {
+			continue
+		}
+		style := entry.ParamStyle
+		if sv.ParamStyle != "" {
+			style = sv.ParamStyle
+		}
+		out = append(out, config.Target{Provider: sv.Provider, Model: sv.Model, ParamStyle: style})
+	}
+	return out
+}
 
 // expand turns one configured target into the concrete attempts it stands for.
 //
@@ -146,7 +190,16 @@ func (r *Router) resolveChatTargets(model string) ([]config.Target, bool) {
 		return out, len(out) > 0
 	}
 	if t, ok := r.resolvePassthrough(model); ok {
-		return []config.Target{t}, true
+		// Pinning a provider still asks for a model. If that model is in the
+		// registry, the other providers serving it are legitimate retries —
+		// same model, different provider.
+		if style, known := r.logicalOf[t.Provider+"/"+t.Model]; known {
+			entry := r.registry[style]
+			if t.ParamStyle == "" {
+				t.ParamStyle = entry.ParamStyle
+			}
+		}
+		return append([]config.Target{t}, r.siblings(t)...), true
 	}
 	// A model named directly, e.g. {"model": "gpt-5.5"}: try every provider
 	// that serves it.

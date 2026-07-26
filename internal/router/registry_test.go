@@ -32,7 +32,10 @@ func (a namedAdapter) Chat(context.Context, provider.ChatRequest) (provider.Chat
 
 func registryRouter(t *testing.T, adapters map[string]provider.Adapter, models map[string]config.ModelRoute) *Router {
 	t.Helper()
-	r := New(adapters, models, nil, nil, nil, nil, discardLogger())
+	// Passthrough must be enabled for the pinned-coordinate cases.
+	r := New(adapters, models, nil, nil, nil,
+		map[string][]string{"parspack": nil, "avalai": nil, "gapgpt": nil},
+		discardLogger())
 	r.SetRegistry(map[string]config.ModelEntry{
 		"gpt-5.5": {
 			ParamStyle: provider.ParamStyleReasoning,
@@ -134,5 +137,48 @@ func TestConcreteTargetsAreUnaffected(t *testing.T) {
 	}
 	if targets[0].Model != "openai/gpt-4o-mini" {
 		t.Errorf("model = %q, want it passed through untouched", targets[0].Model)
+	}
+}
+
+func TestPinnedProviderRetriesTheSameModelElsewhere(t *testing.T) {
+	first, second := 0, 0
+
+	r := registryRouter(t, map[string]provider.Adapter{
+		"parspack": namedAdapter{name: "parspack", err: errors.New("502"), hits: &first},
+		"avalai":   namedAdapter{name: "avalai", said: "hi", hits: &second},
+	}, map[string]config.ModelRoute{})
+
+	// The caller pinned a provider, but what they asked for is gpt-5.5. When
+	// that provider fails the retry must stay on gpt-5.5 — a different model
+	// would not be what was requested.
+	res, err := r.Chat(context.Background(), "parspack/openai/gpt-5.5", provider.ChatRequest{})
+	if err != nil {
+		t.Fatalf("Chat: %v", err)
+	}
+	if res.Provider != "avalai" {
+		t.Errorf("provider = %q, want avalai to serve the same model", res.Provider)
+	}
+	if res.Model != "gpt-5.5" {
+		t.Errorf("model = %q, want gpt-5.5 — the model must not change on retry", res.Model)
+	}
+	if first != 1 || second != 1 {
+		t.Errorf("attempts: parspack=%d avalai=%d, want 1 and 1", first, second)
+	}
+}
+
+func TestUnknownPassthroughModelHasNoSiblings(t *testing.T) {
+	hits := 0
+	r := registryRouter(t, map[string]provider.Adapter{
+		"parspack": namedAdapter{name: "parspack", said: "hi", hits: &hits},
+		"avalai":   namedAdapter{name: "avalai", said: "hi", hits: &hits},
+	}, map[string]config.ModelRoute{})
+
+	// A model absent from the registry cannot be assumed available elsewhere.
+	targets, ok := r.resolveChatTargets("parspack/some/unlisted-model")
+	if !ok {
+		t.Fatal("passthrough did not resolve")
+	}
+	if len(targets) != 1 {
+		t.Errorf("targets = %+v, want only the pinned coordinate", targets)
 	}
 }
