@@ -161,10 +161,16 @@ models:
         model: "gpt-4o-mini"
       - provider: anthropic
         model: "claude-3-5-haiku-latest"
-      # Last rung: a different vendor entirely, so a quota or outage that takes
-      # out the rungs above cannot take this one with it.
+      # Last rungs: a different vendor entirely, so a quota or outage that
+      # takes out the rungs above cannot take these with it. More than one
+      # parspack model on purpose — its per-model availability fluctuates, and
+      # a single rung there fails as often as it succeeds.
       - provider: parspack
         model: "anthropic/claude-haiku-4.5"
+      - provider: parspack
+        model: "google/gemini-2.5-flash"
+      - provider: parspack
+        model: "openai/gpt-5.5"
 
   nabu-smart:
     primary:
@@ -179,6 +185,10 @@ models:
         model: "gemini-1.5-pro"
       - provider: parspack
         model: "openai/gpt-5.5"
+      - provider: parspack
+        model: "anthropic/claude-sonnet-4.6"
+      - provider: parspack
+        model: "google/gemini-2.5-flash"
 
   nabu-cheap:
     primary:
@@ -191,6 +201,10 @@ models:
         model: "MiniMaxAI/MiniMax-M2.7"
       - provider: parspack
         model: "google/gemini-3.1-flash-lite-preview"
+      - provider: parspack
+        model: "google/gemini-2.5-flash"
+      - provider: parspack
+        model: "openai/gpt-5.5"
 
   nabu-vision:
     primary:
