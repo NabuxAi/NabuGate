@@ -133,6 +133,81 @@ providers:
     api_key_env: "ARVAN_API_KEY"
     auth_scheme: "apikey"
 
+  # ── Providers with a permanent free tier ────────────────────────────────
+  # All OpenAI-wire, so no adapter code is needed. Each is skipped
+  # automatically while its key env is empty, so listing them costs nothing
+  # until you actually sign up.
+  #
+  # passthrough is set on the multi-model ones: their catalogue is discovered
+  # live from the provider's own /v1/models, so a new model they add becomes
+  # addressable as "<provider>/<model>" without touching this file.
+  #
+  # Quotas below were the published figures in mid-2026 and providers change
+  # them often — treat them as orientation, not contract.
+
+  # Cerebras — ~1M tokens/day free, no card. Fastest inference of the group.
+  cerebras:
+    enabled: true
+    type: openai
+    base_url: "https://api.cerebras.ai/v1"
+    api_key_env: "CEREBRAS_API_KEY"
+    passthrough: true
+
+  # Mistral — Experiment tier is ~1B tokens/month, the most generous permanent
+  # free quota here, but it requires opting into training on your data. Do not
+  # route anything confidential through it.
+  mistral:
+    enabled: true
+    type: openai
+    base_url: "https://api.mistral.ai/v1"
+    api_key_env: "MISTRAL_API_KEY"
+    passthrough: true
+
+  # NVIDIA NIM — 100+ hosted models (Llama, Mistral, Nemotron, DeepSeek, Qwen,
+  # Phi, Gemma, Granite) free on one endpoint.
+  nvidia:
+    enabled: true
+    type: openai
+    base_url: "https://integrate.api.nvidia.com/v1"
+    api_key_env: "NVIDIA_API_KEY"
+    passthrough: true
+
+  # GitHub Models — free access to GPT-4o, Claude and Llama for GitHub
+  # accounts, through an Azure-hosted OpenAI-wire endpoint. Auth is a GitHub
+  # PAT, not a vendor key.
+  github:
+    enabled: true
+    type: openai
+    base_url: "https://models.inference.ai.azure.com"
+    api_key_env: "GITHUB_MODELS_TOKEN"
+    passthrough: true
+
+  # SiliconFlow — a set of permanently free open-weight models alongside paid
+  # ones.
+  siliconflow:
+    enabled: true
+    type: openai
+    base_url: "https://api.siliconflow.cn/v1"
+    api_key_env: "SILICONFLOW_API_KEY"
+    passthrough: true
+
+  # Together AI — free credits plus a few permanently free model endpoints.
+  together:
+    enabled: true
+    type: openai
+    base_url: "https://api.together.xyz/v1"
+    api_key_env: "TOGETHER_API_KEY"
+    passthrough: true
+
+  # Cohere — free developer tier; note the OpenAI-compatible surface lives
+  # under /compatibility/v1, not /v1.
+  cohere:
+    enabled: true
+    type: openai
+    base_url: "https://api.cohere.ai/compatibility/v1"
+    api_key_env: "COHERE_API_KEY"
+    passthrough: true
+
   # 9Router — an OpenAI-compatible smart router you SELF-HOST, fronting 60+
   # providers (Claude Code, Codex, Gemini, GLM, MiniMax, Kimi, Qwen, …) with its
   # own 3-tier fallback. It is software, not a SaaS, which is why NabuGate's
