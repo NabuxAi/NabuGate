@@ -127,8 +127,9 @@ func (a *OpenAIAdapter) Speech(ctx context.Context, req SpeechRequest) (SpeechRe
 // --- Embeddings (OpenAI Embeddings API) ---
 
 type openAIEmbeddingRequest struct {
-	Model string   `json:"model"`
-	Input []string `json:"input"`
+	Model      string   `json:"model"`
+	Input      []string `json:"input"`
+	Dimensions *int     `json:"dimensions,omitempty"`
 }
 
 type openAIEmbeddingResponse struct {
@@ -147,7 +148,11 @@ type openAIEmbeddingResponse struct {
 
 // Embed implements EmbeddingAdapter using POST /embeddings.
 func (a *OpenAIAdapter) Embed(ctx context.Context, req EmbeddingRequest) (EmbeddingResponse, error) {
-	raw, status, err := a.postJSON(ctx, "/embeddings", openAIEmbeddingRequest{Model: req.Model, Input: req.Input})
+	raw, status, err := a.postJSON(ctx, "/embeddings", openAIEmbeddingRequest{
+		Model:      req.Model,
+		Input:      req.Input,
+		Dimensions: req.Dimensions,
+	})
 	if err != nil {
 		return EmbeddingResponse{}, err
 	}

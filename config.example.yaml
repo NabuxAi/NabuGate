@@ -363,6 +363,19 @@ audio:
       - provider: gemini
         model: "gemini-2.5-flash-preview-tts"
 
+# Embedding aliases.
+#
+# The OpenAI-wire "dimensions" parameter is forwarded to the provider: OpenAI
+# receives it as `dimensions`, Gemini as `outputDimensionality` (set per
+# sub-request). Clients that index the vectors need it — gemini-embedding-001
+# returns 3072 dimensions by default, which pgvector cannot build an HNSW index
+# over (its ceiling is 2000), so such a client asks for the width its schema
+# declares.
+#
+# A caveat for those clients: the fallback chain below crosses vector widths
+# (1536 → 768 → 1024). That is fine for search-at-query-time, but a store with a
+# fixed-width column should point at its own alias with NO fallback — a failed
+# embed is a retryable error, while a wrong-width vector is a corrupt index.
 embeddings:
   nabu-embed:
     primary:

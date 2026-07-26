@@ -113,6 +113,11 @@ type SpeechAdapter interface {
 type EmbeddingRequest struct {
 	Model string
 	Input []string
+	// Dimensions is the OpenAI-wire "dimensions" parameter: the requested
+	// vector width, for models that can emit more than one. Nil means "provider
+	// default". Callers that index vectors depend on this — a store with a
+	// fixed-width column cannot accept whatever width the default happens to be.
+	Dimensions *int
 }
 
 // EmbeddingResponse carries one vector per input (same order).

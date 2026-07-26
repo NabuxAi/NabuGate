@@ -614,8 +614,9 @@ func (s *Server) handleSpeech(w http.ResponseWriter, r *http.Request) {
 // embeddingRequestBody is the OpenAI-compatible embeddings request. "input"
 // may be a single string or an array of strings.
 type embeddingRequestBody struct {
-	Model string          `json:"model"`
-	Input json.RawMessage `json:"input"`
+	Model      string          `json:"model"`
+	Input      json.RawMessage `json:"input"`
+	Dimensions *int            `json:"dimensions,omitempty"`
 }
 
 func (s *Server) handleEmbeddings(w http.ResponseWriter, r *http.Request) {
@@ -647,7 +648,10 @@ func (s *Server) handleEmbeddings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	result, err := s.router.Embed(r.Context(), body.Model, provider.EmbeddingRequest{Input: inputs})
+	result, err := s.router.Embed(r.Context(), body.Model, provider.EmbeddingRequest{
+		Input:      inputs,
+		Dimensions: body.Dimensions,
+	})
 	if err != nil {
 		writeError(w, aliasErrStatus(err, "unknown embedding alias"), err.Error())
 		return

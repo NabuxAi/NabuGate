@@ -164,10 +164,16 @@ func (a *GeminiAdapter) Embed(ctx context.Context, req EmbeddingRequest) (Embedd
 	modelPath := "models/" + req.Model
 	requests := make([]any, 0, len(req.Input))
 	for _, text := range req.Input {
-		requests = append(requests, map[string]any{
+		entry := map[string]any{
 			"model":   modelPath,
 			"content": map[string]any{"parts": []any{map[string]any{"text": text}}},
-		})
+		}
+		// Gemini's name for the OpenAI "dimensions" parameter, and it is set
+		// per sub-request rather than once for the batch.
+		if req.Dimensions != nil {
+			entry["outputDimensionality"] = *req.Dimensions
+		}
+		requests = append(requests, entry)
 	}
 	payload, err := json.Marshal(map[string]any{"requests": requests})
 	if err != nil {
