@@ -378,6 +378,8 @@ model_registry:
       - provider: parspack
         model: "moonshotai/kimi-k2.6"
 
+  # Leaks its chain of thought into `content` on Parspack, intermittently.
+  # Keep it out of the lead position on user-facing aliases.
   minimax-m2.7:
     serves:
       - provider: dahl
@@ -499,11 +501,16 @@ model_registry:
 
 models:
   nabu-fast:
+    # minimax-m2.7 is deliberately not the primary. Like kimi-k2.6 it leaks its
+    # reasoning into `content` on Parspack — intermittently, which is worse than
+    # always: the same prompt returns "Hi!" once and "The user asks: ..." the
+    # next time, so it looks like a flaky model rather than a broken one.
+    # It stays reachable as nabu-minimax.
     primary:
-      model: minimax-m2.7
+      model: gpt-4o-mini
     fallback:
-      - model: gpt-4o-mini
       - model: gpt-4.1-mini
+      - model: minimax-m2.7
 
 
   nabu-smart:

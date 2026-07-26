@@ -173,10 +173,15 @@ becomes a style exemplar.
 
 ### Some models leak their reasoning into `content`
 
-`moonshotai/kimi-k2.6` on Parspack returns its chain of thought in the content
-field — no separate reasoning field, no delimiter to strip. The caller gets
-"The user says … the persona is …" where an answer should be. Keep such models
-out of user-facing aliases.
+`moonshotai/kimi-k2.6` and `minimax/minimax-m2.7` on Parspack return their chain
+of thought in the content field — no separate reasoning field, no delimiter to
+strip. The caller gets "The user says … the persona is …" where an answer should
+be.
+
+MiniMax does it **intermittently**, which is worse than always: the same prompt
+answers cleanly once and leaks the next time, so it reads as a flaky model
+rather than a broken one. Probe a model more than once before trusting it at the
+head of a user-facing alias.
 
 ## The console
 
