@@ -200,6 +200,19 @@ func (s *Store) CreateAdmin(username, password string) error {
 	return s.save()
 }
 
+// Usernames returns the console account usernames, sorted, so the console can
+// list who has admin access. Passwords/hashes are never exposed.
+func (s *Store) Usernames() []string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	names := make([]string, 0, len(s.st.Admins))
+	for _, a := range s.st.Admins {
+		names = append(names, a.Username)
+	}
+	sort.Strings(names)
+	return names
+}
+
 // Authenticate verifies a console login and returns a session token.
 //
 // A missing account and a wrong password return the same error, and the missing

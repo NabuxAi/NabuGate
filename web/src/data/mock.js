@@ -104,5 +104,6 @@ export const nav = [
   { id: 'keys', label: 'کلیدهای پیکربندی', icon: '▣' },
   { id: 'usage', label: 'مصرف و هزینه', icon: '▤' },
   { id: 'agents', label: 'ساب‌اجنت‌ها', icon: '◈' },
+  { id: 'users', label: 'کاربران ادمین', icon: '⚇' },
   { id: 'logs', label: 'لاگ‌ها', icon: '➤' },
 ];

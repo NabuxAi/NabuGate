@@ -9,6 +9,8 @@ import Providers from './views/Providers.jsx';
 import Models from './views/Models.jsx';
 import Keys from './views/Keys.jsx';
 import Usage from './views/Usage.jsx';
+import Agents from './views/Agents.jsx';
+import Users from './views/Users.jsx';
 import Placeholder from './views/Placeholder.jsx';
 
 const VIEWS = {
@@ -18,14 +20,8 @@ const VIEWS = {
   keys: () => <Keys />,
   tokens: () => <Tokens />,
   usage: () => <Usage />,
-  agents: () => (
-    <Placeholder
-      title="ساب‌اجنت‌ها"
-      subtitle="دستیارهای نام‌دار: system prompt + پارامترهای پیش‌فرض روی یک آلیاس"
-      icon="◈"
-      body="مدیریت ساب‌اجنت‌ها به‌زودی در این نما اضافه می‌شود."
-    />
-  ),
+  agents: () => <Agents />,
+  users: () => <Users />,
   logs: () => (
     <Placeholder
       title="لاگ‌ها"
@@ -36,8 +32,15 @@ const VIEWS = {
   ),
 };
 
+// The current view lives in the URL hash (#/tokens) so every menu click changes
+// the address bar and each section is a real, shareable, back-button-able link.
+function viewFromHash() {
+  const id = (window.location.hash || '').replace(/^#\/?/, '');
+  return VIEWS[id] ? id : 'dashboard';
+}
+
 export default function App() {
-  const [view, setView] = useState('dashboard');
+  const [view, setView] = useState(viewFromHash);
   // null while we ask the gateway; the console must not flash its shell before
   // we know whether this visitor is allowed to see it.
   const [session, setSession] = useState(null);
@@ -50,6 +53,16 @@ export default function App() {
 
   useEffect(refresh, []);
 
+  useEffect(() => {
+    const onHash = () => setView(viewFromHash());
+    window.addEventListener('hashchange', onHash);
+    return () => window.removeEventListener('hashchange', onHash);
+  }, []);
+
+  const navigate = (id) => {
+    window.location.hash = '#/' + id; // updates the URL; hashchange syncs the view.
+  };
+
   if (session === null) return <div className="app-boot">…</div>;
   if (!session.authenticated) {
     return <SignIn needsSetup={session.needs_setup} onAuthenticated={refresh} />;
@@ -58,7 +71,7 @@ export default function App() {
   const render = VIEWS[view] || VIEWS.dashboard;
   return (
     <div className="app">
-      <Sidebar current={view} onNavigate={setView} />
+      <Sidebar current={view} onNavigate={navigate} />
       {render()}
     </div>
   );
