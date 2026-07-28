@@ -38,6 +38,11 @@ func (s *Server) mountConsoleAPI(mux *http.ServeMux) {
 	mux.Handle("GET /admin/api/overview", s.consoleAuth(s.consoleOverview))
 	mux.Handle("GET /admin/api/usage", s.consoleAuth(s.consoleUsage))
 	mux.Handle("POST /admin/api/usage/reset", s.consoleAuth(s.resetUsage))
+
+	mux.Handle("GET /admin/api/admins", s.consoleAuth(s.listAdmins))
+	mux.Handle("POST /admin/api/admins", s.consoleAuth(s.createAdmin))
+
+	mux.Handle("GET /admin/api/agents", s.consoleAuth(s.listAgents))
 }
 
 // consoleAuth gates a console endpoint on a live login session.
@@ -130,6 +135,51 @@ func (s *Server) consoleLogout(w http.ResponseWriter, r *http.Request) {
 		HttpOnly: true, SameSite: http.SameSiteStrictMode, MaxAge: -1,
 	})
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// ─────────────────────────── admin accounts ─────────────────────────────────
+
+// listAdmins returns the console account usernames (never hashes).
+func (s *Server) listAdmins(w http.ResponseWriter, _ *http.Request) {
+	writeJSON(w, http.StatusOK, map[string]any{"admins": s.admin.Usernames()})
+}
+
+// createAdmin adds another console account. Unlike consoleSetup (first-run and
+// unauthenticated), this requires an existing signed-in admin (consoleAuth).
+func (s *Server) createAdmin(w http.ResponseWriter, r *http.Request) {
+	var c credentials
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<16)).Decode(&c); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid JSON body")
+		return
+	}
+	if err := s.admin.CreateAdmin(c.Username, c.Password); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusCreated, map[string]any{
+		"username": strings.ToLower(strings.TrimSpace(c.Username)),
+	})
+}
+
+// ─────────────────────────── sub-agents ─────────────────────────────────────
+
+// listAgents surfaces the configured sub-agents (name + description + the
+// underlying alias) so the console can show them instead of a placeholder.
+func (s *Server) listAgents(w http.ResponseWriter, _ *http.Request) {
+	type agentInfo struct {
+		Name        string `json:"name"`
+		Description string `json:"description"`
+		Model       string `json:"model"`
+	}
+	out := make([]agentInfo, 0)
+	if s.agents != nil {
+		for _, name := range s.agents.Names() {
+			if a, ok := s.agents.Lookup(name); ok {
+				out = append(out, agentInfo{Name: a.Name, Description: a.Description, Model: a.Model})
+			}
+		}
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"agents": out})
 }
 
 // ─────────────────────────── tokens ─────────────────────────────────────────

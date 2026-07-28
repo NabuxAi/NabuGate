@@ -88,3 +88,14 @@ export const resetUsage = (project) =>
   req(`/usage/reset${project ? `?project=${encodeURIComponent(project)}` : ''}`, {
     method: 'POST',
   });
+
+// ---- admin accounts ---------------------------------------------------------
+
+export const listAdmins = () => req('/admins');
+
+export const createAdmin = (username, password) =>
+  req('/admins', { method: 'POST', body: JSON.stringify({ username, password }) });
+
+// ---- sub-agents -------------------------------------------------------------
+
+export const listAgents = () => req('/agents');
