@@ -135,6 +135,26 @@ untraceable. Declare `param_style: reasoning` on the model.
 The dialect is **not inferable from the name**: both `gpt-4o-*-search-preview`
 models speak it while plain `gpt-4o` does not. Probe, do not guess.
 
+### An image alias is not always a picture generator
+
+`nabu-image` and `nabu-photo` answer a prompt with a scene: one draws it, the
+other finds a photograph of it. `nabu-header`, `nabu-card` and `nabu-story` do
+not. They render mrc_imagegen's fixed layouts — a kicker, two headline lines, a
+theme, the brand's typeface and palette — so the prompt is **copy to be set**,
+not a scene to imagine. Ask one of them for "a cat on a roof" and you get those
+words in the brand's typography.
+
+That is also why they carry no fallback. A diffusion model standing in for a
+branded header returns something that is not the brand at all, and a caller who
+asked for the brand would rather see an error than a stranger's design.
+
+For exact control send JSON in the prompt — `kicker`, `head1`, `head2`,
+`theme`, `brand`, `palette`, `design` — which is what a caller that already
+wrote its copy should do. Plain text is split across the two headline lines and
+clipped to what the canvas holds; that is a convenience, not composition. When
+the copy matters, get it from the `mrc-imagegen-writer` agent (one chat call,
+usually one the caller is already making) and pass the result through.
+
 ### Never let a stored index cross vector widths
 
 `nabu-embed`'s chain crosses widths on purpose (1536 → 768 → 1024). That is fine

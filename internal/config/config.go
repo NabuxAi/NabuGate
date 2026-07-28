@@ -263,6 +263,10 @@ func (c *Config) BuildAdapters() (map[string]provider.Adapter, []string) {
 			adapters[name] = provider.NewGeminiAdapter(name, p.BaseURL, apiKey)
 		case "pexels":
 			adapters[name] = provider.NewPexelsAdapter(name, p.BaseURL, apiKey)
+		case "imagegen":
+			// mrc_imagegen: a template renderer, not a diffusion model. See the
+			// adapter for how a prompt maps onto its fields.
+			adapters[name] = provider.NewImagegenAdapter(name, p.BaseURL, apiKey)
 		default:
 			warnings = append(warnings, fmt.Sprintf("provider %q has unknown type %q", name, p.Type))
 		}
