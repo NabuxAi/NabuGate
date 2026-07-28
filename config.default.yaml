@@ -300,6 +300,22 @@ providers:
     base_url: "https://api.pexels.com/v1"
     api_key_env: "PEXELS_API_KEY"
 
+  # mrc_imagegen — branded graphics, not a diffusion model.
+  #
+  # It renders a fixed canvas from a kicker, two headline lines, a theme and a
+  # palette: the same card, story and header layouts the studio produces. A
+  # prompt here is copy to be laid out, not a scene to imagine — ask it for "a
+  # cat on a roof" and you get those words set in the brand's typeface. That is
+  # why its aliases are separate from nabu-image rather than a fallback for it.
+  #
+  # Send JSON in the prompt for exact control of the fields; plain text is split
+  # across the two headline lines. Skipped while MRC_IMAGEGEN_KEY is unset.
+  imagegen:
+    enabled: true
+    type: imagegen
+    base_url: "${MRC_IMAGEGEN_URL}"
+    api_key_env: "MRC_IMAGEGEN_KEY"
+
   ollama:
     enabled: true
     type: openai
@@ -634,6 +650,30 @@ images:
     primary:
       provider: pexels
       model: "search"
+
+  # Branded graphics from mrc_imagegen. Three aliases rather than one because
+  # the canvas is chosen by the model name, and these are three different
+  # shapes: 1600x900 for an article header, 1080x1350 for a feed card,
+  # 1080x1920 for a story.
+  #
+  # No fallback on any of them. A diffusion model standing in for these would
+  # return something that is not the brand — wrong typeface, wrong palette, no
+  # logo — and a caller asking for a branded header would rather get an error
+  # than a plausible-looking stranger's design.
+  nabu-header:
+    primary:
+      provider: imagegen
+      model: "header"
+
+  nabu-card:
+    primary:
+      provider: imagegen
+      model: "card"
+
+  nabu-story:
+    primary:
+      provider: imagegen
+      model: "story"
 
 audio:
   nabu-voice:
