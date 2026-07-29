@@ -1,0 +1,12 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "nabugate"
+version = "1.0.0"
+description = "Official Python SDK for NabuGate AI & Voice Gateway"
+readme = "README.md"
+authors = [{ name = "NabuX Team", email = "support@nabuxai.com" }]
+license = "MIT"
+dependencies = ["requests>=2.28.0"]

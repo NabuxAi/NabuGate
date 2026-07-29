@@ -64,6 +64,30 @@ func (r *Registry) Add(a Agent) error {
 	return nil
 }
 
+// Set adds or replaces an agent (upsert). Unlike Add it does not fail on a
+// duplicate name — it overwrites — so console-managed agents can be created and
+// edited at runtime. It still validates name and model.
+func (r *Registry) Set(a Agent) error {
+	name := strings.TrimSpace(a.Name)
+	if name == "" {
+		return fmt.Errorf("agent has an empty name")
+	}
+	if strings.TrimSpace(a.Model) == "" {
+		return fmt.Errorf("agent %q has no model", name)
+	}
+	a.Name = name
+	r.byName[name] = a
+	return nil
+}
+
+// Remove deletes an agent by name. Removing an unknown name is a no-op.
+func (r *Registry) Remove(name string) {
+	if r == nil {
+		return
+	}
+	delete(r.byName, strings.TrimSpace(name))
+}
+
 // Lookup returns the agent registered under name. It is safe to call on a nil
 // registry (returns not-found), so callers need not special-case the no-agents
 // deployment.

@@ -1,0 +1,20 @@
+{
+  "name": "@nabugate/sdk",
+  "version": "1.0.0",
+  "description": "Official Node.js & TypeScript SDK for NabuGate AI & Voice Gateway",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc"
+  },
+  "keywords": [
+    "nabugate",
+    "ai",
+    "openai",
+    "llm",
+    "voice",
+    "elevenlabs"
+  ],
+  "author": "NabuX Team",
+  "license": "MIT"
+}

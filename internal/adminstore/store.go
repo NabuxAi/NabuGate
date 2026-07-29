@@ -86,9 +86,24 @@ type Counters struct {
 	Denied           int64   `json:"denied"`
 }
 
+// AgentRecord is a console-managed sub-agent, persisted so it survives a
+// restart. Agents declared in config/YAML are separate and not stored here; the
+// server merges both into the live registry at startup.
+type AgentRecord struct {
+	Name        string    `json:"name"`
+	Description string    `json:"description"`
+	Model       string    `json:"model"` // underlying chat alias or "<provider>/<model>"
+	System      string    `json:"system"`
+	Temperature *float64  `json:"temperature,omitempty"`
+	MaxTokens   *int      `json:"max_tokens,omitempty"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at,omitempty"`
+}
+
 type state struct {
 	Admins   []Admin              `json:"admins"`
 	Tokens   []Token              `json:"tokens"`
+	Agents   []AgentRecord        `json:"agents"`
 	Usage    map[string]Counters  `json:"usage"`
 	Sessions map[string]time.Time `json:"sessions"` // token hash -> expiry
 }
@@ -211,6 +226,57 @@ func (s *Store) Usernames() []string {
 	}
 	sort.Strings(names)
 	return names
+}
+
+// ─────────────────────────── sub-agents ─────────────────────────────────────
+
+// Agents returns the console-managed sub-agents (a copy, safe to mutate).
+func (s *Store) Agents() []AgentRecord {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	out := make([]AgentRecord, len(s.st.Agents))
+	copy(out, s.st.Agents)
+	return out
+}
+
+// SaveAgent creates or replaces a console-managed agent by name (upsert),
+// preserving the original CreatedAt on edit.
+func (s *Store) SaveAgent(rec AgentRecord) error {
+	rec.Name = strings.TrimSpace(rec.Name)
+	if rec.Name == "" {
+		return errors.New("agent name is required")
+	}
+	if strings.TrimSpace(rec.Model) == "" {
+		return errors.New("agent model is required")
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	now := time.Now().UTC()
+	for i := range s.st.Agents {
+		if s.st.Agents[i].Name == rec.Name {
+			rec.CreatedAt = s.st.Agents[i].CreatedAt
+			rec.UpdatedAt = now
+			s.st.Agents[i] = rec
+			return s.save()
+		}
+	}
+	rec.CreatedAt = now
+	s.st.Agents = append(s.st.Agents, rec)
+	return s.save()
+}
+
+// DeleteAgent removes a console-managed agent by name. Unknown name is a no-op.
+func (s *Store) DeleteAgent(name string) error {
+	name = strings.TrimSpace(name)
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for i := range s.st.Agents {
+		if s.st.Agents[i].Name == name {
+			s.st.Agents = append(s.st.Agents[:i], s.st.Agents[i+1:]...)
+			return s.save()
+		}
+	}
+	return nil
 }
 
 // Authenticate verifies a console login and returns a session token.

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"nabugate/internal/adminstore"
+	"nabugate/internal/provider"
 )
 
 const consoleCookie = "nabugate_console"
@@ -43,6 +44,10 @@ func (s *Server) mountConsoleAPI(mux *http.ServeMux) {
 	mux.Handle("POST /admin/api/admins", s.consoleAuth(s.createAdmin))
 
 	mux.Handle("GET /admin/api/agents", s.consoleAuth(s.listAgents))
+	mux.Handle("POST /admin/api/agents", s.consoleAuth(s.saveAgent))
+	mux.Handle("PATCH /admin/api/agents/{name}", s.consoleAuth(s.saveAgent))
+	mux.Handle("DELETE /admin/api/agents/{name}", s.consoleAuth(s.deleteAgent))
+	mux.Handle("POST /admin/api/agents/{name}/test", s.consoleAuth(s.testAgent))
 }
 
 // consoleAuth gates a console endpoint on a live login session.
@@ -163,23 +168,129 @@ func (s *Server) createAdmin(w http.ResponseWriter, r *http.Request) {
 
 // ─────────────────────────── sub-agents ─────────────────────────────────────
 
-// listAgents surfaces the configured sub-agents (name + description + the
-// underlying alias) so the console can show them instead of a placeholder.
+// listAgents surfaces every sub-agent — baked (config/YAML, read-only) and
+// console-managed (editable) — with the fields the editor needs.
 func (s *Server) listAgents(w http.ResponseWriter, _ *http.Request) {
+	managed := map[string]bool{}
+	if s.admin != nil {
+		for _, rec := range s.admin.Agents() {
+			managed[rec.Name] = true
+		}
+	}
 	type agentInfo struct {
-		Name        string `json:"name"`
-		Description string `json:"description"`
-		Model       string `json:"model"`
+		Name        string   `json:"name"`
+		Description string   `json:"description"`
+		Model       string   `json:"model"`
+		System      string   `json:"system"`
+		Temperature *float64 `json:"temperature,omitempty"`
+		MaxTokens   *int     `json:"max_tokens,omitempty"`
+		Editable    bool     `json:"editable"`
 	}
 	out := make([]agentInfo, 0)
 	if s.agents != nil {
 		for _, name := range s.agents.Names() {
 			if a, ok := s.agents.Lookup(name); ok {
-				out = append(out, agentInfo{Name: a.Name, Description: a.Description, Model: a.Model})
+				out = append(out, agentInfo{
+					Name: a.Name, Description: a.Description, Model: a.Model,
+					System: a.System, Temperature: a.Temperature, MaxTokens: a.MaxTokens,
+					Editable: managed[a.Name],
+				})
 			}
 		}
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"agents": out})
+}
+
+type agentRequest struct {
+	Name        string   `json:"name"`
+	Description string   `json:"description"`
+	Model       string   `json:"model"`
+	System      string   `json:"system"`
+	Temperature *float64 `json:"temperature"`
+	MaxTokens   *int     `json:"max_tokens"`
+}
+
+// saveAgent creates (POST) or updates (PATCH) a console-managed sub-agent and
+// registers it live, so it is callable immediately. Baked agents are read-only;
+// creating one under a baked name shadows it with the managed definition.
+func (s *Server) saveAgent(w http.ResponseWriter, r *http.Request) {
+	var req agentRequest
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<18)).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid JSON body")
+		return
+	}
+	if name := r.PathValue("name"); name != "" {
+		req.Name = name // PATCH takes the name from the path
+	}
+	rec := adminstore.AgentRecord{
+		Name: req.Name, Description: req.Description, Model: req.Model,
+		System: req.System, Temperature: req.Temperature, MaxTokens: req.MaxTokens,
+	}
+	if err := s.admin.SaveAgent(rec); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	s.loadManagedAgents()
+	writeJSON(w, http.StatusOK, map[string]any{"agent": rec})
+}
+
+// deleteAgent removes a console-managed sub-agent. Baked agents cannot be
+// deleted here — edit their YAML in the repo.
+func (s *Server) deleteAgent(w http.ResponseWriter, r *http.Request) {
+	name := r.PathValue("name")
+	managed := false
+	for _, rec := range s.admin.Agents() {
+		if rec.Name == name {
+			managed = true
+			break
+		}
+	}
+	if !managed {
+		writeError(w, http.StatusBadRequest, "this agent is defined in config; edit its YAML in the repo")
+		return
+	}
+	if err := s.admin.DeleteAgent(name); err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if s.agents != nil {
+		s.agents.Remove(name)
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// testAgent runs one message through the agent and returns its reply, so an
+// admin can preview an agent from the console without a gateway token.
+func (s *Server) testAgent(w http.ResponseWriter, r *http.Request) {
+	name := r.PathValue("name")
+	ag, ok := s.agents.Lookup(name)
+	if !ok {
+		writeError(w, http.StatusNotFound, "unknown agent")
+		return
+	}
+	var body struct {
+		Message string `json:"message"`
+	}
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<18)).Decode(&body); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid JSON body")
+		return
+	}
+	if strings.TrimSpace(body.Message) == "" {
+		writeError(w, http.StatusBadRequest, "message is required")
+		return
+	}
+	req := provider.ChatRequest{Messages: []provider.Message{{Role: "user", Content: body.Message}}}
+	applyAgentToChat(ag, &req)
+	result, err := s.router.Chat(r.Context(), ag.Model, req)
+	if err != nil {
+		writeError(w, http.StatusBadGateway, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"content":  result.Response.Content,
+		"provider": result.Provider,
+		"model":    result.Model,
+	})
 }
 
 // ─────────────────────────── tokens ─────────────────────────────────────────

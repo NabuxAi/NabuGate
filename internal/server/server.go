@@ -56,7 +56,30 @@ func (s *Server) SetMemory(m *memory.Store) { s.memory = m }
 
 // SetAdminStore attaches the console state. Separate from New so existing
 // callers and their tests keep compiling.
-func (s *Server) SetAdminStore(st *adminstore.Store) { s.admin = st }
+func (s *Server) SetAdminStore(st *adminstore.Store) {
+	s.admin = st
+	s.loadManagedAgents()
+}
+
+// loadManagedAgents registers the console-created sub-agents into the live
+// registry (upsert, so a console agent wins over a same-named baked one). Called
+// when the admin store is attached and again after every console mutation, so a
+// newly created or edited agent is immediately callable without a restart.
+func (s *Server) loadManagedAgents() {
+	if s.admin == nil || s.agents == nil {
+		return
+	}
+	for _, rec := range s.admin.Agents() {
+		_ = s.agents.Set(agent.Agent{
+			Name:        rec.Name,
+			Description: rec.Description,
+			Model:       rec.Model,
+			System:      rec.System,
+			Temperature: rec.Temperature,
+			MaxTokens:   rec.MaxTokens,
+		})
+	}
+}
 
 // New builds a Server. If the enforcer has no keys, authentication is disabled
 // (dev mode) and a warning is logged by the caller. agents may be nil or empty
