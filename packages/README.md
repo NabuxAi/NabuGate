@@ -26,6 +26,25 @@ these clients must not have.
 
 ## Releasing
 
+Two paths, same result.
+
+**From this machine** — fastest for a first release, uses whatever you are
+already logged into:
+
+```bash
+npm login          # for npm
+cargo login        # for crates.io
+export TWINE_USERNAME=__token__ TWINE_PASSWORD=pypi-...   # for PyPI
+
+./packages/publish.sh              # everything that is ready
+./packages/publish.sh node rust    # or only the named ones
+```
+
+It skips a target whose credentials are missing rather than failing the run, and
+tells you the one command that would fix it.
+
+**From CI** — the durable path once the repository secrets exist.
+
 All six ship at the same version, so a project in any language sees the same
 surface.
 
