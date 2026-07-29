@@ -16,5 +16,9 @@
     "elevenlabs"
   ],
   "author": "NabuX Team",
-  "license": "MIT"
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^26.1.2",
+    "typescript": "^7.0.2"
+  }
 }

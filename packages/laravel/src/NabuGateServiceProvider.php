@@ -25,6 +25,19 @@ class NabuGateServiceProvider extends ServiceProvider
             return new StoryWriter($app->make(NabuGateClient::class));
         });
 
+        $this->app->singleton(\NabuGate\Agent\NabuAgentEngine::class, function ($app) {
+            return new \NabuGate\Agent\NabuAgentEngine($app->make(NabuGateClient::class));
+        });
+
+        $this->app->singleton(\NabuGate\Auth\NabuAuthClient::class, function ($app) {
+            $config = $app['config']->get('nabugate.auth', []);
+            return new \NabuGate\Auth\NabuAuthClient(
+                authUrl: $config['url'] ?? 'https://auth.nabuxai.com',
+                clientId: $config['client_id'] ?? null,
+                clientSecret: $config['client_secret'] ?? null,
+            );
+        });
+
         $this->app->alias(NabuGateClient::class, 'nabugate');
     }
 
