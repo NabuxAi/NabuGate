@@ -1,0 +1,143 @@
+# Publishes the NabuGate SDKs.
+#
+# Triggered by a tag of the form sdk-v1.2.3. Every package is released at the
+# same version, so a project on any language is looking at the same surface.
+#
+# Each language is a separate job on purpose: a registry outage in one must not
+# block the other five, and a re-run can target just the one that failed.
+name: Release SDKs
+
+on:
+  push:
+    tags:
+      - 'sdk-v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to publish, without the sdk-v prefix (e.g. 1.0.1)'
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      value: ${{ steps.resolve.outputs.value }}
+    steps:
+      - id: resolve
+        run: |
+          if [ -n "${{ inputs.version }}" ]; then
+            echo "value=${{ inputs.version }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "value=${GITHUB_REF_NAME#sdk-v}" >> "$GITHUB_OUTPUT"
+          fi
+
+  npm:
+    needs: version
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: packages/node
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          registry-url: 'https://registry.npmjs.org'
+      - run: npm install --no-package-lock
+      - run: npm version "${{ needs.version.outputs.value }}" --no-git-tag-version --allow-same-version
+      - run: npm run build
+      - run: npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+  pypi:
+    needs: version
+    runs-on: ubuntu-latest
+    # PyPI trusted publishing exchanges this token for an upload credential, so
+    # no long-lived API token has to live in repository secrets.
+    permissions:
+      id-token: write
+    defaults:
+      run:
+        working-directory: packages/python
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: |
+          python -m pip install --upgrade build
+          sed -i "s/^version = .*/version = \"${{ needs.version.outputs.value }}\"/" pyproject.toml
+          python -m build
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: packages/python/dist
+
+  crates:
+    needs: version
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: packages/rust
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - run: |
+          sed -i "0,/^version = .*/s//version = \"${{ needs.version.outputs.value }}\"/" Cargo.toml
+          cargo publish --allow-dirty --token "$CARGO_REGISTRY_TOKEN"
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+
+  pub_dev:
+    needs: version
+    runs-on: ubuntu-latest
+    # pub.dev authenticates through GitHub's OIDC provider; the package must
+    # first be configured for automated publishing from this repository.
+    permissions:
+      id-token: write
+    defaults:
+      run:
+        working-directory: packages/dart
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dart-lang/setup-dart@v1
+      - run: |
+          sed -i "s/^version: .*/version: ${{ needs.version.outputs.value }}/" pubspec.yaml
+          dart pub get
+          dart pub publish --force
+
+  # Packagist and the Go module registry both resolve a package from its own
+  # repository root, which a monorepo subdirectory cannot satisfy. These jobs
+  # push read-only mirrors of the two directories, tagged at the same version.
+  mirrors:
+    needs: version
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - directory: packages/laravel
+            repository: nabuxai/nabugate-laravel
+          - directory: packages/go
+            repository: nabuxai/nabugate-go
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Push subtree mirror
+        env:
+          MIRROR_TOKEN: ${{ secrets.MIRROR_TOKEN }}
+          VERSION: ${{ needs.version.outputs.value }}
+        run: |
+          set -euo pipefail
+          git config user.name "nabu-release"
+          git config user.email "support@nabuxai.com"
+          branch=$(git subtree split --prefix="${{ matrix.directory }}")
+          remote="https://x-access-token:${MIRROR_TOKEN}@github.com/${{ matrix.repository }}.git"
+          git push --force "$remote" "$branch:refs/heads/main"
+          # Tag the mirror, not this repo: `go get` and Packagist both read the
+          # version from the mirror's own tags.
+          git tag -f "v${VERSION}" "$branch"
+          git push --force "$remote" "v${VERSION}"

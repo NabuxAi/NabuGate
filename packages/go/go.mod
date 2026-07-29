@@ -1,3 +1,3 @@
-module github.com/nabux-ai/nabugate-go
+module github.com/nabuxai/nabugate-go
 
-go 1.20
+go 1.21

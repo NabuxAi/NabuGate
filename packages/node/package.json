@@ -1,22 +1,46 @@
 {
   "name": "@nabugate/sdk",
   "version": "1.0.0",
-  "description": "Official Node.js & TypeScript SDK for NabuGate AI & Voice Gateway",
+  "description": "Official Node.js and TypeScript SDK for NabuGate, the OpenAI-compatible AI gateway",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
-    "build": "tsc"
+    "build": "tsc",
+    "prepublishOnly": "npm run build"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nabuxai/NabuGate.git",
+    "directory": "packages/node"
+  },
+  "homepage": "https://github.com/nabuxai/NabuGate/tree/main/packages/node#readme",
+  "bugs": {
+    "url": "https://github.com/nabuxai/NabuGate/issues"
   },
   "keywords": [
     "nabugate",
     "ai",
-    "openai",
     "llm",
-    "voice",
-    "elevenlabs"
+    "openai",
+    "anthropic",
+    "gemini",
+    "gateway",
+    "embeddings",
+    "text-to-speech"
   ],
-  "author": "NabuX Team",
+  "author": "NabuX Team <support@nabuxai.com>",
   "license": "MIT",
+  "engines": {
+    "node": ">=18"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "devDependencies": {
     "@types/node": "^26.1.2",
     "typescript": "^7.0.2"

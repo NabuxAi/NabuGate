@@ -35,6 +35,7 @@ class NabuGateServiceProvider extends ServiceProvider
                 authUrl: $config['url'] ?? 'https://auth.nabuxai.com',
                 clientId: $config['client_id'] ?? null,
                 clientSecret: $config['client_secret'] ?? null,
+                redirectUri: $config['redirect_uri'] ?? null,
             );
         });
 

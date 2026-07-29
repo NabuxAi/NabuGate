@@ -11,3 +11,18 @@ config.yaml
 
 # macOS
 .DS_Store
+
+# SDK build output and local tool state. Each package is built from source at
+# publish time, so committing artefacts only creates diff noise.
+packages/node/dist/
+packages/node/node_modules/
+packages/dart/.dart_tool/
+packages/dart/pubspec.lock
+packages/rust/target/
+packages/rust/Cargo.lock
+packages/python/dist/
+packages/python/*.egg-info/
+packages/laravel/vendor/
+packages/laravel/composer.lock
+packages/python/**/__pycache__/
+packages/rust/examples/
