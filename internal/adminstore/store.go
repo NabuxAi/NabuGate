@@ -324,6 +324,26 @@ func (s *Store) Authenticate(username, password string) (string, time.Time, erro
 	return token, expiry, s.save()
 }
 
+// NewSession issues a console session without a password check.
+//
+// Used by the single sign-on callback, where NabuAuth has already established
+// who the person is and the caller has already checked they are allowed in.
+// Nothing here re-authorises: keep that decision at the call site.
+func (s *Store) NewSession() (string, time.Time, error) {
+	raw := make([]byte, 32)
+	if _, err := rand.Read(raw); err != nil {
+		return "", time.Time{}, err
+	}
+	token := base64.RawURLEncoding.EncodeToString(raw)
+	expiry := time.Now().Add(SessionTTL)
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.purgeExpiredLocked()
+	s.st.Sessions[hashString(token)] = expiry
+	return token, expiry, s.save()
+}
+
 // ValidSession reports whether a console session token is live.
 func (s *Store) ValidSession(token string) bool {
 	if token == "" {

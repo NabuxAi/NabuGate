@@ -31,6 +31,13 @@ func (s *Server) mountConsoleAPI(mux *http.ServeMux) {
 	mux.HandleFunc("POST /admin/api/login", s.consoleLogin)
 	mux.HandleFunc("POST /admin/api/logout", s.consoleLogout)
 
+	// Single sign-on with a Nabu account, restricted to an explicit admin
+	// allow-list. Browser redirects rather than JSON: the browser is handed to
+	// NabuAuth and comes back with a code.
+	mux.HandleFunc("GET /admin/api/nabu/status", s.consoleNabuStatus)
+	mux.HandleFunc("GET /admin/api/nabu", s.consoleNabuStart)
+	mux.HandleFunc("GET /admin/api/nabu/callback", s.consoleNabuCallback)
+
 	mux.Handle("GET /admin/api/tokens", s.consoleAuth(s.listTokens))
 	mux.Handle("POST /admin/api/tokens", s.consoleAuth(s.createToken))
 	mux.Handle("DELETE /admin/api/tokens/{name}", s.consoleAuth(s.deleteToken))
