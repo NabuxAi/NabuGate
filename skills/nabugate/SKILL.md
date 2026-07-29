@@ -12,8 +12,8 @@ agent, and the gateway picks the provider, handles fallback, holds the secrets,
 enforces per-app quota and records real cost.
 
 - Repo: `NabuxAi/NabuGate` — Go 1.24, stdlib + `gopkg.in/yaml.v3` only
-- Production: `https://nabugate.nabuxai.com/v1`
-- Console: `https://nabugate.nabuxai.com/admin/`
+- Production: `https://gate.nabuxai.com/v1`
+- Console: `https://gate.nabuxai.com/admin/`
 
 ## The one rule
 
@@ -35,7 +35,7 @@ handed over the whole gateway.
 4. In the project:
 
 ```bash
-NABUGATE_BASE_URL=https://nabugate.nabuxai.com/v1
+NABUGATE_BASE_URL=https://gate.nabuxai.com/v1
 NABUGATE_API_KEY=<the secret>
 ```
 
@@ -205,7 +205,7 @@ head of a user-facing alias.
 
 ## The console
 
-`https://nabugate.nabuxai.com/admin/`
+`https://gate.nabuxai.com/admin/`
 
 Username and password. The first account is created through a setup form that
 refuses forever after — so **create it immediately** on a fresh gateway; until
