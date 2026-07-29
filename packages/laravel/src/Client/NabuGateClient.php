@@ -37,4 +37,17 @@ class NabuGateClient
         $json = $this->chat($messages, $model, $temperature);
         return trim((string) data_get($json, 'choices.0.message.content', ''));
     }
+
+    public function stream(array $messages, callable $onChunk, ?string $model = null, float $temperature = 0.7): void
+    {
+        Http::withToken($this->apiKey)
+            ->timeout(120)
+            ->withOptions(['stream' => true])
+            ->post(rtrim($this->baseUrl, '/') . '/chat/completions', [
+                'model' => $model ?? $this->defaultModel,
+                'messages' => $messages,
+                'temperature' => $temperature,
+                'stream' => true,
+            ]);
+    }
 }
