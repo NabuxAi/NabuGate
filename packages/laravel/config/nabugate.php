@@ -12,7 +12,7 @@ return [
         'client_id' => env('NABUAUTH_CLIENT_ID'),
         'client_secret' => env('NABUAUTH_CLIENT_SECRET'),
         'redirect_uri' => env('NABUAUTH_REDIRECT_URI'),
-        'ecosystem_apps' => ['NabuDesk', 'NabuGen', 'NabuGate', 'NabuVoice', 'NabuBot'],
+        'ecosystem_apps' => ['NabuWrite', 'NabuDesk', 'NabuGen', 'NabuGate', 'NabuVoice', 'NabuBot'],
     ],
 
     'tts' => [
