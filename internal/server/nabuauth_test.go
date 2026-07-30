@@ -140,3 +140,22 @@ func TestLoadNabuAuthConfigNormalisesAdmins(t *testing.T) {
 		t.Fatal("config with id, secret and admins should be enabled")
 	}
 }
+
+func TestConsolePrimaryDefaultsOnAndIsOptOut(t *testing.T) {
+	t.Setenv("NABUAUTH_CLIENT_ID", "nabugate")
+	t.Setenv("NABUAUTH_CLIENT_SECRET", "secret")
+	t.Setenv("NABU_CONSOLE_NABUAUTH_ADMINS", "owner@nabuxai.com")
+
+	// A Nabu account is the way in wherever sign-on is configured, without
+	// needing another variable set to opt in.
+	if cfg := loadNabuAuthConfig(); !cfg.Primary {
+		t.Fatal("single sign-on should lead by default once it is configured")
+	}
+
+	// The password form stays reachable: this console is the tool for fixing a
+	// broken deployment, including one where NabuAuth itself is down.
+	t.Setenv("NABUAUTH_PRIMARY", "0")
+	if cfg := loadNabuAuthConfig(); cfg.Primary {
+		t.Fatal("NABUAUTH_PRIMARY=0 must put the password form back in front")
+	}
+}

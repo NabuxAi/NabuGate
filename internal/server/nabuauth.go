@@ -47,6 +47,11 @@ type nabuAuthConfig struct {
 	Scopes       string
 	// Admins is the set of NabuAuth account emails allowed into the console.
 	Admins map[string]bool
+	// Primary means the console presents a Nabu account as the way in rather
+	// than one option beside the password form. The form stays reachable, since
+	// this console is also the tool for fixing a broken deployment — including
+	// one where NabuAuth itself is down.
+	Primary bool
 }
 
 func loadNabuAuthConfig() nabuAuthConfig {
@@ -63,6 +68,7 @@ func loadNabuAuthConfig() nabuAuthConfig {
 		RedirectURI:  os.Getenv("NABUAUTH_REDIRECT_URI"),
 		Scopes:       envOrDefault("NABUAUTH_SCOPES", "openid profile email"),
 		Admins:       admins,
+		Primary:      os.Getenv("NABUAUTH_PRIMARY") != "0",
 	}
 }
 
@@ -141,9 +147,15 @@ func (c nabuAuthConfig) unpackFlow(value string) (consoleNabuFlow, bool) {
 	return f, true
 }
 
-// consoleNabuStatus tells the console UI whether to offer the button.
+// consoleNabuStatus tells the console UI whether single sign-on exists and
+// whether it leads.
 func (s *Server) consoleNabuStatus(w http.ResponseWriter, _ *http.Request) {
-	writeJSON(w, http.StatusOK, map[string]bool{"enabled": loadNabuAuthConfig().enabled()})
+	cfg := loadNabuAuthConfig()
+	enabled := cfg.enabled()
+	writeJSON(w, http.StatusOK, map[string]bool{
+		"enabled": enabled,
+		"primary": enabled && cfg.Primary,
+	})
 }
 
 // consoleNabuStart sends the browser to NabuAuth.
