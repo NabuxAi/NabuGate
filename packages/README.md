@@ -4,14 +4,20 @@ One client per language, all against the same OpenAI-compatible gateway. Every
 package covers the whole surface: chat, streaming, embeddings, images, speech,
 the model catalogue and usage.
 
-| Language | Package | Registry |
-|---|---|---|
-| Node / TypeScript | `@nabugate/sdk` | npm |
-| Python | `nabugate` | PyPI |
-| Go | `github.com/nabuxai/nabugate-go` | Go modules |
-| Rust | `nabugate` | crates.io |
-| Dart / Flutter | `nabugate_sdk` | pub.dev |
-| PHP / Laravel | `nabux/nabugate-laravel` | Packagist |
+| Language | Package | Registry | Published |
+|---|---|---|---|
+| Node / TypeScript | `@nabugate/sdk` | npm | yes |
+| Rust | `nabugate` | crates.io | yes |
+| Dart / Flutter | `nabugate_sdk` | pub.dev | yes |
+| Go | `github.com/nabuxai/nabugate-go` | Go modules | yes |
+| Python | `nabugate` | PyPI | not yet |
+| PHP / Laravel | `nabux/nabugate-laravel` | Packagist | not yet |
+
+The two outstanding ones are blocked on an account action, not on the code:
+PyPI asks for the account password before it will show the token page, and
+Packagist already has an account under the same email that is not linked to
+GitHub, so it wants a username-and-password sign-in before the GitHub connection
+can be made. Both are one-time.
 
 Each directory has its own README with installation and examples.
 
@@ -62,7 +68,7 @@ The mirrors are generated; never commit to them directly.
 
 | Secret / setting | Where | For |
 |---|---|---|
-| `NPM_TOKEN` | repository secret | npm publish |
+| `NPM_TOKEN` | repository secret | npm publish — must be a **granular** token with *bypass 2FA* enabled, or npm refuses with a 403. The one in use expires 90 days after creation, and npm is restricting this token type from January 2027; moving the workflow to Trusted Publishing removes both problems. |
 | `CARGO_REGISTRY_TOKEN` | repository secret | crates.io publish |
 | `MIRROR_TOKEN` | repository secret, `contents: write` on both mirrors | subtree mirrors |
 | PyPI trusted publisher | pypi.org project settings | PyPI, no stored token |
