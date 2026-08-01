@@ -751,6 +751,26 @@ embeddings:
       - provider: gemini
         model: "gemini-embedding-001"
 
+  # Zooey's semantic-memory index — 768 wide.
+  #
+  # Its Qdrant collection is created with `"size": 768` because the code called
+  # Google text-embedding-004 directly before it moved onto the gateway. The
+  # existing vectors stay valid only while every new one is also 768, so this
+  # alias must never change width.
+  #
+  # text-embedding-004 is natively 768. gemini-embedding-001 emits any requested
+  # width, so the fallback is same-width ONLY because Zooey sends
+  # `dimensions: 768` on every request and verifies the returned length before
+  # inserting. Drop that and this rung starts writing 3072-wide vectors into a
+  # 768 collection.
+  zooey-embed:
+    primary:
+      provider: gemini
+      model: "text-embedding-004"
+    fallback:
+      - provider: gemini
+        model: "gemini-embedding-001"
+
   # NabuWrite's Style RAG index.
   #
   # No fallback, deliberately. NabuWrite stores these vectors in a fixed-width
