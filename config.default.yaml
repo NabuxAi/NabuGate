@@ -758,18 +758,29 @@ embeddings:
   # existing vectors stay valid only while every new one is also 768, so this
   # alias must never change width.
   #
-  # text-embedding-004 is natively 768. gemini-embedding-001 emits any requested
-  # width, so the fallback is same-width ONLY because Zooey sends
-  # `dimensions: 768` on every request and verifies the returned length before
-  # inserting. Drop that and this rung starts writing 3072-wide vectors into a
-  # 768 collection.
+  # No fallback, deliberately — and note this is the one place the
+  # cross-vendor-fallback rule does NOT apply.
+  #
+  # That rule is about availability: two models behind one key share an outage,
+  # so a chat alias must end on a different vendor. For a STORED index the
+  # binding constraint is different and stricter. Zooey's existing vectors were
+  # produced by text-embedding-004. Any other model writes into a different
+  # semantic space, so a fallback would keep the width valid while quietly
+  # making half the corpus unsearchable against the other half — no failed
+  # insert, no error, just retrieval that slowly stops working.
+  #
+  # Matching the width is necessary and not sufficient: same width, different
+  # model is still a split corpus. write-embed reaches the same conclusion.
+  #
+  # A failed embed is a retryable error. A wrong-model vector is a corrupt index
+  # that nothing detects.
+  #
+  # Zooey still sends `dimensions: 768` on every request and verifies the
+  # returned length before inserting, as a second line of defence.
   zooey-embed:
     primary:
       provider: gemini
       model: "text-embedding-004"
-    fallback:
-      - provider: gemini
-        model: "gemini-embedding-001"
 
   # NabuWrite's Style RAG index.
   #
