@@ -3,10 +3,13 @@ package server
 
 import (
 	"context"
+	"encoding/base64"
+	"encoding/binary"
 	"encoding/json"
 	"fmt"
 	"io/fs"
 	"log/slog"
+	"math"
 	"net/http"
 	"strconv"
 	"strings"
@@ -702,6 +705,34 @@ type embeddingRequestBody struct {
 	Model      string          `json:"model"`
 	Input      json.RawMessage `json:"input"`
 	Dimensions *int            `json:"dimensions,omitempty"`
+	// EncodingFormat is "float" or "base64", as in OpenAI's API.
+	//
+	// It has to be honoured rather than ignored, because the official OpenAI
+	// SDK asks for base64 by DEFAULT — so most callers send it without ever
+	// choosing to. A client that asks for base64 and receives a JSON array
+	// decodes that array as packed float32 bytes and ends up with a vector a
+	// quarter of the expected length: 384 floats where 1536 were promised.
+	// Nothing errors. The vector store then rejects the write, or worse
+	// accepts it, and the whole retrieval pipeline is quietly wrong.
+	EncodingFormat string `json:"encoding_format,omitempty"`
+}
+
+// encodeEmbedding renders one vector in the format the caller asked for.
+//
+// base64 is little-endian float32, which is what OpenAI returns and therefore
+// what every client that decodes base64 expects.
+// The gateway carries vectors as float64; OpenAI's base64 encoding is packed
+// float32, so the narrowing happens here rather than in the caller. It costs
+// precision no embedding model actually provides.
+func encodeEmbedding(vec []float64, format string) any {
+	if format != "base64" {
+		return vec
+	}
+	buf := make([]byte, 4*len(vec))
+	for i, v := range vec {
+		binary.LittleEndian.PutUint32(buf[i*4:], math.Float32bits(float32(v)))
+	}
+	return base64.StdEncoding.EncodeToString(buf)
 }
 
 func (s *Server) handleEmbeddings(w http.ResponseWriter, r *http.Request) {
@@ -729,6 +760,15 @@ func (s *Server) handleEmbeddings(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "field 'input' must not be empty")
 		return
 	}
+	// Refuse a format we cannot produce rather than silently sending floats to
+	// someone waiting for base64 — that failure is invisible until a vector
+	// store rejects the write, far from here.
+	switch body.EncodingFormat {
+	case "", "float", "base64":
+	default:
+		writeError(w, http.StatusBadRequest, "field 'encoding_format' must be 'float' or 'base64'")
+		return
+	}
 	if !s.aliasAllowed(w, r, body.Model) {
 		return
 	}
@@ -749,7 +789,11 @@ func (s *Server) handleEmbeddings(w http.ResponseWriter, r *http.Request) {
 
 	data := make([]map[string]any, 0, len(result.Embeddings))
 	for i, vec := range result.Embeddings {
-		data = append(data, map[string]any{"object": "embedding", "index": i, "embedding": vec})
+		data = append(data, map[string]any{
+			"object":    "embedding",
+			"index":     i,
+			"embedding": encodeEmbedding(vec, body.EncodingFormat),
+		})
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
 		"object":         "list",

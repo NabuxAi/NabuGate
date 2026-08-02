@@ -37,6 +37,45 @@ both key-choice failure modes, and `X-Forwarded-For` parsing.
 - **First-run setup cannot be replayed.** `consoleSetup` refuses once an admin exists.
 - **`go vet` clean, all 8 test packages pass.**
 
+## Fixed 2026-08-02 — `encoding_format` was dropped, silently
+
+`/v1/embeddings` decoded the request into a typed struct that had no
+`encoding_format` field, so the parameter was discarded, and every response was
+a JSON array of floats.
+
+That is not cosmetic. **The official OpenAI SDK sends `encoding_format: "base64"`
+by default**, so most callers ask for it without ever choosing to — and a client
+that asks for base64 decodes whatever comes back as packed little-endian
+float32. Given a JSON array it produces a vector a quarter of the promised
+length: 384 floats where 1536 were expected. Nothing raises. The vector store
+then refuses the write, the ingest reports success, and the datastore stays
+empty.
+
+Found while proving NabuChat's retrieval pipeline: its embeddings came back at
+384 dimensions and the upsert wrote nothing, with no error anywhere.
+
+The handler now accepts the field, encodes base64 as little-endian float32
+(narrowing from the float64 the gateway carries — a precision no embedding model
+actually provides), leaves `float` and an omitted value exactly as they were,
+and returns 400 for anything else rather than quietly sending floats to a caller
+waiting on base64.
+
+Proven end to end against a running gateway, not just in unit tests:
+
+```
+encoding_format: base64   → string, decodes to 1536 floats
+encoding_format: float    → array of 1536 floats
+omitted                   → array of 1536 floats   (unchanged behaviour)
+encoding_format: hex      → HTTP 400
+```
+
+and then NabuChat's own `QdrantManager` driven through this gateway: three
+chunks embedded, upserted into real Qdrant, searched, ranked correctly, removed.
+
+Covered by `internal/server/embed_encoding_test.go` — five cases, all asserting
+the *decoded* vector rather than the shape of the string, because length is what
+breaks a vector store.
+
 ## Remaining work
 
 1. **Throttle state is per-process.** Fine for the current single-container deployment;
