@@ -32,6 +32,11 @@ services:
       # http://ollama:11434/v1. Left empty, the ollama provider is skipped.
       - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-}
       - PARSPACK_API_KEY=${PARSPACK_API_KEY}
+      # Whisper — the self-hosted `whisper` service below. Keyless, like
+      # Ollama: set the OpenAI-compatible base URL to enable it, blank it to
+      # skip. Transcription has no keyed vendor otherwise (Parspack lists the
+      # models but its /audio/transcriptions answers 500, measured directly).
+      - WHISPER_BASE_URL=${WHISPER_BASE_URL:-http://whisper:8000/v1}
       # 9Router — the self-hosted `ninerouter` service below. Points the 9router
       # provider (and its "9router/*" passthrough) at it over the internal Docker
       # network. Blank it to disable, or override with a tunnel URL if 9Router
@@ -94,8 +99,42 @@ services:
       - ninerouter-data:/app/data
     restart: unless-stopped
 
+  # Whisper — self-hosted speech-to-text behind the gateway's
+  # `transcription:` aliases. OpenAI-wire compatible, so it needs no adapter of
+  # its own: the gateway talks to it exactly as it talks to a hosted vendor.
+  #
+  # Why self-hosted rather than a vendor: no keyed provider serves transcription
+  # here today. It also puts one instance behind the gateway instead of one
+  # Whisper per application — which is what this replaced.
+  #
+  # `base` is deliberate. On a shared CPU box the large models turn a
+  # sixty-second clip into minutes of full-core work; base keeps a queue moving
+  # and is capped below so it cannot starve everything else on the host.
+  whisper:
+    image: fedirz/faster-whisper-server:latest-cpu
+    environment:
+      - WHISPER__MODEL=${WHISPER_MODEL:-Systran/faster-whisper-base}
+      - WHISPER__INFERENCE_DEVICE=cpu
+      - WHISPER__COMPUTE_TYPE=int8
+      # Unload an idle model rather than holding a GB resident between calls.
+      - WHISPER__TTL=300
+      - ENABLE_UI=false
+    expose:
+      - "8000"
+    volumes:
+      # The model downloads once; without this every redeploy re-fetches it.
+      - whisper-models:/root/.cache/huggingface
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 2G
+    restart: unless-stopped
+
 volumes:
   nabugate-state:
     name: nabugate-state
   ninerouter-data:
     name: ninerouter-data
+  whisper-models:
+    name: whisper-models

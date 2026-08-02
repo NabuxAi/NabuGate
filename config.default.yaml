@@ -340,6 +340,14 @@ providers:
     base_url: "${MRC_IMAGEGEN_URL}"
     api_key_env: "MRC_IMAGEGEN_KEY"
 
+  # Self-hosted Whisper (see docker-compose.yml). Keyless, like Ollama: it is
+  # enabled purely by having a base_url, and skipped when WHISPER_BASE_URL is
+  # blank.
+  whisper:
+    enabled: true
+    type: openai
+    base_url: "${WHISPER_BASE_URL}"
+
   ollama:
     enabled: true
     type: openai
@@ -747,11 +755,17 @@ transcription:
   # so one rung is not a fallback chain. The rungs below it are other vendors
   # entirely; each stays inert until its key env is set, which costs nothing.
   nabu-transcribe:
+    # The self-hosted engine leads because it is the only one that actually
+    # serves transcription here: Parspack lists whisper-1 and gpt-4o-transcribe
+    # in /models but its /audio/transcriptions answers 500 (and 502 HTML for the
+    # gpt-4o one) — verified by calling Parspack directly, not through here.
+    # The rungs below stay in place so the day a vendor works, it just works.
     primary:
-      provider: parspack
-      model: "openai/whisper-1"
+      provider: whisper
+      model: "Systran/faster-whisper-base"
     fallback:
-      # Same vendor, different model: covers a single model going dark.
+      - provider: parspack
+        model: "openai/whisper-1"
       - provider: parspack
         model: "openai/gpt-4o-transcribe"
       # Genuinely different vendors, so one outage cannot take the chain with
@@ -772,8 +786,8 @@ transcription:
       provider: groq
       model: "whisper-large-v3-turbo"
     fallback:
-      - provider: parspack
-        model: "openai/whisper-1"
+      - provider: whisper
+        model: "Systran/faster-whisper-base"
 
 embeddings:
   # General-purpose embedding alias. The fallback chain deliberately crosses
