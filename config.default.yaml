@@ -550,13 +550,25 @@ models:
       - model: gpt-oss-20b
 
 
+  # Both rungs of the previous chain were dead, so the alias returned 502 for
+  # every request — including plain text:
+  #   - `openai/gpt-4o` was a PINNED coordinate and OPENAI_API_KEY is empty, so
+  #     the router skipped it ("provider unavailable") instead of reaching the
+  #     same model on a provider that is keyed.
+  #   - `gemini-1.5-pro` has been retired; Google answers 404 for it.
+  #
+  # Naming `gpt-4o` through the registry is the fix for the first: the router
+  # expands it across every provider serving that model and skips the unkeyed
+  # ones, which is how nabu-smart survives the same empty OPENAI_API_KEY.
+  #
+  # The Gemini rung is checked against ListModels rather than assumed — that is
+  # what made the old one rot silently.
   nabu-vision:
     primary:
-      provider: openai
-      model: "gpt-4o"
+      model: gpt-4o
     fallback:
       - provider: gemini
-        model: "gemini-1.5-pro"
+        model: "gemini-2.5-flash"
 
   nabu-minimax:
     primary:
