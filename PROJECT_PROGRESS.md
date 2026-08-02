@@ -100,3 +100,66 @@ go test ./internal/server/ -run Throttle -v
 
 Nothing is blocked. Provider keys in `config.yaml` and an admin-store path are deployment
 configuration, already documented in `config.example.yaml`.
+
+---
+
+## 2026-08-02 — six consumers were dialling a host that is not there
+
+Three services were found separately today with `NABUGATE_BASE_URL` pointing at
+`nabugate.nabuxai.com`. That is not the gateway. It answers **503**;
+`gate.nabuxai.com` answers 401 without a key — alive and asking for one.
+
+Since the same fault kept appearing, every stored environment variable across
+all Coolify applications was swept for hostnames, and each distinct external
+host was probed. 77 hosts; the dead ones that an application actually dials:
+
+| service | variable | was |
+|---|---|---|
+| NabuChat | `NABUGATE_BASE_URL` | `nabugate.nabuxai.com/v1` |
+| NabuDesk | `NABUGATE_BASE_URL` | `nabugate.nabuxai.com/v1` |
+| dadebaran.ir | `NABUGATE_URL` | `nabugate.nabuxai.com` |
+| mrc_imagegen | `NABUGATE_HOST` | `nabugate.nabuxai.com` |
+| internship | `LLM_BASE_URL` | `nabugate.nabuxai.com/v1` |
+| bootcamp | `LLM_BASE_URL` | `nabugate.nabuxai.com/v1` |
+
+All six corrected. **dadebaran.ir is a live public product** whose model picker
+is this gateway's catalogue — its key lists 135 models and it had been posting
+every request to a dead host. mrc_imagegen's key lists 489.
+
+Two of the six were wrong in the **repository**, not only in the stored value —
+`mrc_imagegen` (Dockerfile and compose default) and `internship` (both compose
+files, `.env.example`, and a test that asserted the dead address, which is how
+it survived: the suite agreed with the bug). Those are fixed in code. The other
+four were stored values overriding correct defaults, invisible from the code.
+
+Verified after redeploying: each container now holds the corrected value, and
+dadebaran fetches the model list from inside its own container.
+
+### What this says about the failure mode
+
+A stored environment variable silently overriding a correct default produces a
+service that is healthy, logs nothing useful, and does none of its work. It
+cannot be found by reading the repository, because the repository is right. The
+sweep took minutes and found four more instances of a fault that had been found
+three times by accident.
+
+Worth repeating whenever a host is renamed: probe every stored value, not the
+code.
+
+## Needs you
+
+**Two bots have no LLM credential at all.** Both now point at the right gateway
+and can still call nothing, because both `LLM_API_KEY` and `ANTHROPIC_API_KEY`
+are empty:
+
+- **bootcamp** (`bootcamp.nabuxai.com`) is configured with `AI_MODEL=nabu-smart`,
+  so it is plainly meant to use this gateway. It needs a project key. Minting one
+  is a one-line change here, but whether that bot should be running at all is
+  your call, not something to decide by giving it credentials.
+- **internship** (`internship.nabuxai.com`) is configured with
+  `AI_MODEL=claude-opus-4-8` against Anthropic directly. That needs your
+  Anthropic key — or point `AI_MODEL` at a `nabu-*` alias and give it a gateway
+  key instead, which is the arrangement everything else here uses.
+
+Both are Telegram bots with no web surface, so a 404 on their domain is correct
+and not a fault. Both containers are healthy.
