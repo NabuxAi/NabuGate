@@ -117,11 +117,22 @@ func (s *Server) consoleLogin(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) startConsoleSession(w http.ResponseWriter, r *http.Request, user, pass string) {
+	// Guessing this password is what gets an attacker the whole gateway, so the
+	// endpoint is rate-limited per username and source address. See throttle.go.
+	key := loginKey(user, r)
+	if s.logins.blocked(key) {
+		writeError(w, http.StatusTooManyRequests, "too many failed sign-in attempts; try again later")
+		return
+	}
+
 	token, expiry, err := s.admin.Authenticate(user, pass)
 	if err != nil {
+		s.logins.fail(key)
+		s.log.Warn("console sign-in failed", "username", user, "ip", clientIP(r))
 		writeError(w, http.StatusUnauthorized, "invalid username or password")
 		return
 	}
+	s.logins.reset(key)
 
 	http.SetCookie(w, &http.Cookie{
 		Name:  consoleCookie,

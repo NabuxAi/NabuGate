@@ -49,6 +49,9 @@ type Server struct {
 	// memory is the conversation store. nil disables the feature entirely and
 	// every request behaves exactly as it did before.
 	memory *memory.Store
+
+	// logins rate-limits console sign-in attempts. See throttle.go.
+	logins *throttle
 }
 
 // SetMemory attaches the conversation store.
@@ -85,7 +88,7 @@ func (s *Server) loadManagedAgents() {
 // (dev mode) and a warning is logged by the caller. agents may be nil or empty
 // when no sub-agents are configured.
 func New(r *router.Router, enforcer *policy.Enforcer, tracker *usage.Tracker, agents *agent.Registry, log *slog.Logger) *Server {
-	return &Server{router: r, policy: enforcer, usage: tracker, agents: agents, log: log}
+	return &Server{router: r, policy: enforcer, usage: tracker, agents: agents, log: log, logins: newThrottle()}
 }
 
 // WithPhotos enables the stock-photo proxy (GET /v1/photos/search). A nil

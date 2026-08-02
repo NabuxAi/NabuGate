@@ -56,6 +56,18 @@ server:
       allow: ["nabu-*", "chat-*"]
       rate_limit: 240
 
+    # Zooey. zooey-* covers zooey-embed, the 768-wide alias its Qdrant
+    # collection is pinned to. No passthrough glob: Zooey names portable
+    # aliases only, so a pinned provider coordinate would be a bug on its side,
+    # not something to permit here.
+    #
+    # Higher ceiling than the other CRMs because a single inbound lead message
+    # can fan out to several calls — qualification, scoring, and a reply.
+    - key: "${ZOOEY_KEY}"
+      project: "zooey"
+      allow: ["nabu-*", "zooey-*"]
+      rate_limit: 300
+
     - key: "${DADEBARAN_KEY}"
       project: "dadebaran"
       allow: ["nabu-*", "parspack/*", "avalai/*", "gapgpt/*", "gpt-*", "o1", "o3", "o3-mini", "o4-mini", "deepseek-*", "kimi-*", "minimax-*", "glm-*"]
