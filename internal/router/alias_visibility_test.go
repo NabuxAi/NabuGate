@@ -91,3 +91,20 @@ func TestEveryAliasHiddenWhenNoProviderIsConfigured(t *testing.T) {
 		t.Errorf("expected no aliases advertised, got %v", ids(got))
 	}
 }
+
+func TestAliasWithoutAnExplicitProviderStaysListed(t *testing.T) {
+	// A rung with no provider names a model-registry entry that the router
+	// expands across serving providers at resolve time — it is not a missing
+	// provider. nabu-fast, nabu-smart and nabu-cheap are all this shape, and the
+	// first version of this filter hid all three.
+	r := routerWith(
+		map[string]provider.Adapter{"live": nil},
+		map[string]config.ModelRoute{
+			"registry-backed": {Primary: config.Target{Model: "gpt-4o-mini"}},
+		},
+	)
+
+	if _, ok := ids(r.AliasInfos())["registry-backed"]; !ok {
+		t.Error("an alias resolved through the model registry must stay listed")
+	}
+}

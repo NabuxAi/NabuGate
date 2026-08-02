@@ -519,8 +519,18 @@ type AliasInfo struct {
 // AliasInfos returns every configured alias across all capabilities.
 // firstReachableProvider returns the provider that would serve this route today
 // — the first rung whose adapter exists — and whether any rung does at all.
+//
+// A rung with an EMPTY provider is not a missing provider: per config.Target,
+// it names an entry in the model registry that the router expands into one
+// target per serving provider at resolve time. Whether any of those is
+// available cannot be answered here, so such a rung counts as reachable and the
+// alias stays listed. Treating it as unavailable hid nabu-fast, nabu-smart and
+// nabu-cheap — three aliases that work — the first time this filter shipped.
 func (r *Router) firstReachableProvider(route config.ModelRoute) (string, bool) {
 	for _, t := range append([]config.Target{route.Primary}, route.Fallback...) {
+		if t.Provider == "" {
+			return "", true
+		}
 		if _, ok := r.adapters[t.Provider]; ok {
 			return t.Provider, true
 		}
