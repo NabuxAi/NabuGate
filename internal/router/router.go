@@ -238,12 +238,12 @@ func (r *Router) Chat(ctx context.Context, alias string, req provider.ChatReques
 	if !ok {
 		return Result{}, fmt.Errorf("unknown model alias %q", alias)
 	}
-	var lastErr error
+	var failures targetErrors
 
 	for i, t := range targets {
 		adapter, ok := r.adapters[t.Provider]
 		if !ok {
-			lastErr = fmt.Errorf("provider %q not available", t.Provider)
+			failures.add(t.Provider, t.Model, fmt.Errorf("provider not available (is its API key set?)"))
 			r.log.Warn("skip target", "alias", alias, "provider", t.Provider, "model", t.Model, "reason", "provider unavailable")
 			continue
 		}
@@ -262,7 +262,7 @@ func (r *Router) Chat(ctx context.Context, alias string, req provider.ChatReques
 			"latency_ms", latency.Milliseconds(),
 		}
 		if err != nil {
-			lastErr = err
+			failures.add(t.Provider, t.Model, err)
 			r.log.Warn("upstream failed", append(attrs, "error", err.Error())...)
 			continue
 		}
@@ -277,7 +277,7 @@ func (r *Router) Chat(ctx context.Context, alias string, req provider.ChatReques
 		return Result{Alias: alias, Provider: t.Provider, Model: t.Model, Response: resp}, nil
 	}
 
-	return Result{}, fmt.Errorf("all targets failed for alias %q: %w", alias, lastErr)
+	return Result{}, failures.err("model", alias)
 }
 
 // StreamResult is the outcome of a (possibly partial) streaming completion.
@@ -297,17 +297,17 @@ func (r *Router) ChatStream(ctx context.Context, alias string, req provider.Chat
 	if !ok {
 		return StreamResult{}, fmt.Errorf("unknown model alias %q", alias)
 	}
-	var lastErr error
+	var failures targetErrors
 
 	for i, t := range targets {
 		adapter, ok := r.adapters[t.Provider]
 		if !ok {
-			lastErr = fmt.Errorf("provider %q not available", t.Provider)
+			failures.add(t.Provider, t.Model, fmt.Errorf("provider not available (is its API key set?)"))
 			continue
 		}
 		streamer, ok := adapter.(provider.StreamAdapter)
 		if !ok {
-			lastErr = fmt.Errorf("provider %q does not support streaming", t.Provider)
+			failures.add(t.Provider, t.Model, fmt.Errorf("provider does not support streaming"))
 			r.log.Warn("skip stream target", "alias", alias, "provider", t.Provider, "reason", "no stream support")
 			continue
 		}
@@ -323,7 +323,7 @@ func (r *Router) ChatStream(ctx context.Context, alias string, req provider.Chat
 		})
 		attrs := []any{"capability", "chat-stream", "alias", alias, "provider", t.Provider, "model", t.Model, "attempt", i + 1, "latency_ms", time.Since(start).Milliseconds()}
 		if err != nil {
-			lastErr = err
+			failures.add(t.Provider, t.Model, err)
 			r.log.Warn("upstream failed", append(attrs, "error", err.Error(), "started", started)...)
 			if started {
 				// Cannot fall back once the client has received bytes.
@@ -338,7 +338,7 @@ func (r *Router) ChatStream(ctx context.Context, alias string, req provider.Chat
 		// remaining targets are never tried. Nothing reached the client yet —
 		// that is what `started` guarantees — so falling back is safe.
 		if !started {
-			lastErr = fmt.Errorf("%s: stream produced no content", t.Provider)
+			failures.add(t.Provider, t.Model, fmt.Errorf("stream produced no content"))
 			r.log.Warn("upstream produced an empty stream", attrs...)
 			continue
 		}
@@ -346,7 +346,7 @@ func (r *Router) ChatStream(ctx context.Context, alias string, req provider.Chat
 		r.log.Info("upstream ok", append(attrs, "total_tokens", usage.TotalTokens)...)
 		return StreamResult{Provider: t.Provider, Model: t.Model, Usage: usage}, nil
 	}
-	return StreamResult{}, fmt.Errorf("all targets failed for alias %q: %w", alias, lastErr)
+	return StreamResult{}, failures.err("model", alias)
 }
 
 // ImageResult is the outcome of a successful image generation.
@@ -364,17 +364,17 @@ func (r *Router) Image(ctx context.Context, alias string, req provider.ImageRequ
 		return ImageResult{}, fmt.Errorf("unknown image alias %q", alias)
 	}
 	targets := append([]config.Target{route.Primary}, route.Fallback...)
-	var lastErr error
+	var failures targetErrors
 
 	for i, t := range targets {
 		adapter, ok := r.adapters[t.Provider]
 		if !ok {
-			lastErr = fmt.Errorf("provider %q not available", t.Provider)
+			failures.add(t.Provider, t.Model, fmt.Errorf("provider not available (is its API key set?)"))
 			continue
 		}
 		imgAdapter, ok := adapter.(provider.ImageAdapter)
 		if !ok {
-			lastErr = fmt.Errorf("provider %q does not support images", t.Provider)
+			failures.add(t.Provider, t.Model, fmt.Errorf("provider does not support images"))
 			r.log.Warn("skip image target", "alias", alias, "provider", t.Provider, "reason", "no image support")
 			continue
 		}
@@ -384,14 +384,14 @@ func (r *Router) Image(ctx context.Context, alias string, req provider.ImageRequ
 		resp, err := imgAdapter.Image(ctx, req)
 		attrs := []any{"capability", "image", "alias", alias, "provider", t.Provider, "model", t.Model, "attempt", i + 1, "latency_ms", time.Since(start).Milliseconds()}
 		if err != nil {
-			lastErr = err
+			failures.add(t.Provider, t.Model, err)
 			r.log.Warn("upstream failed", append(attrs, "error", err.Error())...)
 			continue
 		}
 		r.log.Info("upstream ok", append(attrs, "images", len(resp.Images))...)
 		return ImageResult{Alias: alias, Provider: t.Provider, Model: t.Model, Images: resp.Images}, nil
 	}
-	return ImageResult{}, fmt.Errorf("all targets failed for image alias %q: %w", alias, lastErr)
+	return ImageResult{}, failures.err("image", alias)
 }
 
 // SpeechResult is the outcome of a successful speech synthesis.
@@ -410,17 +410,17 @@ func (r *Router) Speech(ctx context.Context, alias string, req provider.SpeechRe
 		return SpeechResult{}, fmt.Errorf("unknown audio alias %q", alias)
 	}
 	targets := append([]config.Target{route.Primary}, route.Fallback...)
-	var lastErr error
+	var failures targetErrors
 
 	for i, t := range targets {
 		adapter, ok := r.adapters[t.Provider]
 		if !ok {
-			lastErr = fmt.Errorf("provider %q not available", t.Provider)
+			failures.add(t.Provider, t.Model, fmt.Errorf("provider not available (is its API key set?)"))
 			continue
 		}
 		spAdapter, ok := adapter.(provider.SpeechAdapter)
 		if !ok {
-			lastErr = fmt.Errorf("provider %q does not support speech", t.Provider)
+			failures.add(t.Provider, t.Model, fmt.Errorf("provider does not support speech"))
 			r.log.Warn("skip audio target", "alias", alias, "provider", t.Provider, "reason", "no speech support")
 			continue
 		}
@@ -430,14 +430,14 @@ func (r *Router) Speech(ctx context.Context, alias string, req provider.SpeechRe
 		resp, err := spAdapter.Speech(ctx, req)
 		attrs := []any{"capability", "speech", "alias", alias, "provider", t.Provider, "model", t.Model, "attempt", i + 1, "latency_ms", time.Since(start).Milliseconds()}
 		if err != nil {
-			lastErr = err
+			failures.add(t.Provider, t.Model, err)
 			r.log.Warn("upstream failed", append(attrs, "error", err.Error())...)
 			continue
 		}
 		r.log.Info("upstream ok", append(attrs, "bytes", len(resp.Audio))...)
 		return SpeechResult{Alias: alias, Provider: t.Provider, Model: t.Model, Audio: resp.Audio, ContentType: resp.ContentType}, nil
 	}
-	return SpeechResult{}, fmt.Errorf("all targets failed for audio alias %q: %w", alias, lastErr)
+	return SpeechResult{}, failures.err("audio", alias)
 }
 
 // targetErrors accumulates why each rung of a fallback chain failed.
@@ -644,16 +644,16 @@ func (r *Router) Responses(ctx context.Context, model string, body map[string]js
 	if !ok {
 		return nil, "", "", fmt.Errorf("unknown model alias %q", model)
 	}
-	var lastErr error
+	var failures targetErrors
 	for _, t := range targets {
 		adapter, ok := r.adapters[t.Provider]
 		if !ok {
-			lastErr = fmt.Errorf("provider %q not available", t.Provider)
+			failures.add(t.Provider, t.Model, fmt.Errorf("provider not available (is its API key set?)"))
 			continue
 		}
 		responder, ok := adapter.(provider.ResponsesAdapter)
 		if !ok {
-			lastErr = fmt.Errorf("provider %q does not support the Responses API", t.Provider)
+			failures.add(t.Provider, t.Model, fmt.Errorf("provider does not support the Responses API"))
 			r.log.Warn("skip responses target", "model", model, "provider", t.Provider, "reason", "no responses support")
 			continue
 		}
@@ -667,14 +667,14 @@ func (r *Router) Responses(ctx context.Context, model string, body map[string]js
 		resp, err := responder.Responses(ctx, raw)
 		attrs := []any{"capability", "responses", "model", model, "provider", t.Provider, "upstream_model", t.Model, "latency_ms", time.Since(start).Milliseconds()}
 		if err != nil {
-			lastErr = err
+			failures.add(t.Provider, t.Model, err)
 			r.log.Warn("upstream failed", append(attrs, "error", err.Error())...)
 			continue
 		}
 		r.log.Info("upstream ok", append(attrs, "status", resp.StatusCode)...)
 		return resp, t.Provider, t.Model, nil
 	}
-	return nil, "", "", fmt.Errorf("all targets failed for %q: %w", model, lastErr)
+	return nil, "", "", failures.err("model", model)
 }
 
 // ProviderNames returns the providers that actually came up, sorted. A provider
@@ -718,17 +718,17 @@ func (r *Router) Transcribe(ctx context.Context, alias string, req provider.Tran
 		return TranscribeResult{}, fmt.Errorf("unknown transcription alias %q", alias)
 	}
 	targets := append([]config.Target{route.Primary}, route.Fallback...)
-	var lastErr error
+	var failures targetErrors
 
 	for i, t := range targets {
 		adapter, ok := r.adapters[t.Provider]
 		if !ok {
-			lastErr = fmt.Errorf("provider %q not available", t.Provider)
+			failures.add(t.Provider, t.Model, fmt.Errorf("provider not available (is its API key set?)"))
 			continue
 		}
 		trAdapter, ok := adapter.(provider.TranscriptionAdapter)
 		if !ok {
-			lastErr = fmt.Errorf("provider %q does not support transcription", t.Provider)
+			failures.add(t.Provider, t.Model, fmt.Errorf("provider does not support transcription"))
 			r.log.Warn("skip transcription target", "alias", alias, "provider", t.Provider, "reason", "no transcription support")
 			continue
 		}
@@ -738,7 +738,7 @@ func (r *Router) Transcribe(ctx context.Context, alias string, req provider.Tran
 		resp, err := trAdapter.Transcribe(ctx, req)
 		attrs := []any{"capability", "transcription", "alias", alias, "provider", t.Provider, "model", t.Model, "attempt", i + 1, "latency_ms", time.Since(start).Milliseconds()}
 		if err != nil {
-			lastErr = err
+			failures.add(t.Provider, t.Model, err)
 			r.log.Warn("upstream failed", append(attrs, "error", err.Error())...)
 			continue
 		}
@@ -749,5 +749,5 @@ func (r *Router) Transcribe(ctx context.Context, alias string, req provider.Tran
 			Segments: resp.Segments, Usage: resp.Usage,
 		}, nil
 	}
-	return TranscribeResult{}, fmt.Errorf("all targets failed for transcription alias %q: %w", alias, lastErr)
+	return TranscribeResult{}, failures.err("transcription", alias)
 }
