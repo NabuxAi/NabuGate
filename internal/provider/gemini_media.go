@@ -106,13 +106,45 @@ func (a *GeminiAdapter) Image(ctx context.Context, req ImageRequest) (ImageRespo
 	return out, nil
 }
 
+// openAIToGeminiVoice maps the OpenAI voice names to their nearest Gemini
+// equivalent. Without it the Gemini rung of an audio alias is dead on arrival:
+// a caller speaking OpenAI's wire protocol sends "alloy", Gemini answers 400
+// with its own list, and the fallback that looks configured has never once been
+// able to serve the request it exists to catch.
+//
+// The pairings are by character (bright, deep, light), not by any promise of
+// the same voice — no two vendors have that. A name Gemini already knows is
+// passed through untouched, so a caller who deliberately asked for "Puck"
+// still gets Puck.
+var openAIToGeminiVoice = map[string]string{
+	"alloy":   "Kore",         // neutral, the default on both sides
+	"ash":     "Enceladus",    // soft, breathy
+	"ballad":  "Vindemiatrix", // measured, narrative
+	"coral":   "Sulafat",      // warm
+	"echo":    "Charon",       // even, informative
+	"fable":   "Puck",         // expressive
+	"onyx":    "Orus",         // deep
+	"nova":    "Aoede",        // bright
+	"sage":    "Rasalgethi",   // considered
+	"shimmer": "Leda",         // light
+	"verse":   "Algieba",      // smooth
+}
+
+func geminiVoice(v string) string {
+	v = strings.TrimSpace(v)
+	if v == "" {
+		return "Kore"
+	}
+	if mapped, ok := openAIToGeminiVoice[strings.ToLower(v)]; ok {
+		return mapped
+	}
+	return v
+}
+
 // Speech implements SpeechAdapter. Gemini returns raw PCM (signed 16-bit LE);
 // we wrap it in a WAV container so the gateway always returns a playable file.
 func (a *GeminiAdapter) Speech(ctx context.Context, req SpeechRequest) (SpeechResponse, error) {
-	voice := req.Voice
-	if voice == "" {
-		voice = "Kore"
-	}
+	voice := geminiVoice(req.Voice)
 	body := map[string]any{
 		"contents": []any{map[string]any{"parts": []any{map[string]any{"text": req.Input}}}},
 		"generationConfig": map[string]any{
