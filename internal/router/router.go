@@ -440,6 +440,28 @@ func (r *Router) Speech(ctx context.Context, alias string, req provider.SpeechRe
 	return SpeechResult{}, fmt.Errorf("all targets failed for audio alias %q: %w", alias, lastErr)
 }
 
+// targetErrors accumulates why each rung of a fallback chain failed.
+//
+// The loops below used to keep only the last error, so a chain whose FIRST rung
+// failed for the interesting reason — no API key, a retired model name —
+// reported whatever the last rung happened to say instead. Debugging
+// "all targets failed … provider \"cloudflare\" not available" tells you nothing
+// about the primary that actually broke.
+type targetErrors []string
+
+func (t *targetErrors) add(provider, model string, err error) {
+	*t = append(*t, fmt.Sprintf("%s/%s: %v", provider, model, err))
+}
+
+// err renders the whole chain, or nil when nothing was recorded.
+func (t targetErrors) err(kind, alias string) error {
+	if len(t) == 0 {
+		return fmt.Errorf("all targets failed for %s alias %q: no targets configured", kind, alias)
+	}
+
+	return fmt.Errorf("all targets failed for %s alias %q: %s", kind, alias, strings.Join(t, "; "))
+}
+
 // EmbedResult is the outcome of a successful embedding call.
 type EmbedResult struct {
 	Alias      string
@@ -456,17 +478,19 @@ func (r *Router) Embed(ctx context.Context, alias string, req provider.Embedding
 		return EmbedResult{}, fmt.Errorf("unknown embedding alias %q", alias)
 	}
 	targets := append([]config.Target{route.Primary}, route.Fallback...)
-	var lastErr error
+	var failures targetErrors
 
 	for i, t := range targets {
 		adapter, ok := r.adapters[t.Provider]
 		if !ok {
-			lastErr = fmt.Errorf("provider %q not available", t.Provider)
+			// Almost always an unset API key: a provider whose key is missing is
+			// skipped at start-up, so it never reaches the adapter map.
+			failures.add(t.Provider, t.Model, fmt.Errorf("provider not available (is its API key set?)"))
 			continue
 		}
 		embAdapter, ok := adapter.(provider.EmbeddingAdapter)
 		if !ok {
-			lastErr = fmt.Errorf("provider %q does not support embeddings", t.Provider)
+			failures.add(t.Provider, t.Model, fmt.Errorf("provider does not support embeddings"))
 			r.log.Warn("skip embedding target", "alias", alias, "provider", t.Provider, "reason", "no embedding support")
 			continue
 		}
@@ -476,14 +500,14 @@ func (r *Router) Embed(ctx context.Context, alias string, req provider.Embedding
 		resp, err := embAdapter.Embed(ctx, req)
 		attrs := []any{"capability", "embedding", "alias", alias, "provider", t.Provider, "model", t.Model, "attempt", i + 1, "latency_ms", time.Since(start).Milliseconds()}
 		if err != nil {
-			lastErr = err
+			failures.add(t.Provider, t.Model, err)
 			r.log.Warn("upstream failed", append(attrs, "error", err.Error())...)
 			continue
 		}
 		r.log.Info("upstream ok", append(attrs, "vectors", len(resp.Embeddings), "total_tokens", resp.Usage.TotalTokens)...)
 		return EmbedResult{Alias: alias, Provider: t.Provider, Model: t.Model, Embeddings: resp.Embeddings, Usage: resp.Usage}, nil
 	}
-	return EmbedResult{}, fmt.Errorf("all targets failed for embedding alias %q: %w", alias, lastErr)
+	return EmbedResult{}, failures.err("embedding", alias)
 }
 
 // AliasInfo describes one public alias and the provider that primarily serves it.

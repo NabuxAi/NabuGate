@@ -798,8 +798,15 @@ embeddings:
       provider: openai
       model: "text-embedding-3-small"
     fallback:
+      # gemini-embedding-001, not text-embedding-004. Google retired the latter
+      # and now answers 404 for it — verified against the live API. This file
+      # already said so a few aliases down; this rung had simply not been
+      # updated with the others, so the only reachable target in the whole chain
+      # was a dead model name. With openai's key unset and cloudflare
+      # unconfigured, that left the alias advertised on /v1/models and failing
+      # every request.
       - provider: gemini
-        model: "text-embedding-004"
+        model: "gemini-embedding-001"
       - provider: cloudflare
         model: "@cf/baai/bge-large-en-v1.5"
 
