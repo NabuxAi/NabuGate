@@ -762,7 +762,7 @@ transcription:
     # The rungs below stay in place so the day a vendor works, it just works.
     primary:
       provider: whisper
-      model: "Systran/faster-whisper-large-v3-turbo"
+      model: "mobiuslabsgmbh/faster-whisper-large-v3-turbo"
     fallback:
       - provider: parspack
         model: "openai/whisper-1"
@@ -787,7 +787,7 @@ transcription:
       model: "whisper-large-v3-turbo"
     fallback:
       - provider: whisper
-        model: "Systran/faster-whisper-large-v3-turbo"
+        model: "mobiuslabsgmbh/faster-whisper-large-v3-turbo"
 
 embeddings:
   # General-purpose embedding alias. The fallback chain deliberately crosses

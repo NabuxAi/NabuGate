@@ -107,6 +107,11 @@ services:
   # here today. It also puts one instance behind the gateway instead of one
   # Whisper per application — which is what this replaced.
   #
+  # The repo is mobiuslabsgmbh's, not Systran's — Systran publishes large-v3 but
+  # not the turbo conversion, and asking the hub for a repo that does not exist
+  # comes back as "Invalid username or password", which reads like an auth
+  # problem rather than a typo.
+  #
   # large-v3-turbo: the current best accuracy-per-second Whisper. Turbo is a
   # distilled decoder — roughly the accuracy of large-v3 at a fraction of the
   # work — which is what makes a large model viable on CPU at all. int8 keeps
@@ -117,7 +122,7 @@ services:
   whisper:
     image: fedirz/faster-whisper-server:latest-cpu
     environment:
-      - WHISPER__MODEL=${WHISPER_MODEL:-Systran/faster-whisper-large-v3-turbo}
+      - WHISPER__MODEL=${WHISPER_MODEL:-mobiuslabsgmbh/faster-whisper-large-v3-turbo}
       - WHISPER__INFERENCE_DEVICE=cpu
       - WHISPER__COMPUTE_TYPE=int8
       # Unload an idle model rather than holding a GB resident between calls.
