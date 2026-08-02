@@ -33,7 +33,7 @@ func (a namedAdapter) Chat(context.Context, provider.ChatRequest) (provider.Chat
 func registryRouter(t *testing.T, adapters map[string]provider.Adapter, models map[string]config.ModelRoute) *Router {
 	t.Helper()
 	// Passthrough must be enabled for the pinned-coordinate cases.
-	r := New(adapters, models, nil, nil, nil,
+	r := New(adapters, models, nil, nil, nil, nil,
 		map[string][]string{"parspack": nil, "avalai": nil, "gapgpt": nil},
 		discardLogger())
 	r.SetRegistry(map[string]config.ModelEntry{

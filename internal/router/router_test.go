@@ -41,7 +41,7 @@ func TestRouterFallback(t *testing.T) {
 			Fallback: []config.Target{{Provider: "backup", Model: "m2"}},
 		},
 	}
-	r := New(adapters, models, nil, nil, nil, nil, discardLogger())
+	r := New(adapters, models, nil, nil, nil, nil, nil, discardLogger())
 
 	res, err := r.Chat(context.Background(), "nabu-fast", provider.ChatRequest{})
 	if err != nil {
@@ -55,7 +55,7 @@ func TestRouterFallback(t *testing.T) {
 // TestRouterUnknownAlias verifies an unknown alias is an error (mapped to 400 by
 // the server).
 func TestRouterUnknownAlias(t *testing.T) {
-	r := New(map[string]provider.Adapter{}, map[string]config.ModelRoute{}, nil, nil, nil, nil, discardLogger())
+	r := New(map[string]provider.Adapter{}, map[string]config.ModelRoute{}, nil, nil, nil, nil, nil, discardLogger())
 	if _, err := r.Chat(context.Background(), "nope", provider.ChatRequest{}); err == nil {
 		t.Fatal("expected error for unknown alias")
 	}
@@ -69,7 +69,7 @@ func TestRouterAllTargetsFail(t *testing.T) {
 	models := map[string]config.ModelRoute{
 		"nabu-fast": {Primary: config.Target{Provider: "a", Model: "m"}},
 	}
-	r := New(adapters, models, nil, nil, nil, nil, discardLogger())
+	r := New(adapters, models, nil, nil, nil, nil, nil, discardLogger())
 	if _, err := r.Chat(context.Background(), "nabu-fast", provider.ChatRequest{}); err == nil {
 		t.Fatal("expected error when all targets fail")
 	}
@@ -99,7 +99,7 @@ func TestRouterPassthroughRouting(t *testing.T) {
 	adapters := map[string]provider.Adapter{
 		"parspack": fakeAdapter{name: "parspack", resp: provider.ChatResponse{Content: "hi"}},
 	}
-	r := New(adapters, map[string]config.ModelRoute{}, nil, nil, nil,
+	r := New(adapters, map[string]config.ModelRoute{}, nil, nil, nil, nil,
 		map[string][]string{"parspack": nil}, discardLogger())
 
 	res, err := r.Chat(context.Background(), "parspack/openai/gpt-5.5", provider.ChatRequest{})
@@ -117,7 +117,7 @@ func TestRouterPassthroughDisabled(t *testing.T) {
 	adapters := map[string]provider.Adapter{
 		"parspack": fakeAdapter{name: "parspack"},
 	}
-	r := New(adapters, map[string]config.ModelRoute{}, nil, nil, nil, nil, discardLogger())
+	r := New(adapters, map[string]config.ModelRoute{}, nil, nil, nil, nil, nil, discardLogger())
 	if _, err := r.Chat(context.Background(), "parspack/openai/gpt-5.5", provider.ChatRequest{}); err == nil {
 		t.Fatal("expected unknown-alias error when passthrough is disabled")
 	}
@@ -128,7 +128,7 @@ func TestRouterPassthroughDisabled(t *testing.T) {
 func TestRouterCatalogModels(t *testing.T) {
 	l := &listerAdapter{name: "parspack", models: []string{"openai/gpt-5.5", "google/gemini-2.5-flash"}}
 	adapters := map[string]provider.Adapter{"parspack": l}
-	r := New(adapters, map[string]config.ModelRoute{}, nil, nil, nil,
+	r := New(adapters, map[string]config.ModelRoute{}, nil, nil, nil, nil,
 		map[string][]string{"parspack": {"curated/model-x"}}, discardLogger())
 
 	got := r.CatalogModels(context.Background())
@@ -153,7 +153,7 @@ func TestRouterCatalogModels(t *testing.T) {
 func TestRouterCatalogModelsDiscoveryError(t *testing.T) {
 	l := &listerAdapter{name: "parspack", err: errors.New("upstream down")}
 	adapters := map[string]provider.Adapter{"parspack": l}
-	r := New(adapters, map[string]config.ModelRoute{}, nil, nil, nil,
+	r := New(adapters, map[string]config.ModelRoute{}, nil, nil, nil, nil,
 		map[string][]string{"parspack": {"curated/model-x"}}, discardLogger())
 
 	got := r.CatalogModels(context.Background())

@@ -54,7 +54,7 @@ func newTestServer(t *testing.T, upstreamURL string, enforcer *policy.Enforcer, 
 	models := map[string]config.ModelRoute{
 		"nabu-fast": {Primary: config.Target{Provider: "parspack", Model: "openai/gpt-5.5"}},
 	}
-	r := router.New(adapters, models, nil, nil, nil, map[string][]string{"parspack": nil}, discardLogger())
+	r := router.New(adapters, models, nil, nil, nil, nil, map[string][]string{"parspack": nil}, discardLogger())
 	srv := New(r, enforcer, usage.New(nil), agents, discardLogger())
 	return httptest.NewServer(srv.Handler())
 }

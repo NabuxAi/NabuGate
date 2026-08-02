@@ -18,7 +18,7 @@ import (
 func newPhotoTestServer(t *testing.T, client *photos.Client) *Server {
 	t.Helper()
 	log := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError}))
-	r := router.New(nil, nil, nil, nil, nil, nil, log)
+	r := router.New(nil, nil, nil, nil, nil, nil, nil, log)
 	srv := New(r, policy.New(nil, nil), usage.New(nil), agent.NewRegistry(), log)
 	if client != nil {
 		srv.WithPhotos(client)

@@ -114,6 +114,48 @@ type SpeechAdapter interface {
 	Speech(ctx context.Context, req SpeechRequest) (SpeechResponse, error)
 }
 
+// TranscriptionRequest is a provider-agnostic speech-to-text request.
+//
+// The audio travels as bytes rather than a path or a URL because the gateway
+// never touches the caller's filesystem and upstreams take a multipart upload.
+type TranscriptionRequest struct {
+	Model    string
+	Audio    []byte
+	Filename string // upstreams sniff the container from the extension
+	// Language as ISO-639-1. Empty asks the model to detect it, which is the
+	// right default for a caller indexing someone else's archive.
+	Language    string
+	Prompt      string // optional bias: names, jargon, spellings
+	Temperature *float64
+	// Granularities requests timestamps, e.g. ["segment"] or ["word"]. Segment
+	// timestamps are what turns a transcript into a citable source, so a caller
+	// that wants them must be able to ask.
+	Granularities []string
+}
+
+// TranscriptionSegment is one timed slice of speech.
+type TranscriptionSegment struct {
+	ID    int     `json:"id"`
+	Start float64 `json:"start"` // seconds
+	End   float64 `json:"end"`   // seconds
+	Text  string  `json:"text"`
+}
+
+// TranscriptionResponse is the normalized result. Duration and Segments are
+// zero when the upstream returned a plain-text format.
+type TranscriptionResponse struct {
+	Text     string
+	Language string
+	Duration float64
+	Segments []TranscriptionSegment
+	Usage    Usage
+}
+
+// TranscriptionAdapter is implemented by providers that can transcribe audio.
+type TranscriptionAdapter interface {
+	Transcribe(ctx context.Context, req TranscriptionRequest) (TranscriptionResponse, error)
+}
+
 // EmbeddingRequest is a provider-agnostic text embedding request.
 type EmbeddingRequest struct {
 	Model string

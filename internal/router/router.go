@@ -25,12 +25,13 @@ const discoveryTTL = 5 * time.Minute
 // Router holds the live adapters and the alias routing tables (one per
 // capability: chat, images, audio).
 type Router struct {
-	adapters   map[string]provider.Adapter
-	models     map[string]config.ModelRoute
-	images     map[string]config.ModelRoute
-	audio      map[string]config.ModelRoute
-	embeddings map[string]config.ModelRoute
-	log        *slog.Logger
+	adapters      map[string]provider.Adapter
+	models        map[string]config.ModelRoute
+	images        map[string]config.ModelRoute
+	audio         map[string]config.ModelRoute
+	transcription map[string]config.ModelRoute
+	embeddings    map[string]config.ModelRoute
+	log           *slog.Logger
 
 	// passthrough maps a passthrough-enabled provider name to its static model
 	// catalogue. Its presence as a key is what makes "<provider>/<model>" direct
@@ -61,18 +62,19 @@ type catalogEntry struct {
 // New builds a Router. passthrough maps each passthrough-enabled provider to its
 // optional static model catalogue (nil/empty is fine); pass nil to disable
 // passthrough entirely.
-func New(adapters map[string]provider.Adapter, models, images, audio, embeddings map[string]config.ModelRoute, passthrough map[string][]string, log *slog.Logger) *Router {
+func New(adapters map[string]provider.Adapter, models, images, audio, embeddings, transcription map[string]config.ModelRoute, passthrough map[string][]string, log *slog.Logger) *Router {
 	return &Router{
-		adapters:    adapters,
-		models:      models,
-		images:      images,
-		audio:       audio,
-		embeddings:  embeddings,
-		log:         log,
-		passthrough: passthrough,
-		catalog:     make(map[string]catalogEntry),
-		ttl:         discoveryTTL,
-		now:         time.Now,
+		adapters:      adapters,
+		models:        models,
+		images:        images,
+		audio:         audio,
+		embeddings:    embeddings,
+		transcription: transcription,
+		log:           log,
+		passthrough:   passthrough,
+		catalog:       make(map[string]catalogEntry),
+		ttl:           discoveryTTL,
+		now:           time.Now,
 	}
 }
 
@@ -630,4 +632,61 @@ func (r *Router) ProviderNames() []string {
 func (r *Router) IsPassthrough(name string) bool {
 	_, ok := r.passthrough[name]
 	return ok
+}
+
+// TranscribeResult is the outcome of a successful transcription.
+type TranscribeResult struct {
+	Alias    string
+	Provider string
+	Model    string
+	Text     string
+	Language string
+	Duration float64
+	Segments []provider.TranscriptionSegment
+	Usage    provider.Usage
+}
+
+// Transcribe resolves a transcription alias and tries primary then fallbacks.
+//
+// The audio is held in memory across attempts on purpose: a fallback that had
+// to re-read a consumed stream could not retry at all, and re-uploading a few
+// megabytes is the cheap half of this call.
+func (r *Router) Transcribe(ctx context.Context, alias string, req provider.TranscriptionRequest) (TranscribeResult, error) {
+	route, ok := r.transcription[alias]
+	if !ok {
+		return TranscribeResult{}, fmt.Errorf("unknown transcription alias %q", alias)
+	}
+	targets := append([]config.Target{route.Primary}, route.Fallback...)
+	var lastErr error
+
+	for i, t := range targets {
+		adapter, ok := r.adapters[t.Provider]
+		if !ok {
+			lastErr = fmt.Errorf("provider %q not available", t.Provider)
+			continue
+		}
+		trAdapter, ok := adapter.(provider.TranscriptionAdapter)
+		if !ok {
+			lastErr = fmt.Errorf("provider %q does not support transcription", t.Provider)
+			r.log.Warn("skip transcription target", "alias", alias, "provider", t.Provider, "reason", "no transcription support")
+			continue
+		}
+
+		req.Model = t.Model
+		start := time.Now()
+		resp, err := trAdapter.Transcribe(ctx, req)
+		attrs := []any{"capability", "transcription", "alias", alias, "provider", t.Provider, "model", t.Model, "attempt", i + 1, "latency_ms", time.Since(start).Milliseconds()}
+		if err != nil {
+			lastErr = err
+			r.log.Warn("upstream failed", append(attrs, "error", err.Error())...)
+			continue
+		}
+		r.log.Info("upstream ok", append(attrs, "chars", len(resp.Text), "segments", len(resp.Segments), "audio_seconds", resp.Duration)...)
+		return TranscribeResult{
+			Alias: alias, Provider: t.Provider, Model: t.Model,
+			Text: resp.Text, Language: resp.Language, Duration: resp.Duration,
+			Segments: resp.Segments, Usage: resp.Usage,
+		}, nil
+	}
+	return TranscribeResult{}, fmt.Errorf("all targets failed for transcription alias %q: %w", alias, lastErr)
 }

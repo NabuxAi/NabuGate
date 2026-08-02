@@ -52,7 +52,7 @@ func TestChatStreamFallsBackOnEmptyStream(t *testing.T) {
 				Fallback: []config.Target{{Provider: "solid", Model: "m2"}},
 			},
 		},
-		nil, nil, nil, nil, discardLogger(),
+		nil, nil, nil, nil, nil, discardLogger(),
 	)
 
 	var got strings.Builder

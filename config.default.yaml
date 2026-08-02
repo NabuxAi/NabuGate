@@ -728,6 +728,53 @@ audio:
       provider: 9router
       model: "anthropic/claude-3-5-sonnet-20241022"
 
+# ─────────────────────────── speech to text ────────────────────────────────
+#
+# The opposite direction to `audio:` above, and a separate section because the
+# models are different and one alias cannot serve both.
+#
+# Why this belongs in the gateway at all: transcription used to run inside
+# ReelMind as a local Whisper, which meant a CPU-bound model on an application
+# box, no cost accounting, and every future caller re-solving the same problem.
+# Here it is one alias with the same failover, quota and usage tracking as chat.
+transcription:
+  # General-purpose transcription. Multilingual and timestamped: ask for
+  # `timestamp_granularities[]=segment` and the response carries the bounds
+  # that turn a transcript into a citable source.
+  #
+  # Parspack leads because it is the only vendor keyed here today, and it gets
+  # two rungs of its own — its per-model availability moves minute to minute,
+  # so one rung is not a fallback chain. The rungs below it are other vendors
+  # entirely; each stays inert until its key env is set, which costs nothing.
+  nabu-transcribe:
+    primary:
+      provider: parspack
+      model: "openai/whisper-1"
+    fallback:
+      # Same vendor, different model: covers a single model going dark.
+      - provider: parspack
+        model: "openai/gpt-4o-transcribe"
+      # Genuinely different vendors, so one outage cannot take the chain with
+      # it. Groq serves whisper-large-v3-turbo faster and cheaper than anyone.
+      - provider: groq
+        model: "whisper-large-v3-turbo"
+      - provider: avalai
+        model: "whisper-1"
+      - provider: gapgpt
+        model: "whisper-1"
+      - provider: openai
+        model: "whisper-1"
+
+  # Cheapest path, for bulk work where a few percent of accuracy is worth the
+  # price difference. Same shape, fewer rungs.
+  nabu-transcribe-fast:
+    primary:
+      provider: groq
+      model: "whisper-large-v3-turbo"
+    fallback:
+      - provider: parspack
+        model: "openai/whisper-1"
+
 embeddings:
   # General-purpose embedding alias. The fallback chain deliberately crosses
   # vector widths (1536 → 768 → 1024): fine for search performed at query time,

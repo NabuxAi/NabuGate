@@ -26,13 +26,16 @@ const EnvConfigYAML = "NABU_CONFIG_YAML"
 
 // Config is the top-level configuration file structure.
 type Config struct {
-	Server     ServerConfig              `yaml:"server"`
-	Providers  map[string]ProviderConfig `yaml:"providers"`
-	Models     map[string]ModelRoute     `yaml:"models"`     // chat aliases
-	Images     map[string]ModelRoute     `yaml:"images"`     // image-generation aliases
-	Audio      map[string]ModelRoute     `yaml:"audio"`      // text-to-speech aliases
-	Embeddings map[string]ModelRoute     `yaml:"embeddings"` // text-embedding aliases
-	Pricing    map[string]usage.Price    `yaml:"pricing"`    // USD per 1M tokens, keyed by "provider/model"
+	Server    ServerConfig              `yaml:"server"`
+	Providers map[string]ProviderConfig `yaml:"providers"`
+	Models    map[string]ModelRoute     `yaml:"models"` // chat aliases
+	Images    map[string]ModelRoute     `yaml:"images"` // image-generation aliases
+	Audio     map[string]ModelRoute     `yaml:"audio"`  // text-to-speech aliases
+	// Speech-to-text. Separate from Audio because they are opposite directions
+	// with different upstream models, and one alias cannot serve both.
+	Transcription map[string]ModelRoute  `yaml:"transcription"`
+	Embeddings    map[string]ModelRoute  `yaml:"embeddings"` // text-embedding aliases
+	Pricing       map[string]usage.Price `yaml:"pricing"`    // USD per 1M tokens, keyed by "provider/model"
 
 	// Registry maps a logical model name to the providers that can serve it.
 	// A target naming a model with no provider expands through this, so one
