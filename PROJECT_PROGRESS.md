@@ -226,3 +226,70 @@ Consumers that store vectors should use a width-pinned alias — `chat-embed`,
 `desk-embed`, `write-embed`, `zooey-embed` — exactly as they do today. Nothing
 currently points at `nabu-embed`; `NABUCHAT_KEY` merely has it in its allow-list,
 which is why the failure was found at all.
+
+---
+
+## 2026-08-02 (later) — swept every alias the gateway advertises
+
+`nabu-embed` turned out to be advertised and broken, so the same question was
+put to every other alias. Results against the live gateway with the admin key:
+
+**Embeddings — all six healthy.** chat-embed, desk-embed and write-embed serve
+1536 via parspack; gen-embed, zooey-embed and nabu-embed serve via gemini.
+Zooey's contract was checked on both sides and is sound: `EMBED_DIMENSIONS = 768`
+in its source, it sends `dimensions`, the alias honours it, and a guard test ties
+the constant to its Qdrant collection.
+
+**Chat — eight of thirteen failed**, every one with `provider "x" not
+available`: ollama, avalai, gapgpt, arvan, cloudflare, tokenrouter, groq and
+openai have no API key here, so they are skipped at start-up. Skipping is
+deliberate. Advertising the aliases that depended on them was not — and
+**dadebaran presents this catalogue directly as its users' model picker**, so
+those were options a person could pick and could not use.
+
+An alias is now listed only when a rung of its chain can be served. The owner
+reported is the rung that will actually serve it, not the configured primary.
+
+### Two mistakes made getting there
+
+**The first filter hid three working aliases.** nabu-fast, nabu-smart and
+nabu-cheap name a model and no provider — which per `config.Target` means the
+model names a model-registry entry the router expands across serving providers
+at resolve time. The filter read the empty string as "provider missing". An
+empty provider now counts as reachable: what cannot be answered where the
+catalogue is built should not cause a working model to disappear. Caught by
+checking the live catalogue against live requests rather than trusting the
+change.
+
+**The error accumulator was applied to one loop out of six.** Chat still
+reported only its last rung, which is how this whole thread started. All six
+paths — chat, streaming, images, audio, Responses and transcription — now report
+every rung.
+
+### What the fixed error immediately revealed
+
+```
+all targets failed for model alias "nabu-kimi":
+  dahl/moonshotai/Kimi-K2.6: dahl: invalid response (status 403):
+  <!DOCTYPE html>… <title>Just a moment...</title>
+```
+
+`nabu-kimi` and `nabu-minimax` are not failing for want of a key. The **dahl**
+provider is behind Cloudflare bot protection and answers the gateway with a
+challenge page. The old message blamed `provider "openai" not available` — the
+last rung, and entirely beside the point.
+
+## Needs you
+
+**Decide what to do about dahl.** `inference.dahl.global` returns a Cloudflare
+interstitial to server-to-server requests, so `nabu-kimi` and `nabu-minimax`
+cannot work as configured. Either the account needs an allowlist or a
+non-challenged endpoint from dahl, or those two aliases should be pointed at
+another provider — both models are available through parspack and tokenrouter.
+They remain advertised because a reachable provider exists on paper; only trying
+reveals the challenge page.
+
+**The keyless providers are a choice, not a fault.** ollama, avalai, gapgpt,
+arvan, cloudflare, tokenrouter and groq are all configured and skipped for want
+of a key. Set any of their keys and the corresponding aliases reappear in
+`/v1/models` on the next start with no code change.
