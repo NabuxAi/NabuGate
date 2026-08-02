@@ -293,3 +293,52 @@ reveals the challenge page.
 arvan, cloudflare, tokenrouter and groq are all configured and skipped for want
 of a key. Set any of their keys and the corresponding aliases reappear in
 `/v1/models` on the next start with no code change.
+
+---
+
+## 2026-08-02 (final) — every advertised chat alias now works
+
+`nabu-kimi` and `nabu-minimax` were the last two failing. Their primary is dahl,
+which sits behind Cloudflare bot protection and answers this gateway with a
+challenge page — HTTP 403 and "Just a moment...", not an API error.
+
+Their only fallbacks named a **different model** on a provider with no key:
+`nabu-kimi` fell back to `openai/gpt-4o`, `nabu-minimax` to
+`groq/llama-3.1-70b-versatile`. So an alias named after a model had no rung that
+could serve that model, and its one substitute was unreachable anyway.
+
+Both models are served by **openrouter2**, which is configured and working. That
+rung is now placed ahead of the unrelated-model fallback: an alias named after a
+model should try that model on every vendor that has it before answering as
+something else. dahl stays primary, so fixing its access later needs no further
+change.
+
+```
+nabu-fast      ok via parspack        nabu-kimi     ok via openrouter2
+nabu-smart     ok via parspack        nabu-minimax  ok via openrouter2
+nabu-cheap     ok via parspack
+nabu-vision    ok via parspack
+nabu-parspack  ok via parspack
+```
+
+**7 of 7 advertised chat aliases work.** With the six embedding aliases already
+verified, every alias this gateway advertises can now be served.
+
+### A correction
+
+The previous entry said Kimi and MiniMax were available through parspack and
+tokenrouter. **That was wrong** — asserted without checking. They are on
+openrouter2. The catalogue was the place to look and I had not looked.
+
+## Needs you
+
+**dahl access, if you want it.** `inference.dahl.global` returns a Cloudflare
+interstitial to server-to-server requests. Either get an allowlist or a
+non-challenged endpoint from them, or leave it: both aliases now serve their
+real model through openrouter2, and dahl resumes taking the traffic
+automatically the moment it starts answering.
+
+**The keyless providers remain a choice.** ollama, avalai, gapgpt, arvan,
+cloudflare, tokenrouter and groq are configured and skipped for want of a key.
+Set any key and its aliases return to `/v1/models` on the next start, with no
+code change.
