@@ -517,11 +517,38 @@ type AliasInfo struct {
 }
 
 // AliasInfos returns every configured alias across all capabilities.
+// firstReachableProvider returns the provider that would serve this route today
+// — the first rung whose adapter exists — and whether any rung does at all.
+func (r *Router) firstReachableProvider(route config.ModelRoute) (string, bool) {
+	for _, t := range append([]config.Target{route.Primary}, route.Fallback...) {
+		if _, ok := r.adapters[t.Provider]; ok {
+			return t.Provider, true
+		}
+	}
+
+	return "", false
+}
+
 func (r *Router) AliasInfos() []AliasInfo {
 	var out []AliasInfo
 	add := func(registry map[string]config.ModelRoute) {
 		for alias, route := range registry {
-			out = append(out, AliasInfo{ID: alias, Owner: route.Primary.Provider})
+			// Only aliases something can actually serve.
+			//
+			// A provider whose API key is unset is skipped at start-up and never
+			// reaches the adapter map, so an alias whose every rung names such a
+			// provider is configuration for a deployment this is not. Listing it
+			// anyway offers callers a model that fails every request — and one
+			// consumer presents this catalogue directly as its users' model
+			// picker, so those become options a person can choose and cannot use.
+			owner, ok := r.firstReachableProvider(route)
+			if !ok {
+				continue
+			}
+			// The provider that will actually serve it, not the configured
+			// primary: when the primary is unavailable and a fallback carries the
+			// traffic, naming the primary describes a route nothing takes.
+			out = append(out, AliasInfo{ID: alias, Owner: owner})
 		}
 	}
 	add(r.models)
