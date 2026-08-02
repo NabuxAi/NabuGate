@@ -342,3 +342,76 @@ automatically the moment it starts answering.
 cloudflare, tokenrouter and groq are configured and skipped for want of a key.
 Set any key and its aliases return to `/v1/models` on the next start, with no
 code change.
+
+## Image and audio: the categories that claim was never checked against
+
+The entry above says "every alias this gateway advertises can now be served."
+That was a chat-and-embedding result stated as a whole-gateway one. Image and
+audio had not been tried, and neither category worked.
+
+### Three branded image aliases pointed at a service that was already running
+
+`nabu-card`, `nabu-header` and `nabu-story` route to the `imagegen` provider,
+which is `mrc_imagegen` — deployed, healthy, and answering at
+`imagen-api.nabuxai.com` the whole time. The gateway had no `MRC_IMAGEGEN_URL`
+and no `MRC_IMAGEGEN_KEY`, so the provider was skipped at startup and all three
+aliases were hidden from `/v1/models`. `nabu-photo` was hidden the same way for
+want of `PEXELS_API_KEY`.
+
+Both keys existed already, on `mrc_imagegen` itself (`MRC_API_KEY` for inbound
+callers, `PEXELS_KEY`). Nothing was invented: the service authenticates with
+`X-API-Key`, and the key was confirmed against the live endpoint — no key 401,
+that key 200 — before being copied.
+
+### nabu-story had never rendered anything
+
+The gateway maps `nabu-story` to `kind: "story"`, and the renderer's API only
+ever accepted `card`, `header` and `design`. Every call returned 422 from
+pydantic. The canvas the alias promises simply did not exist.
+
+It exists now (`mrc_imagegen@ed19439`): the story is the card at 9:16 rather
+than a second layout, because it is the same brand card and two hand-tuned
+layouts drift apart the first time either is edited. `build()` takes a height,
+the bottom group moves by the full extra height and the content group by half,
+and the 1350 card is unchanged — asserted element by element in the tests.
+
+### The Gemini rung of every audio alias was structurally dead
+
+`nabu-voice` failed twice over: OpenAI has no key, and Gemini answered 400
+`Voice name alloy is not supported`. The gateway speaks OpenAI's wire protocol,
+so every caller sends an OpenAI voice name, and the adapter forwarded it
+verbatim — the fallback could never once serve the request it exists to catch.
+Voice names are now translated, and `nabu-voice` returns a 177 KB WAV from
+Gemini with no OpenAI key at all.
+
+### nabu-9router was a chat alias filed under audio
+
+It targeted `anthropic/claude-3-5-sonnet-20241022` from the `audio:` section,
+so `/v1/audio/speech` asked a text model for speech. Moved to `models:`.
+
+### Verified end to end, not asserted
+
+```
+nabu-card    ok   1,628 KB PNG        nabu-photo   ok    150 KB JPEG
+nabu-header  ok   1,825 KB PNG        nabu-image   ok    150 KB JPEG
+nabu-story   ok   2,251 KB PNG 2160x3840
+nabu-voice   ok     177 KB WAV 24 kHz mono, via the Gemini fallback
+```
+
+**5 of 5 image aliases and the audio alias now work.** Together with 7/7 chat
+and 6/6 embedding, the claim the previous entry made is finally true — with the
+one exception below.
+
+## Needs you
+
+**9Router needs its one-time dashboard setup.** `nabu-9router` fails with 401
+`API key required for remote API access`. The self-hosted service holds its
+provider hookups in the `ninerouter-data` volume and issues its own key from
+its dashboard; nothing here can produce that key. Until it is set, the alias
+fails loudly rather than pretending. The dashboard has no built-in auth and
+holds provider tokens — put Basic Auth or an IP allow-list in front of it in
+Coolify before opening it.
+
+**`nabu-voice` still has no primary.** It works today only because the Gemini
+fallback finally understands the request. Set `OPENAI_API_KEY` if you want
+`gpt-4o-mini-tts` as the primary rung.
