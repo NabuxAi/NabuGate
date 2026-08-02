@@ -859,19 +859,30 @@ embeddings:
   # is created at 1536 and a fallback of another width would corrupt it rather
   # than fail loudly. NabuChat's own code notes the 1536 constraint and then
   # defaults to nabu-embed, which does cross widths — hence this alias.
+  # Single target, and it must stay that way. The previous fallback here
+  # (parspack/text-embedding-3-small -> gemini/gemini-embedding-001) was
+  # justified on the grounds that both rungs are 1536 wide, but width is not the
+  # invariant — the SPACE is. Two 1536-dim models are two different geometries,
+  # and cosine between a vector from one and a vector from the other is noise.
+  #
+  # Measured on identical text through this gateway, Persian question against
+  # English passage: 3-small scores correct pairs 0.189-0.323 and gemini scores
+  # them 0.663-0.691. So a corpus indexed while the primary was up and queried
+  # after it fell over does not degrade — it stops meaning anything, silently,
+  # with every score still looking like a plausible number.
+  #
+  # gemini-embedding-001 is also the only rung of the two that is actually
+  # multilingual, which is what NabuChat needs: its users write Persian
+  # questions about English documents. 3-small put the correct answer at 0.189
+  # and the consumer's threshold at 0.25, rejecting most of what it found.
+  #
+  # There is no same-space fallback to offer, and that is the right outcome for
+  # a STORED index: fail loudly rather than write a second geometry into a
+  # collection nobody will think to suspect.
   chat-embed:
     primary:
-      provider: parspack
-      model: "openai/text-embedding-3-small"
-    fallback:
-      # Same width, which is the whole point. The no-fallback rule existed to
-      # stop a fallback CHANGING the vector width, not to forbid fallback: a
-      # rung that is also 1536 is strictly better than none. gemini-embedding-001
-      # defaults to 3072, so this is only safe because the gateway forwards the
-      # client's `dimensions` and NabuWrite/NabuChat both send 1536 — verified
-      # against this key returning exactly 1536.
-      - provider: gemini
-        model: "gemini-embedding-001"
+      provider: gemini
+      model: "gemini-embedding-001"
 
   # Zooey's semantic-memory index — 768 wide.
   #
