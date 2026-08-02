@@ -692,6 +692,18 @@ models:
       - provider: tokenrouter
         model: "gpt-4o"
 
+  # 9Router-backed alias. 9Router runs its own 3-tier fallback internally, so a
+  # single target is usually enough; the model id must match something its
+  # dashboard actually exposes for a connected provider.
+  #
+  # This is a chat alias. It spent its life under `audio:`, where a request for
+  # speech was routed to a text model that cannot produce any — no key and no
+  # dashboard hookup would have made that succeed.
+  nabu-9router:
+    primary:
+      provider: 9router
+      model: "anthropic/claude-3-5-sonnet-20241022"
+
 images:
   nabu-image:
     primary:
@@ -741,14 +753,6 @@ audio:
     fallback:
       - provider: gemini
         model: "gemini-2.5-flash-preview-tts"
-
-  # 9Router-backed alias. 9Router runs its own 3-tier fallback internally, so a
-  # single target is usually enough; the model id must match something its
-  # dashboard actually exposes for a connected provider.
-  nabu-9router:
-    primary:
-      provider: 9router
-      model: "anthropic/claude-3-5-sonnet-20241022"
 
 # ─────────────────────────── speech to text ────────────────────────────────
 #
