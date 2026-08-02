@@ -68,6 +68,18 @@ server:
       allow: ["nabu-*", "zooey-*"]
       rate_limit: 300
 
+    # ClaudeBridge. Its assistant runs a bounded tool loop against a WordPress
+    # site, so a single question can turn into several completions — hence the
+    # ceiling sits with the CRMs rather than the one-shot writers.
+    #
+    # Chat aliases only. It embeds nothing and stores no vectors, so an
+    # embedding alias here would be scope it cannot use. Skipped automatically
+    # when CLAUDEBRIDGE_KEY is unset.
+    - key: "${CLAUDEBRIDGE_KEY}"
+      project: "claudebridge"
+      allow: ["nabu-*"]
+      rate_limit: 300
+
     - key: "${DADEBARAN_KEY}"
       project: "dadebaran"
       allow: ["nabu-*", "parspack/*", "avalai/*", "gapgpt/*", "gpt-*", "o1", "o3", "o3-mini", "o4-mini", "deepseek-*", "kimi-*", "minimax-*", "glm-*"]
