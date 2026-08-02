@@ -163,3 +163,66 @@ are empty:
 
 Both are Telegram bots with no web surface, so a 404 on their domain is correct
 and not a fault. Both containers are healthy.
+
+---
+
+## 2026-08-02 (later) — an alias that was advertised and failed every call
+
+`nabu-embed` appears on `/v1/models` and answered every request with an error.
+Its whole chain was dead:
+
+| rung | provider | model | why it failed |
+|---|---|---|---|
+| primary | openai | text-embedding-3-small | `OPENAI_API_KEY` empty → provider skipped at start-up |
+| fallback 1 | gemini | **text-embedding-004** | Google retired it — the live API answers **404** |
+| fallback 2 | cloudflare | @cf/baai/bge-large-en-v1.5 | `CLOUDFLARE_API_KEY` unset → skipped |
+
+This file already recorded that retirement a few aliases further down;
+`nabu-embed` had simply not been updated with the others. It now names
+`gemini-embedding-001`, verified against Google's API with this deployment's key
+(200, where `text-embedding-004` gives 404).
+
+Confirmed on the live gateway after deploying:
+
+```
+nabu-embed  → 1536 dims via gemini/gemini-embedding-001
+chat-embed  → unchanged, still parspack
+```
+
+### The error hid the two facts that explained it
+
+The fallback loops kept only the most recent error, so the message read:
+
+```
+all targets failed for embedding alias "nabu-embed": provider "cloudflare" not available
+```
+
+Cloudflare was the **last** rung and the least interesting. The unset key and
+the retired model — the two things that actually explain the failure — were both
+overwritten by it. Diagnosing this meant reading the config, checking three
+provider keys, and calling Google directly.
+
+Every rung's reason is now collected and reported in order, primary first, each
+naming its provider and model. A skipped provider says "is its API key set?",
+because in practice that is always what it means. Four tests pin it.
+
+## Worth knowing — this alias now works, and that activates its width hazard
+
+`nabu-embed` was previously **failing**, which was at least safe. Now that it
+resolves, the deliberate width-crossing in its chain is live:
+
+```
+nabu-embed with    dimensions: 1536  → 1536 dims
+nabu-embed without dimensions        → 3072 dims   (gemini-embedding-001's default)
+```
+
+That is by design for this alias — it is the "any width will do" chain for
+instant, throwaway search. **It must still never be used to build a stored
+index.** A caller that omits `dimensions` gets 3072-wide vectors, and a
+collection pinned to 1536 will either reject the insert or, worse, end up split
+across two incompatible vector spaces with nothing raising an error.
+
+Consumers that store vectors should use a width-pinned alias — `chat-embed`,
+`desk-embed`, `write-embed`, `zooey-embed` — exactly as they do today. Nothing
+currently points at `nabu-embed`; `NABUCHAT_KEY` merely has it in its allow-list,
+which is why the failure was found at all.
