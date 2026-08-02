@@ -809,8 +809,14 @@ transcription:
 
 embeddings:
   # General-purpose embedding alias. The fallback chain deliberately crosses
-  # vector widths (1536 → 768 → 1024): fine for search performed at query time,
-  # wrong for anything that stores the vectors — see write-embed below.
+  # vector widths (1536 → 768 → 1024) AND vector spaces: fine only for a search
+  # that embeds the corpus and the query together in one request, wrong for
+  # anything that stores the vectors — see write-embed below.
+  #
+  # Spaces matter independently of widths, and are the easier of the two to miss
+  # because nothing fails: comparing a vector from one model against a vector
+  # from another of the same width yields a number, and the number is noise.
+  # Any alias backing a persisted index must have exactly one rung.
   nabu-embed:
     primary:
       provider: openai
@@ -831,15 +837,19 @@ embeddings:
   # NabuDesk's knowledge + conversation index, 1536 wide.
   #
   # Its EmbeddingService checks the returned width and logs a mismatch, which is
-  # better than most callers manage — but a warning does not stop the insert, so
-  # the alias still must not change width. Same-width fallback only.
+  # better than most callers manage — and is exactly why the gemini fallback
+  # that used to sit here was so dangerous. A width check passes a 1536-dim
+  # gemini vector without complaint, because the problem is not the width: it is
+  # that the vector belongs to a different space than everything already stored.
+  # A check that can only see width certifies the one failure it cannot see.
+  #
+  # Single rung, so a provider outage fails the embed — retryable — instead of
+  # quietly writing a second geometry into the index. See write-embed below on
+  # why the primary is not moved to the multilingual model yet.
   desk-embed:
     primary:
       provider: parspack
       model: "openai/text-embedding-3-small"
-    fallback:
-      - provider: gemini
-        model: "gemini-embedding-001"
 
   # NabuGen's content memory — 1024 wide, matching the column its schema
   # already declares, so enabling the feature needs no re-index.
@@ -938,14 +948,25 @@ embeddings:
   # Routed through Parspack because it is the provider actually keyed on this
   # deployment, and text-embedding-3-small is natively 1536-wide, so the
   # client's requested `dimensions` and the model's default agree.
+  # The gemini fallback that used to sit here is gone, and the comment above is
+  # the reason: it named the exact hazard — "split the corpus across two
+  # incompatible embedding spaces with no error at all" — and then a later
+  # change added a rung that does precisely that, on the grounds that both are
+  # 1536 wide. Width was never the invariant. Measured through this gateway,
+  # correct pairs score 0.189-0.323 under 3-small and 0.663-0.691 under
+  # gemini-embedding-001: the two do not share a geometry, so a corpus written
+  # partly by each means nothing.
+  #
+  # The primary is left alone rather than moved to the multilingual model, which
+  # would be the better model here too. NabuWrite's index was written by
+  # 3-small, and NabuWrite has no way to notice that its stored vectors came
+  # from a different model — NabuChat only found out because its loader now
+  # hashes the resolved embedding space. Switching this before NabuWrite can
+  # detect it would silently strand its corpus.
   write-embed:
     primary:
       provider: parspack
       model: "openai/text-embedding-3-small"
-    fallback:
-      # Same-width rung; see chat-embed above for why this is safe.
-      - provider: gemini
-        model: "gemini-embedding-001"
 
 # Sub-agents (system prompt + defaults over an alias, addressable as a "model").
 # The Cinematic Scrollytelling squad ships as one YAML file per agent under
