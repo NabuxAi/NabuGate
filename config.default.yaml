@@ -607,6 +607,15 @@ models:
       provider: dahl
       model: "MiniMaxAI/MiniMax-M2.7"
     fallback:
+      # Same model, different vendor. dahl sits behind Cloudflare bot
+      # protection and answers this gateway with a challenge page (HTTP 403,
+      # "Just a moment..."), so the primary cannot serve anyone today. This rung
+      # is verified working. It is placed FIRST because an alias named after a
+      # model should try that model everywhere before giving up on it.
+      - provider: openrouter2
+        model: "minimax/minimax-m2.7"
+      # Last resort, and a different model entirely: something is better than an
+      # error, but only after MiniMax has been tried on every vendor that has it.
       - provider: groq
         model: "llama-3.1-70b-versatile"
 
@@ -615,6 +624,11 @@ models:
       provider: dahl
       model: "moonshotai/Kimi-K2.6"
     fallback:
+      # Same model, different vendor — see nabu-minimax above for why dahl
+      # cannot serve it. Verified working through this gateway.
+      - provider: openrouter2
+        model: "moonshotai/kimi-k2.6"
+      # Last resort, and not Kimi at all.
       - provider: openai
         model: "gpt-4o"
 
