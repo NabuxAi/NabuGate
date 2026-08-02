@@ -777,10 +777,19 @@ embeddings:
 
   # Zooey's semantic-memory index — 768 wide.
   #
-  # Its Qdrant collection is created with `"size": 768` because the code called
-  # Google text-embedding-004 directly before it moved onto the gateway. The
-  # existing vectors stay valid only while every new one is also 768, so this
-  # alias must never change width.
+  # Its Qdrant collection is declared at `"size": 768`, inherited from the
+  # Google text-embedding-004 the code called directly before moving onto the
+  # gateway. text-embedding-004 is NOT the model here: it no longer supports
+  # embedContent on this key and answers 404, the same way gemini-1.5-pro rotted
+  # out of nabu-vision. Probed against ListModels filtered by embedContent —
+  # filtering by generateContent, which is the obvious mistake, lists models
+  # that cannot embed at all.
+  #
+  # Switching models is safe only because nothing has been indexed yet: Zooey's
+  # QDRANT_URL points at a host that does not exist in its stack, so the feature
+  # has never run in production and there is no corpus to split. Once it does
+  # run, this model is fixed — a different one writes into a different semantic
+  # space at the same width, which no error would reveal.
   #
   # No fallback, deliberately — and note this is the one place the
   # cross-vendor-fallback rule does NOT apply.
@@ -801,10 +810,13 @@ embeddings:
   #
   # Zooey still sends `dimensions: 768` on every request and verifies the
   # returned length before inserting, as a second line of defence.
+  # gemini-embedding-001 emits whatever width is asked for and defaults to 3072,
+  # so this is only 768 because Zooey sends `dimensions: 768` on every request
+  # and refuses any response of another length before storing it.
   zooey-embed:
     primary:
       provider: gemini
-      model: "text-embedding-004"
+      model: "gemini-embedding-001"
 
   # NabuWrite's Style RAG index.
   #
