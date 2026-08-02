@@ -107,13 +107,17 @@ services:
   # here today. It also puts one instance behind the gateway instead of one
   # Whisper per application — which is what this replaced.
   #
-  # `base` is deliberate. On a shared CPU box the large models turn a
-  # sixty-second clip into minutes of full-core work; base keeps a queue moving
-  # and is capped below so it cannot starve everything else on the host.
+  # large-v3-turbo: the current best accuracy-per-second Whisper. Turbo is a
+  # distilled decoder — roughly the accuracy of large-v3 at a fraction of the
+  # work — which is what makes a large model viable on CPU at all. int8 keeps
+  # it near 1.5 GB resident.
+  #
+  # Still capped, because a transcription queue must not be able to starve the
+  # ~146 other containers on this host.
   whisper:
     image: fedirz/faster-whisper-server:latest-cpu
     environment:
-      - WHISPER__MODEL=${WHISPER_MODEL:-Systran/faster-whisper-base}
+      - WHISPER__MODEL=${WHISPER_MODEL:-Systran/faster-whisper-large-v3-turbo}
       - WHISPER__INFERENCE_DEVICE=cpu
       - WHISPER__COMPUTE_TYPE=int8
       # Unload an idle model rather than holding a GB resident between calls.
@@ -127,8 +131,8 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "2.0"
-          memory: 2G
+          cpus: "3.0"
+          memory: 3G
     restart: unless-stopped
 
 volumes:
