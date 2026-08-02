@@ -228,6 +228,20 @@ var sharedHTTPClient = &http.Client{
 	Transport: &userAgentTransport{base: http.DefaultTransport},
 }
 
+// transcribeHTTPClient is used for speech-to-text, which is the one capability
+// whose work is measured in minutes rather than seconds. A ten-minute recording
+// on a CPU engine runs well past the shared client's two-minute cap, and the
+// failure looks like an upstream error ("context deadline exceeded while
+// awaiting headers") rather than what it is — our own clock running out while
+// the engine was still working.
+//
+// The upload is bounded by the request context, so this is a safety net for a
+// dead upstream, not a work budget.
+var transcribeHTTPClient = &http.Client{
+	Timeout:   45 * time.Minute,
+	Transport: &userAgentTransport{base: http.DefaultTransport},
+}
+
 // streamHTTPClient is used for SSE streaming. It deliberately has NO
 // whole-request timeout: http.Client.Timeout also covers reading the response
 // body, so a fixed cap would sever a long-running stream mid-generation.

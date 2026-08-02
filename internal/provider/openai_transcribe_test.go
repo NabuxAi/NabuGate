@@ -10,6 +10,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 )
 
 // parseUpload reads what the adapter actually put on the wire.
@@ -205,5 +206,20 @@ func TestNormalizeAudioFilename(t *testing.T) {
 		if got := normalizeAudioFilename(in); got != want {
 			t.Errorf("normalizeAudioFilename(%q) = %q, want %q", in, got, want)
 		}
+	}
+}
+
+func TestTranscribeUsesTheLongTimeoutClient(t *testing.T) {
+	// The one capability whose work is measured in minutes. On the shared
+	// two-minute client a ten-minute recording failed as "context deadline
+	// exceeded while awaiting headers" — which reads as an upstream fault
+	// rather than our own clock running out while the engine still worked.
+	if transcribeHTTPClient.Timeout <= sharedHTTPClient.Timeout {
+		t.Fatalf("transcribe timeout %v must exceed the shared %v",
+			transcribeHTTPClient.Timeout, sharedHTTPClient.Timeout)
+	}
+	if transcribeHTTPClient.Timeout < 30*time.Minute {
+		t.Errorf("timeout %v is too short for a long recording on a CPU engine",
+			transcribeHTTPClient.Timeout)
 	}
 }

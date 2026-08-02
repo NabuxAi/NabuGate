@@ -113,7 +113,7 @@ func (a *OpenAIAdapter) Transcribe(ctx context.Context, req TranscriptionRequest
 		httpReq.Header.Set(k, v)
 	}
 
-	resp, err := sharedHTTPClient.Do(httpReq)
+	resp, err := transcribeHTTPClient.Do(httpReq)
 	if err != nil {
 		return TranscriptionResponse{}, err
 	}
