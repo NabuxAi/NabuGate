@@ -16,18 +16,6 @@ import (
 // /v1/models is not: one consumer presents this catalogue directly as its users'
 // model picker, which made them options a person could choose and could not use.
 
-type stubAdapter struct{}
-
-func (stubAdapter) Chat(ctx contextShim, req provider.ChatRequest) (provider.ChatResponse, error) {
-	return provider.ChatResponse{}, nil
-}
-
-// contextShim keeps the stub free of an import that the interface check does not
-// need here; Chat is never called in these tests.
-type contextShim = interface {
-	Deadline() (deadline struct{}, ok bool)
-}
-
 func routerWith(adapters map[string]provider.Adapter, models map[string]config.ModelRoute) *Router {
 	return &Router{
 		adapters:   adapters,
