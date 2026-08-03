@@ -495,3 +495,43 @@ its insert or corrupts the column — far from here, with nothing pointing back.
 Nothing in that is new. It is the same picture the manual sweep produced days
 ago — the difference is that it now takes one command, and says so out loud
 instead of living in a progress note.
+
+## 2026-08-03 — the gateway was serving a build from before its own changes
+
+`nabu-ocr` was added to the config, committed and pushed. The running gateway
+started 2026-08-02 21:25 and had none of it — nor the flows feature merged
+around the same time.
+
+Nothing in this repository deployed it. Only CI, which tests and stops. A survey
+of twelve repositories in this fleet found **one** with a deployment workflow,
+and that one had been added an hour earlier for the same reason.
+
+`deploy.yml` triggers Coolify after CI passes and waits for the result. Firing a
+webhook and exiting is the version of this job that is always green: it reports
+that a request was sent, which is not a build that succeeded and a container
+that started. Failed, cancelled, or still running after fifteen minutes each
+fail the job.
+
+The trigger uses `--fail-with-body`, because a bare `curl` exits 0 on a 401 —
+the trap that had nabuchat's monthly usage reset reporting success for two
+months while resolving a dead hostname.
+
+One step here that nabuchat's version does not have: after the deploy, ask the
+gateway whether it answers. A deploy that finishes and serves nothing is not a
+successful deploy, and "the container started" is a different claim from "the
+aliases answer". Skipped when `NABUGATE_SELFTEST_URL` is unset rather than
+failing, because a deployment with no public URL is a normal thing.
+
+Verified with the variables unset: `::error::COOLIFY_API_URL is not set`.
+
+## Needs you
+
+```
+COOLIFY_API_URL         https://cp.nabuxai.com/api/v1
+COOLIFY_RESOURCE_UUID   de5lmm5tewiy3kfyjz7y6tl8
+COOLIFY_API_TOKEN       Coolify > Keys & Tokens, scoped to this resource
+NABUGATE_SELFTEST_URL   optional — the gateway's own origin, to check it answers
+```
+
+The UUID was read from the running container's name, not guessed. The token has
+to come from your panel.

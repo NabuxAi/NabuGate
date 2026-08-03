@@ -1,0 +1,83 @@
+name: Deploy
+
+# The gateway was running a build from before several merged changes — a new
+# vision alias, and a whole flows feature — because nothing here deployed it.
+# Only CI, which tests and stops.
+#
+# A survey of twelve repositories in this fleet found one with a deployment
+# workflow. This is the second.
+
+on:
+  workflow_run:
+    workflows: ['CI']
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-nabugate
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy to Coolify
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+
+    # Deploying after a failed CI run is deploying a broken build.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success'
+
+    steps:
+      - name: Check required configuration
+        env:
+          COOLIFY_TOKEN: ${{ secrets.COOLIFY_API_TOKEN }}
+          COOLIFY_URL: ${{ secrets.COOLIFY_API_URL }}
+          RESOURCE_UUID: ${{ secrets.COOLIFY_RESOURCE_UUID }}
+        run: |
+          missing=""
+          [ -n "$COOLIFY_TOKEN" ] || missing="$missing COOLIFY_API_TOKEN"
+          [ -n "$COOLIFY_URL" ]   || missing="$missing COOLIFY_API_URL"
+          [ -n "$RESOURCE_UUID" ] || missing="$missing COOLIFY_RESOURCE_UUID"
+
+          if [ -n "$missing" ]; then
+            echo "::error::Repository secrets not set:$missing"
+            echo ""
+            echo "Settings > Secrets and variables > Actions."
+            echo ""
+            echo "  COOLIFY_API_URL         https://cp.nabuxai.com/api/v1"
+            echo "  COOLIFY_RESOURCE_UUID   de5lmm5tewiy3kfyjz7y6tl8"
+            echo "  COOLIFY_API_TOKEN       Coolify > Keys & Tokens > API tokens,"
+            echo "                          scoped to deploy this resource"
+            echo ""
+            echo "Until these exist nothing here deploys, and the gateway keeps"
+            echo "serving whatever was last pushed by hand."
+            exit 1
+          fi
+
+      - uses: actions/checkout@v4
+
+      - name: Deploy and wait for the result
+        env:
+          COOLIFY_API_URL: ${{ secrets.COOLIFY_API_URL }}
+          COOLIFY_API_TOKEN: ${{ secrets.COOLIFY_API_TOKEN }}
+          COOLIFY_RESOURCE_UUID: ${{ secrets.COOLIFY_RESOURCE_UUID }}
+        run: ./scripts/coolify-deploy.sh
+
+      # The gateway's own sweep, against the deployment that just went live. A
+      # deploy that finishes and serves nothing is a deploy nobody should call
+      # successful, and this is the difference between "the container started"
+      # and "the aliases answer".
+      - name: Ask the gateway whether its aliases still answer
+        if: ${{ secrets.NABUGATE_SELFTEST_URL != '' }}
+        env:
+          URL: ${{ secrets.NABUGATE_SELFTEST_URL }}
+        run: |
+          code="$(curl --silent --output /dev/null --write-out '%{http_code}' \
+            --max-time 30 "${URL%/}/healthz" || true)"
+          if [ "$code" != "200" ]; then
+            echo "::error::The gateway answered $code on /healthz after deploying."
+            exit 1
+          fi
+          echo "gateway is answering"
