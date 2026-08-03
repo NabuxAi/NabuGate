@@ -455,3 +455,43 @@ That is testing prose: the comment says *"stores the vectors"* and *"persisted
 index"*, so it failed on wording rather than meaning. Replaced with the
 structural check above. Worth recording — a brittle test that fails for the
 wrong reason teaches people to delete tests.
+
+
+## The alias sweep is a command now
+
+`/healthz` returns `{"status":"ok"}` — the process is up, which is not the
+question anyone has. This gateway answers `/healthz` perfectly while serving
+none of the aliases a given consumer asks for, and the first sign is an opaque
+failure inside somebody else's product. That is exactly how NabuChat's retrieval
+came to look like a broken vector database.
+
+Every alias in this repo was verified by hand this week, one request at a time,
+and none of it was repeatable. `gateway -selftest` does the sweep: each
+advertised chat and embedding alias is asked to do the smallest real piece of
+work it can, and the exit status is non-zero if any fail — so it can gate a
+deploy rather than be read once.
+
+Image and audio sit behind `-selftest-all`. They cost money per call, and
+billing whoever runs a health check is how the check stops being run.
+
+**The embedding case does more than call the alias.** It records the natural
+width, then asks for 1536 and verifies it gets 1536. Honouring `dimensions` is
+the property every consumer storing these vectors depends on, and it is
+invisible until it fails: `gemini-embedding-001` answers **3072** by default, so
+a caller with a `vector(1536)` column that silently receives 3072 either fails
+its insert or corrupts the column — far from here, with nothing pointing back.
+
+### Run against the live deployment
+
+```
+13/20 aliases answered
+
+6/6 embedding aliases  natural width recorded, all honour dimensions=1536
+8/15 chat aliases      answered
+7   chat aliases       failed — every one an unset provider key, except
+                       nabu-9router (401, its dashboard setup is still owed)
+```
+
+Nothing in that is new. It is the same picture the manual sweep produced days
+ago — the difference is that it now takes one command, and says so out loud
+instead of living in a progress note.
