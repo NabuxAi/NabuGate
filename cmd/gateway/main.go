@@ -28,6 +28,10 @@ import (
 func main() {
 	configPath := flag.String("config", envOr("NABU_CONFIG", "config.yaml"),
 		"path to the YAML config file (ignored when the NABU_CONFIG_YAML env var holds the config inline)")
+	selfTest := flag.Bool("selftest", false,
+		"ask every advertised chat and embedding alias to do one small real request, report which answer, and exit")
+	selfTestAll := flag.Bool("selftest-all", false,
+		"as -selftest, and also exercise image and audio aliases (these cost money per call)")
 	flag.Parse()
 
 	log := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
@@ -36,6 +40,13 @@ func main() {
 	if err != nil {
 		log.Error("failed to load config", "error", err)
 		os.Exit(1)
+	}
+
+	// Before the server starts: this answers "does the thing consumers depend
+	// on actually work", which /healthz does not. Exits non-zero on any failure
+	// so it can gate a deploy rather than be read and forgotten.
+	if *selfTest || *selfTestAll {
+		os.Exit(runSelfTest(cfg, *selfTestAll))
 	}
 
 	adapters, warnings := cfg.BuildAdapters()
