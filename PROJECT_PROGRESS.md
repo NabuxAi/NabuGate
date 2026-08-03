@@ -415,3 +415,43 @@ Coolify before opening it.
 **`nabu-voice` still has no primary.** It works today only because the Gemini
 fallback finally understands the request. Set `OPENAI_API_KEY` if you want
 `gpt-4o-mini-tts` as the primary rung.
+
+
+## The stored-index rule is enforced now, not written down again
+
+`write-embed`'s own comment named this hazard precisely — *"split the corpus
+across two incompatible embedding spaces with no error at all"* — and a later
+change added a second rung beside the first anyway, reasoning that both are 1536
+wide. **The comment was read and overridden.** Writing it in a third place would
+not have helped.
+
+Three assertions over `config.default.yaml` now carry it:
+
+- the five stored-index aliases have **no** fallback rungs;
+- **every** embedding alias is classified as stored or query-time, so a new one
+  fails until someone decides which it is. `write-embed` did not acquire its
+  second rung from ignorance of the rule — the question was simply never put;
+- a stored-index alias points at a provider type that forwards the caller's
+  `dimensions`, which is how a 3072-wide vector reaches a 1536-wide column.
+
+`nabu-embed` remains the deliberate exception and is registered as one.
+
+### Both regressions reproduced before committing
+
+```
+re-add the chat-embed fallback   -> FAIL "chat-embed has 1 fallback rung(s)…"
+add an unclassified alias        -> FAIL "brand-new-embed is not classified…"
+config restored                  -> ok
+```
+
+Each message names the alias and what to do about it, because a test that only
+says "assertion failed" sends the next person to read the same comment that did
+not work the first time.
+
+### A first draft of this was a bad test
+
+It asserted that the `nabu-embed` comment still contains the word "stored".
+That is testing prose: the comment says *"stores the vectors"* and *"persisted
+index"*, so it failed on wording rather than meaning. Replaced with the
+structural check above. Worth recording — a brittle test that fails for the
+wrong reason teaches people to delete tests.
