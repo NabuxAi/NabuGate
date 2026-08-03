@@ -38,6 +38,9 @@ COPY config.default.yaml /app/config.yaml
 # Sub-agents (cinematic-scrollytelling squad + the NabuWrite write-* trio);
 # the default config loads them via agents_dir: "/app/agents".
 COPY agents /app/agents
+
+# Flows: chains of the agents above, loaded via flows_dir: "/app/flows".
+COPY flows /app/flows
 ENV NABU_CONFIG=/app/config.yaml
 EXPOSE 8080
 

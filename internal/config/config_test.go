@@ -463,3 +463,35 @@ func containsSubstr(haystack []string, needle string) bool {
 	}
 	return false
 }
+
+// TestShippedFlowsLoad guards the YAML shipped in ./flows: a broken step or a
+// typo'd agent name is only ever noticed by whoever calls the flow and gets a
+// 400, which in production is a customer-facing feature quietly not existing.
+func TestShippedFlowsLoad(t *testing.T) {
+	cfg := &Config{FlowsDir: "../../flows", AgentsDir: "../../agents"}
+
+	flows, warnings := cfg.BuildFlows()
+	if len(warnings) > 0 {
+		t.Errorf("shipped flows produced warnings: %v", warnings)
+	}
+	if flows.Len() == 0 {
+		t.Fatal("no flows loaded from ./flows")
+	}
+
+	agents, _ := cfg.BuildAgents()
+
+	// Every step must name something that exists, or the flow is a 400 waiting
+	// for its first caller.
+	for _, name := range flows.Names() {
+		f, _ := flows.Lookup(name)
+		for _, step := range f.Steps {
+			if _, isAgent := agents.Lookup(step.Agent); isAgent {
+				continue
+			}
+			if _, isFlow := flows.Lookup(step.Agent); isFlow {
+				continue
+			}
+			t.Errorf("flow %q step %q names no shipped agent or flow", name, step.Agent)
+		}
+	}
+}

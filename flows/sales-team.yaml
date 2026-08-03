@@ -1,0 +1,34 @@
+# A worked example of a flow: three specialists, in the order they run.
+#
+# Drop this file into NabuGate's `flows_dir` and it becomes addressable as a
+# model: POST /v1/chat/completions with model: "sales-team". The caller sends
+# one request and gets one answer; that it took three calls is the gateway's
+# business.
+#
+# The agents named below live in ./agents. A step may name a sub-agent, a plain
+# chat alias, or another flow.
+name: sales-team
+description: "Reads the situation, drafts an approach, then argues with the draft before answering."
+
+steps:
+  # Step one gets the caller's messages unchanged, so a flow behaves like the
+  # single agent it replaces.
+  - agent: sales-reader
+    label: "read the situation"
+
+  - agent: sales-drafter
+    label: "draft the approach"
+
+  # The reviewer is shown the brief as well as the draft. Handed only the draft
+  # it can tell you the writing is good; it cannot tell you it answers the wrong
+  # question.
+  - agent: sales-reviewer
+    label: "argue with it"
+    input: |
+      وضعیت مشتری:
+      {{input}}
+
+      پیش‌نویسِ پیشنهاد:
+      {{previous}}
+
+      این پیشنهاد را نقد کن و نسخهٔ بهتر را بنویس. فقط نسخهٔ نهایی را برگردان.

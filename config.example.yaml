@@ -401,6 +401,29 @@ embeddings:
 # Grant a project key access with a glob, e.g. allow: ["cine-*"].
 agents_dir: "./agents"
 
+# ── Flows ───────────────────────────────────────────────────────────────────
+# A flow is several agents in a stated order, each handed what the one before it
+# produced. Declared the same two ways agents are — inline under `flows:` or one
+# file each in `flows_dir` — and callable the same way: as a request "model".
+#
+#   flows:
+#     sales-team:
+#       description: "Read, draft, then argue with the draft."
+#       steps:
+#         - agent: sales-reader
+#         - agent: sales-drafter
+#         - agent: sales-reviewer
+#           label: "argue with it"
+#           # {{previous}} is the step before; {{input}} is what the caller asked.
+#           # Left out, a step simply receives {{previous}}.
+#           input: "BRIEF: {{input}}\n\nDRAFT: {{previous}}"
+#           # optional: true would let the chain continue past this step failing.
+#
+# A step may name a sub-agent, a plain alias, or another flow (nested up to four
+# deep; a cycle is refused by name). A flow cannot stream — its answer does not
+# exist until the last step runs.
+flows_dir: "./flows"
+
 agents:
   # A minimal inline example. `model` points at any existing chat alias (or a
   # "<provider>/<model>" passthrough); the router's fallback still applies.

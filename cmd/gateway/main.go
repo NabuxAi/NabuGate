@@ -67,7 +67,11 @@ func main() {
 	for _, w := range agentWarnings {
 		log.Warn(w)
 	}
-	srv := server.New(r, enforcer, tracker, agents, log)
+	flows, flowWarnings := cfg.BuildFlows()
+	for _, w := range flowWarnings {
+		log.Warn(w)
+	}
+	srv := server.New(r, enforcer, tracker, agents, log).WithFlows(flows)
 
 	// Console state: accounts, console-minted project tokens, and usage that
 	// survives a restart. Mount a volume at NABU_STATE_DIR to keep it — without

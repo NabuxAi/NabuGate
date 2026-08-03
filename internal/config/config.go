@@ -12,6 +12,7 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"nabugate/internal/agent"
+	"nabugate/internal/flow"
 	"nabugate/internal/policy"
 	"nabugate/internal/provider"
 	"nabugate/internal/usage"
@@ -48,6 +49,29 @@ type Config struct {
 	// YAML in AgentsDir.
 	Agents    map[string]AgentConfig `yaml:"agents"`
 	AgentsDir string                 `yaml:"agents_dir"`
+
+	// Flows are named chains of agents, each step handed what the one before
+	// it produced, and are addressable as a "model" the same way agents are.
+	// Declared inline here or one-file-each in FlowsDir, for the same reason.
+	Flows    map[string]FlowConfig `yaml:"flows"`
+	FlowsDir string                `yaml:"flows_dir"`
+}
+
+// FlowConfig is one flow as written in YAML. The name comes from the map key
+// (inline) or the file name (flows_dir) unless Name overrides it.
+type FlowConfig struct {
+	Name        string           `yaml:"name"`
+	Description string           `yaml:"description"`
+	Steps       []FlowStepConfig `yaml:"steps"`
+}
+
+// FlowStepConfig is one link. `input` is a template; left out, the step simply
+// receives the previous step's output, which is what a chain usually means.
+type FlowStepConfig struct {
+	Agent    string `yaml:"agent"`
+	Label    string `yaml:"label"`
+	Input    string `yaml:"input"`
+	Optional bool   `yaml:"optional"`
 }
 
 // AgentConfig is one sub-agent as written in YAML. The agent name comes from the
@@ -342,6 +366,79 @@ func (c *Config) BuildAgents() (*agent.Registry, []string) {
 	}
 
 	return reg, warnings
+}
+
+// BuildFlows assembles the flow registry, the same way BuildAgents assembles
+// agents and for the same reasons: inline first so an inline name wins over a
+// same-named file, and one bad definition warns rather than aborting startup.
+func (c *Config) BuildFlows() (*flow.Registry, []string) {
+	reg := flow.NewRegistry()
+	var warnings []string
+
+	keys := make([]string, 0, len(c.Flows))
+	for key := range c.Flows {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	for _, key := range keys {
+		fc := c.Flows[key]
+		name := strings.TrimSpace(fc.Name)
+		if name == "" {
+			name = key
+		}
+		if err := reg.Add(fc.toFlow(name)); err != nil {
+			warnings = append(warnings, fmt.Sprintf("skip inline flow %q: %v", key, err))
+		}
+	}
+
+	if dir := strings.TrimSpace(c.FlowsDir); dir != "" {
+		files, err := agentFiles(dir)
+		if err != nil {
+			warnings = append(warnings, fmt.Sprintf("flows_dir %q: %v", dir, err))
+		}
+		for _, path := range files {
+			fc, err := loadFlowFile(path)
+			if err != nil {
+				warnings = append(warnings, fmt.Sprintf("skip flow file %q: %v", path, err))
+				continue
+			}
+			name := strings.TrimSpace(fc.Name)
+			if name == "" {
+				name = agentNameFromPath(path)
+			}
+			if err := reg.Add(fc.toFlow(name)); err != nil {
+				warnings = append(warnings, fmt.Sprintf("skip flow file %q: %v", path, err))
+			}
+		}
+	}
+
+	return reg, warnings
+}
+
+func (fc FlowConfig) toFlow(name string) flow.Flow {
+	steps := make([]flow.Step, 0, len(fc.Steps))
+	for _, sc := range fc.Steps {
+		steps = append(steps, flow.Step{
+			Agent:    strings.TrimSpace(sc.Agent),
+			Label:    sc.Label,
+			Input:    sc.Input,
+			Optional: sc.Optional,
+		})
+	}
+
+	return flow.Flow{Name: name, Description: fc.Description, Steps: steps}
+}
+
+func loadFlowFile(path string) (FlowConfig, error) {
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return FlowConfig{}, err
+	}
+	var fc FlowConfig
+	if err := yaml.Unmarshal([]byte(os.ExpandEnv(string(raw))), &fc); err != nil {
+		return FlowConfig{}, err
+	}
+	return fc, nil
 }
 
 // toAgent converts a YAML AgentConfig into a runtime agent.Agent with the given

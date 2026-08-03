@@ -17,6 +17,7 @@ import (
 
 	"nabugate/internal/adminstore"
 	"nabugate/internal/agent"
+	"nabugate/internal/flow"
 	"nabugate/internal/memory"
 	"nabugate/internal/photos"
 	"nabugate/internal/policy"
@@ -40,6 +41,7 @@ type Server struct {
 	policy *policy.Enforcer
 	usage  *usage.Tracker
 	agents *agent.Registry
+	flows  *flow.Registry // nil = no flows configured
 	photos *photos.Client // nil = photo proxy disabled
 	log    *slog.Logger
 
@@ -92,6 +94,14 @@ func (s *Server) loadManagedAgents() {
 // when no sub-agents are configured.
 func New(r *router.Router, enforcer *policy.Enforcer, tracker *usage.Tracker, agents *agent.Registry, log *slog.Logger) *Server {
 	return &Server{router: r, policy: enforcer, usage: tracker, agents: agents, log: log, logins: newThrottle()}
+}
+
+// WithFlows attaches the flow registry. Separate from New for the same reason
+// SetAdminStore is: existing callers and their tests keep compiling, and a
+// deployment with no flows behaves exactly as it did before.
+func (s *Server) WithFlows(f *flow.Registry) *Server {
+	s.flows = f
+	return s
 }
 
 // WithPhotos enables the stock-photo proxy (GET /v1/photos/search). A nil
@@ -222,6 +232,12 @@ func (s *Server) handleModels(w http.ResponseWriter, r *http.Request) {
 	infos = append(infos, s.router.CatalogModels(r.Context())...)
 	for _, name := range s.agents.Names() {
 		infos = append(infos, router.AliasInfo{ID: name, Owner: "agent"})
+	}
+	// Flows list too, and for the same reason agents do: a caller decides what
+	// to send by reading this, and a chain they cannot discover is one they
+	// will never use.
+	for _, name := range s.flows.Names() {
+		infos = append(infos, router.AliasInfo{ID: name, Owner: "flow"})
 	}
 
 	data := make([]map[string]string, 0, len(infos))
@@ -370,6 +386,24 @@ func (s *Server) handleChat(w http.ResponseWriter, r *http.Request) {
 		MaxTokens:   maxTokens,
 		Stop:        raw["stop"],
 		Raw:         raw,
+	}
+
+	// Flow expansion. Checked before agents because a flow is the bigger thing
+	// and a name is only ever one of them; a flow named after an agent is a
+	// definition mistake, not a request the gateway should silently resolve the
+	// smaller way.
+	//
+	// A flow is several provider calls, so it cannot stream: the first token of
+	// the answer does not exist until the last step starts. Saying so beats
+	// streaming an intermediate step's draft as if it were the answer.
+	if fl, ok := s.flows.Lookup(alias); ok {
+		if stream {
+			writeError(w, http.StatusBadRequest, fmt.Sprintf("flow %q cannot be streamed: its answer is not written until the last step runs", alias))
+			return
+		}
+
+		s.completeFlow(w, r, fl, chatReq)
+		return
 	}
 
 	// Sub-agent expansion: if the requested "model" names a configured agent,

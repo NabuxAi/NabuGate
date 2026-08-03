@@ -974,6 +974,10 @@ embeddings:
 # `agents:` map or as more files in this directory. Grant with allow: ["cine-*"].
 agents_dir: "/app/agents"
 
+# Flows: named chains of agents, each step handed what the one before it made.
+# Addressable as a "model" exactly like an agent, so one request runs the chain.
+flows_dir: "/app/flows"
+
 pricing:
   "openai/gpt-4o": { input: 2.5, output: 10 }
   "openai/gpt-4o-mini": { input: 0.15, output: 0.6 }
