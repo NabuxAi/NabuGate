@@ -611,6 +611,29 @@ models:
       - provider: gemini
         model: "gemini-2.5-flash"
 
+  # Reading the text in an image, cheapest engine first.
+  #
+  # NabuOCR is Tesseract on our own hardware: no per-request cost, no data
+  # leaving the building, and measured on 21 real screenshots it read 20 of them
+  # locally. The one it could not was white text on a dark bubble under a
+  # three-dimensional headline — which is precisely what the rungs below are for.
+  #
+  # The chain works because NabuOCR answers 502 when its own confidence says the
+  # read is not worth passing on, rather than returning noise with a 200. A rung
+  # that always succeeds is a rung nothing ever falls past.
+  #
+  # Inert until NABUOCR_BASE_URL names the container: with the provider absent
+  # this alias starts at gpt-4o and behaves exactly as nabu-vision does today,
+  # so setting it up is an improvement and leaving it unset costs nothing.
+  nabu-ocr:
+    primary:
+      provider: nabuocr
+      model: "nabu-ocr"
+    fallback:
+      - model: gpt-4o
+      - provider: gemini
+        model: "gemini-2.5-flash"
+
   nabu-minimax:
     primary:
       provider: dahl
