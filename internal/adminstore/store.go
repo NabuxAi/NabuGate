@@ -100,10 +100,30 @@ type AgentRecord struct {
 	UpdatedAt   time.Time `json:"updated_at,omitempty"`
 }
 
+// FlowRecord is a console-managed flow, persisted so it survives a restart.
+// Flows declared in config/YAML are separate and not stored here; the server
+// merges both into the live registry at startup, the same way agents are.
+type FlowRecord struct {
+	Name        string           `json:"name"`
+	Description string           `json:"description"`
+	Steps       []FlowStepRecord `json:"steps"`
+	CreatedAt   time.Time        `json:"created_at"`
+	UpdatedAt   time.Time        `json:"updated_at,omitempty"`
+}
+
+// FlowStepRecord is one link as the console stores it.
+type FlowStepRecord struct {
+	Agent    string `json:"agent"`
+	Label    string `json:"label,omitempty"`
+	Input    string `json:"input,omitempty"`
+	Optional bool   `json:"optional,omitempty"`
+}
+
 type state struct {
 	Admins   []Admin              `json:"admins"`
 	Tokens   []Token              `json:"tokens"`
 	Agents   []AgentRecord        `json:"agents"`
+	Flows    []FlowRecord         `json:"flows"`
 	Usage    map[string]Counters  `json:"usage"`
 	Sessions map[string]time.Time `json:"sessions"` // token hash -> expiry
 }
@@ -273,6 +293,65 @@ func (s *Store) DeleteAgent(name string) error {
 	for i := range s.st.Agents {
 		if s.st.Agents[i].Name == name {
 			s.st.Agents = append(s.st.Agents[:i], s.st.Agents[i+1:]...)
+			return s.save()
+		}
+	}
+	return nil
+}
+
+func (s *Store) Flows() []FlowRecord {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	out := make([]FlowRecord, len(s.st.Flows))
+	copy(out, s.st.Flows)
+	return out
+}
+
+// SaveFlow creates or replaces a console-managed flow by name (upsert),
+// preserving the original CreatedAt on edit.
+//
+// A flow with no steps is refused here rather than at render time: an empty
+// chain is not a chain that does nothing, it is a model name that answers 502
+// to whoever calls it next.
+func (s *Store) SaveFlow(rec FlowRecord) error {
+	rec.Name = strings.TrimSpace(rec.Name)
+	if rec.Name == "" {
+		return errors.New("flow name is required")
+	}
+	if len(rec.Steps) == 0 {
+		return errors.New("a flow needs at least one step")
+	}
+	for i := range rec.Steps {
+		rec.Steps[i].Agent = strings.TrimSpace(rec.Steps[i].Agent)
+		if rec.Steps[i].Agent == "" {
+			return fmt.Errorf("step %d names no agent", i+1)
+		}
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	now := time.Now().UTC()
+	for i := range s.st.Flows {
+		if s.st.Flows[i].Name == rec.Name {
+			rec.CreatedAt = s.st.Flows[i].CreatedAt
+			rec.UpdatedAt = now
+			s.st.Flows[i] = rec
+			return s.save()
+		}
+	}
+	rec.CreatedAt = now
+	s.st.Flows = append(s.st.Flows, rec)
+	return s.save()
+}
+
+// DeleteFlow removes a console-managed flow by name. Unknown name is a no-op.
+func (s *Store) DeleteFlow(name string) error {
+	name = strings.TrimSpace(name)
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for i := range s.st.Flows {
+		if s.st.Flows[i].Name == name {
+			s.st.Flows = append(s.st.Flows[:i], s.st.Flows[i+1:]...)
 			return s.save()
 		}
 	}

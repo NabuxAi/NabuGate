@@ -55,6 +55,11 @@ func (s *Server) mountConsoleAPI(mux *http.ServeMux) {
 	mux.Handle("PATCH /admin/api/agents/{name}", s.consoleAuth(s.saveAgent))
 	mux.Handle("DELETE /admin/api/agents/{name}", s.consoleAuth(s.deleteAgent))
 	mux.Handle("POST /admin/api/agents/{name}/test", s.consoleAuth(s.testAgent))
+	mux.Handle("GET /admin/api/flows", s.consoleAuth(s.listFlows))
+	mux.Handle("POST /admin/api/flows", s.consoleAuth(s.saveFlow))
+	mux.Handle("PATCH /admin/api/flows/{name}", s.consoleAuth(s.saveFlow))
+	mux.Handle("DELETE /admin/api/flows/{name}", s.consoleAuth(s.deleteFlow))
+	mux.Handle("POST /admin/api/flows/{name}/test", s.consoleAuth(s.testFlow))
 }
 
 // consoleAuth gates a console endpoint on a live login session.

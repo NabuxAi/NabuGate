@@ -67,6 +67,7 @@ func (s *Server) SetMemory(m *memory.Store) { s.memory = m }
 func (s *Server) SetAdminStore(st *adminstore.Store) {
 	s.admin = st
 	s.loadManagedAgents()
+	s.loadManagedFlows()
 }
 
 // loadManagedAgents registers the console-created sub-agents into the live
@@ -101,6 +102,9 @@ func New(r *router.Router, enforcer *policy.Enforcer, tracker *usage.Tracker, ag
 // deployment with no flows behaves exactly as it did before.
 func (s *Server) WithFlows(f *flow.Registry) *Server {
 	s.flows = f
+	// The admin store may already be attached, in which case the flows it holds
+	// have nowhere to have been registered yet.
+	s.loadManagedFlows()
 	return s
 }
 

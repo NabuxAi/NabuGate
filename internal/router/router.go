@@ -220,6 +220,16 @@ type Result struct {
 	Response provider.ChatResponse
 }
 
+// KnowsAlias reports whether a name resolves to something this router can chat
+// with — a configured alias or a passthrough "<provider>/<model>".
+//
+// Exists so a caller can refuse a bad name at the moment somebody writes it
+// down, rather than at the moment somebody else calls it.
+func (r *Router) KnowsAlias(name string) bool {
+	_, ok := r.resolveChatTargets(name)
+	return ok
+}
+
 // Aliases returns the configured public model aliases.
 func (r *Router) Aliases() []string {
 	out := make([]string, 0, len(r.models))
