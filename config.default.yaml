@@ -348,6 +348,15 @@ providers:
     type: openai
     base_url: "${WHISPER_BASE_URL}"
 
+  # On-premise OCR. Same shape as whisper above: a local container speaking the
+  # OpenAI API, inert until NABUOCR_BASE_URL names it, so an environment without
+  # one is unaffected. Tesseract, so it costs CPU rather than money — and its
+  # container carries a CPU limit, which the whisper one does not.
+  nabuocr:
+    enabled: true
+    type: openai
+    base_url: "${NABUOCR_BASE_URL}"
+
   ollama:
     enabled: true
     type: openai
