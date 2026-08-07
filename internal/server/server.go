@@ -120,6 +120,7 @@ func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", s.handleHealth)
 	mux.HandleFunc("GET /v1/models", s.auth(s.handleModels))
+	mux.HandleFunc("GET /v1/health", s.auth(s.handleKeyHealth))
 	mux.HandleFunc("POST /v1/chat/completions", s.auth(s.handleChat))
 	mux.HandleFunc("POST /v1/responses", s.auth(s.handleResponses))
 	mux.HandleFunc("POST /v1/images/generations", s.auth(s.handleImages))
@@ -225,6 +226,80 @@ func (s *Server) handleUsage(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleHealth(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+}
+
+// handleKeyHealth answers, for the calling key, "what can I reach and is any of
+// it already broken" — without spending a single upstream request.
+//
+// /healthz says the process is up and /v1/models says what a key is permitted
+// to name. Neither answers the question consuming projects actually end up
+// debugging: a key that lists several models, some of which lost their
+// provider's API key in this deployment and now fail every request with an
+// error written for the gateway's operators rather than for the caller.
+//
+// Scoped to the caller, because an alias this key may not use is not this
+// key's business — and the warnings name providers.
+func (s *Server) handleKeyHealth(w http.ResponseWriter, r *http.Request) {
+	pol, hasPol := r.Context().Value(policyCtxKey{}).(policy.Policy)
+	scoped := s.policy.Enabled() && hasPol
+
+	aliases := make([]router.AliasHealth, 0)
+	degraded := 0
+
+	for _, alias := range s.router.AliasHealthAll() {
+		if scoped && !pol.Allows(alias.ID) {
+			continue
+		}
+		if len(alias.Warnings) > 0 {
+			degraded++
+		}
+		aliases = append(aliases, alias)
+	}
+
+	// Agents and flows are addressable exactly like models, so a key that can
+	// reach neither an alias nor an agent can do nothing at all — worth saying
+	// plainly rather than leaving as an empty list to interpret.
+	agents := allowedNames(s.agents.Names(), pol, scoped)
+	flows := allowedNames(s.flows.Names(), pol, scoped)
+
+	status := "ok"
+	switch {
+	case len(aliases)+len(agents)+len(flows) == 0:
+		status = "unusable"
+	case degraded > 0:
+		status = "degraded"
+	}
+
+	body := map[string]any{
+		"status":   status,
+		"project":  s.project(r),
+		"aliases":  aliases,
+		"agents":   agents,
+		"flows":    flows,
+		"degraded": degraded,
+	}
+
+	if scoped {
+		// Echoed back because the commonest 401 in this gateway's life is a
+		// caller naming a model outside its own allow-list, and until now the
+		// only place to read that list was the console.
+		body["allow"] = pol.Allow
+		body["rate_limit"] = pol.RateLimit
+	}
+
+	writeJSON(w, http.StatusOK, body)
+}
+
+// allowedNames filters agent/flow names down to what this key may address.
+func allowedNames(names []string, pol policy.Policy, scoped bool) []string {
+	out := make([]string, 0, len(names))
+	for _, name := range names {
+		if scoped && !pol.Allows(name) {
+			continue
+		}
+		out = append(out, name)
+	}
+	return out
 }
 
 func (s *Server) handleModels(w http.ResponseWriter, r *http.Request) {
