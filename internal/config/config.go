@@ -294,6 +294,11 @@ func (c *Config) BuildAdapters() (map[string]provider.Adapter, []string) {
 			// mrc_imagegen: a template renderer, not a diffusion model. See the
 			// adapter for how a prompt maps onto its fields.
 			adapters[name] = provider.NewImagegenAdapter(name, p.BaseURL, apiKey)
+		case "gamma":
+			// gamma.app: decks, documents and social posts. Asynchronous, and a
+			// chat adapter rather than an image one because what comes back is a
+			// hosted URL. See the adapter.
+			adapters[name] = provider.NewGammaAdapter(name, p.BaseURL, apiKey)
 		default:
 			warnings = append(warnings, fmt.Sprintf("provider %q has unknown type %q", name, p.Type))
 		}

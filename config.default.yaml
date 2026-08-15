@@ -340,6 +340,26 @@ providers:
     base_url: "${MRC_IMAGEGEN_URL}"
     api_key_env: "MRC_IMAGEGEN_KEY"
 
+  # gamma.app — decks, documents and social posts, written and designed by
+  # Gamma from a prompt.
+  #
+  # It is reachable as a chat model, not an image one, because what it produces
+  # is a multi-card artefact hosted on gamma.app: the answer is a URL (plus an
+  # export link when one is asked for), which has nowhere to live in an image
+  # response. The API is also asynchronous — create, then poll — and chat is the
+  # only shape here that can hold a request open for the minute or two a deck
+  # takes.
+  #
+  # Send JSON in the prompt for exact control (inputText, numCards, themeName,
+  # exportAs, …); plain text becomes inputText and the format comes from the
+  # alias. Skipped while GAMMA_API_KEY is unset — the key comes from
+  # gamma.app → Settings → API access and needs a paid Gamma plan.
+  gamma:
+    enabled: true
+    type: gamma
+    base_url: "${GAMMA_BASE_URL}"
+    api_key_env: "GAMMA_API_KEY"
+
   # Self-hosted Whisper (see docker-compose.yml). Keyless, like Ollama: it is
   # enabled purely by having a base_url, and skipped when WHISPER_BASE_URL is
   # blank.
@@ -455,9 +475,13 @@ model_registry:
     serves:
       - provider: parspack
         model: "openai/gpt-oss-20b"
-      # Free floor: reaching here costs nothing rather than returning an error.
-      - model: ling-3.0-flash
-      - model: nemotron-3-ultra
+      # A `serves` entry is a provider coordinate, not a rung: Serving has only
+      # `provider` and `model`, so the two registry references that used to sit
+      # here (`- model: ling-3.0-flash`, `- model: nemotron-3-ultra`) named no
+      # provider and were skipped. That is why nabu-cheap returned 502 with
+      # three Parspack 402s and never reached a free model — the floor existed
+      # in the file and not in the router. Cross-registry fallback belongs in a
+      # `fallback` list, where `model:` does resolve; see nabu-cheap.
       - provider: cloudflare
         model: "@cf/openai/gpt-oss-120b"
 
@@ -527,16 +551,25 @@ model_registry:
       - provider: parspack
         model: "openai/gpt-4o-mini-search-preview"
 
-  # OpenRouter free tier — verified answering on the harvested key. These cost
-  # nothing, so they belong at the end of chains as a floor rather than a
-  # failure.
-  ling-3.0-flash:
-    serves:
-      - provider: openrouter
-        model: "inclusionai/ling-3.0-flash:free"
-      - provider: openrouter2
-        model: "inclusionai/ling-3.0-flash:free"
-
+  # OpenRouter free tier — these cost nothing, so they belong at the end of
+  # chains as a floor rather than a failure.
+  #
+  # Re-probed 2026-08-15 against both keys, and most of the catalogue did not
+  # survive it. A ":free" suffix is a marketing state, not a capability: it
+  # lapses, and the model keeps answering 200 with an empty body or with its
+  # own reasoning where the answer belongs. Only what returned clean, non-empty
+  # content is listed here.
+  #
+  #   inclusionai/ling-3.0-flash:free   no longer free ("the paid version is
+  #                                     available now") — was the floor under
+  #                                     gpt-oss-20b and had been dead there
+  #   poolside/laguna-m.1:free          "No endpoints found"
+  #   openai/gpt-oss-20b:free           200, empty content
+  #   poolside/laguna-xs-2.1:free       200, empty content
+  #   dots-studio/dots-3-note:free      200, empty content
+  #   google/gemma-4-31b-it:free        provider error
+  #   nvidia/nemotron-3.5-lightning     leaks its reasoning into content
+  #   nvidia/nemotron-3-nano-30b        leaks its reasoning into content
   nemotron-3-ultra:
     serves:
       - provider: openrouter
@@ -546,14 +579,19 @@ model_registry:
       - provider: parspack
         model: "nvidia/nemotron-3-ultra-preview"
 
-  laguna-m:
+  nemotron-3-super:
     serves:
       - provider: openrouter
-        model: "poolside/laguna-m.1:free"
+        model: "nvidia/nemotron-3-super-120b-a12b:free"
       - provider: openrouter2
-        model: "poolside/laguna-m.1:free"
-      - provider: parspack
-        model: "poolside/laguna-m.1"
+        model: "nvidia/nemotron-3-super-120b-a12b:free"
+
+  laguna-s:
+    serves:
+      - provider: openrouter
+        model: "poolside/laguna-s-2.1:free"
+      - provider: openrouter2
+        model: "poolside/laguna-s-2.1:free"
 
 
 models:
@@ -568,6 +606,14 @@ models:
     fallback:
       - model: gpt-4.1-mini
       - model: minimax-m2.7
+      # Every rung above resolves to Parspack alone, and Parspack answers 402
+      # once its credit runs out — which it has. The alias then returned 502 for
+      # every request while a keyed Gemini and two keyed OpenRouter accounts sat
+      # unused. Probed 2026-08-15: gemini-2.5-flash answers on this key,
+      # gemini-2.5-pro is already 429 on it.
+      - provider: gemini
+        model: "gemini-2.5-flash"
+      - model: laguna-s
 
 
   nabu-smart:
@@ -581,6 +627,14 @@ models:
       - model: gpt-4o
       - model: deepseek-v4-pro
       - model: gpt-4.1-mini
+      # Same all-Parspack chain as nabu-fast, same 402, same outage — and this
+      # is the alias NabuChat sends every message to, so the product went silent
+      # with it. The last two rungs cross vendors on purpose: one Google key,
+      # one OpenRouter free model that was verified answering rather than
+      # assumed to.
+      - provider: gemini
+        model: "gemini-2.5-flash"
+      - model: nemotron-3-ultra
 
 
   nabu-cheap:
@@ -589,6 +643,13 @@ models:
     fallback:
       - model: gpt-4o-mini
       - model: gpt-oss-20b
+      # gpt-oss-20b was supposed to be the free floor here and never was — its
+      # `serves` entries named registry models instead of providers, so the
+      # router skipped them. These rungs resolve.
+      - provider: gemini
+        model: "gemini-2.5-flash-lite"
+      - model: nemotron-3-super
+      - model: laguna-s
 
 
   # Both rungs of the previous chain were dead, so the alias returned 502 for
@@ -735,6 +796,30 @@ models:
     primary:
       provider: 9router
       model: "anthropic/claude-3-5-sonnet-20241022"
+
+  # gamma.app. Three aliases rather than one because the format is chosen by the
+  # model name and the three are different artefacts: slides, a written
+  # document, a social post.
+  #
+  # No fallback, deliberately, and for the same reason nabu-header has none: a
+  # text model standing in for a deck returns prose where the caller asked for
+  # something to present. An error is the honest answer.
+  #
+  # The reply is a link, not the deck itself — Gamma hosts what it makes.
+  nabu-slides:
+    primary:
+      provider: gamma
+      model: "gamma-presentation"
+
+  nabu-doc:
+    primary:
+      provider: gamma
+      model: "gamma-document"
+
+  nabu-social:
+    primary:
+      provider: gamma
+      model: "gamma-social"
 
 images:
   nabu-image:
