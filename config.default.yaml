@@ -551,6 +551,43 @@ model_registry:
       - provider: parspack
         model: "openai/gpt-4o-mini-search-preview"
 
+  # Paid rungs that light up the moment any one of these accounts is topped up.
+  #
+  # A model is an identity, so each entry lists every vendor that sells it: put
+  # credit on OpenRouter, or GapGPT, or AvalAI, and the same alias starts
+  # serving from whichever is funded, with no config change and no redeploy.
+  # While every one of them is dry the router simply falls past these to the
+  # Gemini and free-tier rungs below, which costs a round trip and nothing else.
+  #
+  # They sit BELOW Gemini in every chain on purpose: Gemini is keyed and free
+  # today, so a funded account is reached only once Gemini's quota is spent.
+  claude-sonnet-5:
+    serves:
+      - provider: openrouter
+        model: "anthropic/claude-sonnet-5"
+      - provider: openrouter2
+        model: "anthropic/claude-sonnet-5"
+      - provider: gapgpt
+        model: "claude-sonnet-5"
+      - provider: anthropic
+        model: "claude-sonnet-5"
+
+  gpt-5.6-terra:
+    serves:
+      - provider: openrouter
+        model: "openai/gpt-5.6-terra"
+      - provider: openrouter2
+        model: "openai/gpt-5.6-terra"
+
+  gpt-5.6-luna:
+    serves:
+      - provider: openrouter
+        model: "openai/gpt-5.6-luna"
+      - provider: openrouter2
+        model: "openai/gpt-5.6-luna"
+      - provider: gapgpt
+        model: "gpt-5.6-luna"
+
   # OpenRouter free tier — these cost nothing, so they belong at the end of
   # chains as a floor rather than a failure.
   #
@@ -613,6 +650,7 @@ models:
       # gemini-2.5-pro is already 429 on it.
       - provider: gemini
         model: "gemini-2.5-flash"
+      - model: gpt-5.6-luna
       - model: laguna-s
 
 
@@ -634,6 +672,8 @@ models:
       # assumed to.
       - provider: gemini
         model: "gemini-2.5-flash"
+      - model: claude-sonnet-5
+      - model: gpt-5.6-terra
       - model: nemotron-3-ultra
 
 
@@ -648,6 +688,7 @@ models:
       # router skipped them. These rungs resolve.
       - provider: gemini
         model: "gemini-2.5-flash-lite"
+      - model: gpt-5.6-luna
       - model: nemotron-3-super
       - model: laguna-s
 
