@@ -9,7 +9,7 @@
 # resolved to Parspack, Parspack ran out of credit, and the gateway returned 502
 # for every message for as long as nobody happened to send one by hand.
 #
-# Probes cost a token or two each: max_tokens=1 against ~10 aliases, once a day.
+# Probes are cheap: a handful of tokens against ~10 aliases, once a day.
 #
 # Secrets are never written into this file. Provider keys are read at run time
 # out of the running gateway container, and the Telegram credentials come from
@@ -67,13 +67,22 @@ say() { OUT="${OUT}$1"$'\n'; }
 # A 200 with empty content is a failure, not a success: an upstream can close a
 # stream having emitted a role delta, a stop and nothing else, and reporting
 # that as healthy is how a dead alias stays dead.
+#
+# max_tokens has to leave room for an actual word. At 1 the model spends its
+# only token on a leading space or a reasoning preamble and returns nothing,
+# the router reads that as a failed target and walks the whole chain — so the
+# first run of this script reported nabu-smart and nabu-vision as down while
+# both answered "سلام" perfectly well to a normal request. The probe must not
+# be the thing that breaks.
+PROBE_MAX_TOKENS=16
+
 probe_alias() {
   local alias="$1"
   local body
   body="$(curl -s --max-time 45 \
     -H "Authorization: Bearer $ADMIN_KEY" \
     -H 'Content-Type: application/json' \
-    -d "{\"model\":\"$alias\",\"messages\":[{\"role\":\"user\",\"content\":\"ok\"}],\"max_tokens\":1}" \
+    -d "{\"model\":\"$alias\",\"messages\":[{\"role\":\"user\",\"content\":\"say ok\"}],\"max_tokens\":$PROBE_MAX_TOKENS}" \
     "$GATEWAY/chat/completions")"
 
   ALIAS_STATE="$(printf '%s' "$body" | python3 -c '
@@ -162,7 +171,7 @@ openrouter_credit "$OR_KEY_2" "OpenRouter #2"
 # the empty-wallet signal.
 PARS="$(curl -s --max-time 40 -H "Authorization: Bearer $ADMIN_KEY" \
   -H 'Content-Type: application/json' \
-  -d '{"model":"nabu-parspack","messages":[{"role":"user","content":"ok"}],"max_tokens":1}' \
+  -d '{"model":"nabu-parspack","messages":[{"role":"user","content":"say ok"}],"max_tokens":16}' \
   "$GATEWAY/chat/completions" | python3 -c '
 import json, sys
 try:

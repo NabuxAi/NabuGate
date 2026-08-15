@@ -712,6 +712,15 @@ models:
     fallback:
       - provider: gemini
         model: "gemini-2.5-flash"
+      # Gemini was the last rung, and on the free tier it answers 429 every
+      # other call — so this alias died whenever the quota bit, with nothing
+      # behind it. There is no free cross-vendor rung to offer: the one free
+      # multimodal model on OpenRouter that answers text at all
+      # (nemotron-3-nano-omni) returned 3KB of keepalive whitespace and no body
+      # when given an image, and nemotron-nano-12b-v2-vl does not return JSON.
+      # So the floor here is a paid one, and until an account is funded this
+      # alias is only as reliable as Gemini's free quota.
+      - model: claude-sonnet-5
 
   # Reading the text in an image, cheapest engine first.
   #
