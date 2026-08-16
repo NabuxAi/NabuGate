@@ -31,6 +31,10 @@ services:
       # set the OpenAI-compatible base URL incl. /v1 to enable, e.g.
       # http://ollama:11434/v1. Left empty, the ollama provider is skipped.
       - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-}
+      # llama.cpp — the self-hosted `llamacpp` service below. Keyless ultra-lightweight
+      # GGUF inference engine for local models (e.g. Qwen2.5-0.5B/1.5B) behind the
+      # `nabu-local` / `nabu-tiny` aliases. Set base URL to enable or blank to skip.
+      - LLAMACPP_BASE_URL=${LLAMACPP_BASE_URL:-http://llamacpp:8080/v1}
       - PARSPACK_API_KEY=${PARSPACK_API_KEY}
       # Whisper — the self-hosted `whisper` service below. Keyless, like
       # Ollama: set the OpenAI-compatible base URL to enable it, blank it to
@@ -140,6 +144,33 @@ services:
           memory: 3G
     restart: unless-stopped
 
+  # llama.cpp — self-hosted ultra-lightweight GGUF inference engine for local
+  # models (e.g. Qwen2.5-0.5B/1.5B) on CPU. OpenAI-wire compatible, pure C++,
+  # minimal idle overhead (~400MB-600MB RAM total with Q4 model and 2048 context).
+  # Downloads models automatically from Hugging Face on first boot and caches them.
+  llamacpp:
+    image: ghcr.io/ggerganov/llama.cpp:server
+    environment:
+      - LLAMA_ARG_HOST=0.0.0.0
+      - LLAMA_ARG_PORT=8080
+      - LLAMA_ARG_HF_REPO=${LLAMA_HF_REPO:-Qwen/Qwen2.5-0.5B-Instruct-GGUF}
+      - LLAMA_ARG_HF_FILE=${LLAMA_HF_FILE:-qwen2.5-0.5b-instruct-q4_k_m.gguf}
+      - LLAMA_ARG_CTX_SIZE=${LLAMA_CTX_SIZE:-2048}
+      - LLAMA_ARG_THREADS=${LLAMA_THREADS:-2}
+      - LLAMA_ARG_PARALLEL=1
+      - LLAMA_ARG_ALIAS=${LLAMA_MODEL_ALIAS:-qwen-local}
+    expose:
+      - "8080"
+    volumes:
+      # Model cache outlives container restarts
+      - llamacpp-models:/root/.cache/llama.cpp
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 1G
+    restart: unless-stopped
+
 volumes:
   nabugate-state:
     name: nabugate-state
@@ -147,3 +178,5 @@ volumes:
     name: ninerouter-data
   whisper-models:
     name: whisper-models
+  llamacpp-models:
+    name: llamacpp-models

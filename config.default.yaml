@@ -382,6 +382,15 @@ providers:
     type: openai
     base_url: "${OLLAMA_BASE_URL}"
 
+  # llama.cpp server — ultra-lightweight GGUF inference engine running local
+  # models (e.g. Qwen2.5-0.5B / Qwen2.5-1.5B) on CPU. Fully OpenAI-wire compatible.
+  # Skipped automatically when LLAMACPP_BASE_URL is unset.
+  llamacpp:
+    enabled: true
+    type: openai
+    base_url: "${LLAMACPP_BASE_URL}"
+    passthrough: true
+
 # Model registry — a model is an identity, not a provider coordinate.
 #
 # "gpt-5.5" is the same model whether Parspack, AvalAI or GapGPT serves it, and
@@ -777,8 +786,11 @@ models:
 
   nabu-local:
     primary:
-      provider: ollama
-      model: "llama3.1"
+      provider: llamacpp
+      model: "qwen-local"
+    fallback:
+      - provider: ollama
+        model: "llama3.1"
 
   nabu-parspack:
     primary:
