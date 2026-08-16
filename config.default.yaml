@@ -1172,6 +1172,9 @@ embeddings:
     primary:
       provider: parspack
       model: "openai/text-embedding-3-small"
+    fallback:
+      - provider: openrouter
+        model: "openai/text-embedding-3-small"
 
 # Sub-agents (system prompt + defaults over an alias, addressable as a "model").
 # The Cinematic Scrollytelling squad ships as one YAML file per agent under
