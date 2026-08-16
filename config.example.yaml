@@ -266,11 +266,13 @@ models:
 
   nabu-local:
     primary:
+      provider: ollama
+      model: "llama3.1"
+
+  nabu-tiny:
+    primary:
       provider: llamacpp
       model: "qwen-local"
-    fallback:
-      - provider: ollama
-        model: "llama3.1"
 
   nabu-parspack:
     primary:

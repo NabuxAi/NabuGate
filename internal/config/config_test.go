@@ -207,6 +207,40 @@ func TestDefaultConfigHasCloudflareAndTokenRouter(t *testing.T) {
 	}
 }
 
+// TestDefaultConfigHasLlamaCpp guards the wiring of the self-hosted llama.cpp
+// inference engine and the nabu-tiny alias in config.default.yaml.
+func TestDefaultConfigHasLlamaCpp(t *testing.T) {
+	t.Setenv("NABU_API_KEY", "admin-from-env")
+
+	raw, err := os.ReadFile("../../config.default.yaml")
+	if err != nil {
+		t.Fatalf("read config.default.yaml: %v", err)
+	}
+	cfg, err := Parse(string(raw))
+	if err != nil {
+		t.Fatalf("parse config.default.yaml: %v", err)
+	}
+
+	p, ok := cfg.Providers["llamacpp"]
+	if !ok {
+		t.Fatalf("default config should define provider llamacpp")
+	}
+	if p.Type != "openai" {
+		t.Errorf("llamacpp type = %q, want openai", p.Type)
+	}
+	if !p.Passthrough {
+		t.Error("llamacpp should be passthrough")
+	}
+
+	tiny, ok := cfg.Models["nabu-tiny"]
+	if !ok {
+		t.Fatalf("default config should define alias nabu-tiny")
+	}
+	if tiny.Primary.Provider != "llamacpp" {
+		t.Errorf("nabu-tiny primary provider = %q, want llamacpp", tiny.Primary.Provider)
+	}
+}
+
 func TestBuildAdaptersKeylessProvider(t *testing.T) {
 	withBase := &Config{Providers: map[string]ProviderConfig{
 		"ollama": {
