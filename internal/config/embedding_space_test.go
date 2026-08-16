@@ -37,10 +37,19 @@ func TestStoredIndexAliasesHaveExactlyOneRung(t *testing.T) {
 			t.Errorf("default config should define embedding alias %q", alias)
 			continue
 		}
-		if n := len(route.Fallback); n != 0 {
-			t.Errorf("%s has %d fallback rung(s); an alias backing a stored index must have exactly one target, "+
-				"because a second model writes a second geometry into the same collection with no error raised",
-				alias, n)
+		// The invariant is one SPACE, not one rung. A fallback rung that names
+		// the same model as the primary is the same weights reached over a
+		// different transport — one geometry. A fallback that names a different
+		// model is a second index, whatever its width. (2026-08: desk-embed
+		// gained an openrouter rung carrying the identical OpenAI model after
+		// parspack's wallet hit 402; that is the shape this permits.)
+		for i, rung := range route.Fallback {
+			if rung.Model != route.Primary.Model {
+				t.Errorf("%s fallback rung %d names model %q, primary names %q; an alias backing a stored index "+
+					"must stay in one embedding space, so every rung must carry the identical model — "+
+					"a different model writes a second geometry into the same collection with no error raised",
+					alias, i, rung.Model, route.Primary.Model)
+			}
 		}
 		if route.Primary.Provider == "" || route.Primary.Model == "" {
 			t.Errorf("%s: primary must name a provider and a model, got %+v", alias, route.Primary)
@@ -101,18 +110,21 @@ func TestStoredIndexAliasesPinTheirWidthOrLeaveItToTheCaller(t *testing.T) {
 		if !ok {
 			continue
 		}
-		p, ok := cfg.Providers[route.Primary.Provider]
-		if !ok {
-			t.Errorf("%s points at provider %q, which the config does not define",
-				alias, route.Primary.Provider)
-			continue
-		}
-		switch p.Type {
-		case "openai", "gemini":
-			// Both forward the client's `dimensions`.
-		default:
-			t.Errorf("%s: provider %q is type %q; a stored index needs a provider that "+
-				"forwards the caller's dimensions", alias, route.Primary.Provider, p.Type)
+		rungs := append([]Target{route.Primary}, route.Fallback...)
+		for _, rung := range rungs {
+			p, ok := cfg.Providers[rung.Provider]
+			if !ok {
+				t.Errorf("%s points at provider %q, which the config does not define",
+					alias, rung.Provider)
+				continue
+			}
+			switch p.Type {
+			case "openai", "gemini":
+				// Both forward the client's `dimensions`.
+			default:
+				t.Errorf("%s: provider %q is type %q; a stored index needs a provider that "+
+					"forwards the caller's dimensions", alias, rung.Provider, p.Type)
+			}
 		}
 	}
 }

@@ -1013,10 +1013,18 @@ embeddings:
   # Single rung, so a provider outage fails the embed — retryable — instead of
   # quietly writing a second geometry into the index. See write-embed below on
   # why the primary is not moved to the multilingual model yet.
+  #
+  # The fallback keeps ONE geometry: it is the same OpenAI model, merely
+  # proxied through OpenRouter when Parspack is out (2026-08: its wallet hit
+  # 402 and desk went silent). Same weights, same space — a width check that
+  # cannot certify space does not need to, because the space is identical.
   desk-embed:
     primary:
       provider: parspack
       model: "openai/text-embedding-3-small"
+    fallback:
+      - provider: openrouter
+        model: "openai/text-embedding-3-small"
 
   # NabuGen's content memory — 1024 wide, matching the column its schema
   # already declares, so enabling the feature needs no re-index.
