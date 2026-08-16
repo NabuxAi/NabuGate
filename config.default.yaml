@@ -661,6 +661,9 @@ models:
         model: "gemini-2.5-flash"
       - model: gpt-5.6-luna
       - model: laguna-s
+      # Ultimate local self-hosted fallback
+      - provider: llamacpp
+        model: "qwen-local"
 
 
   nabu-smart:
@@ -684,6 +687,9 @@ models:
       - model: claude-sonnet-5
       - model: gpt-5.6-terra
       - model: nemotron-3-ultra
+      # Ultimate local self-hosted fallback
+      - provider: llamacpp
+        model: "qwen-local"
 
 
   nabu-cheap:
@@ -700,6 +706,9 @@ models:
       - model: gpt-5.6-luna
       - model: nemotron-3-super
       - model: laguna-s
+      # Ultimate local self-hosted fallback
+      - provider: llamacpp
+        model: "qwen-local"
 
 
   # Both rungs of the previous chain were dead, so the alias returned 502 for

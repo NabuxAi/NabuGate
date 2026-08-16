@@ -149,7 +149,7 @@ services:
   # minimal idle overhead (~400MB-600MB RAM total with Q4 model and 2048 context).
   # Downloads models automatically from Hugging Face on first boot and caches them.
   llamacpp:
-    image: ghcr.io/ggerganov/llama.cpp:server
+    image: ghcr.io/ggml-org/llama.cpp:server
     environment:
       - LLAMA_ARG_HOST=0.0.0.0
       - LLAMA_ARG_PORT=8080
