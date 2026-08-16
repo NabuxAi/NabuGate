@@ -184,6 +184,18 @@ when someone reports a seizure or hallucinations. The app repeats those limits
 on its own side, and drops any reply containing dosing language. Treat edits to
 that file as changes to a safety contract, not copywriting.
 
+## SEO & Content Quality squad
+
+Three specialists and a flow (`seo-audit-team`) that audit On-Page SEO, synthesize Schema.org JSON-LD (FAQPage, VideoObject, Article), and compute 0-100 quality scores:
+
+| Agent | Role |
+|-------|------|
+| `seo-content-auditor`     | On-Page audit, headings structure, keyword density/LSI, CWV checks |
+| `seo-schema-engineer`     | JSON-LD structured data generator (FAQPage, VideoObject, Article) |
+| `seo-strategist-reviewer` | 100-point scoring, internal link graph strategy, Markdown report builder |
+
+Grant a project key the whole squad with a glob: `allow: ["seo-*"]`.
+
 ## Squads in this directory
 
 | prefix | purpose | source of truth |
@@ -191,6 +203,7 @@ that file as changes to a safety contract, not copywriting.
 | `cine-*` | cinematic scrollytelling: creative direction, motion, 3D, frontend, content, perf/a11y | this repo |
 | `nabusu-*` | NabuSu companion | this repo |
 | `write-*` | NabuWrite: composer, inline editor, edit classifier | **`NabuxAi/NabuWrite`** |
+| `seo-*` | SEO & schema engineering, content audit, quality scoring | this repo |
 
 ### Agents owned by another repo
 
