@@ -23,6 +23,7 @@ OpenAI-wire compatible, so any OpenAI client works by changing the base URL:
 | `POST /v1/images/generations` | Images |
 | `POST /v1/audio/speech` | Text to speech |
 | `GET /v1/models` | Aliases, agents and passthrough catalogues |
+| `GET /v1/agents` | Agents with their model and tool names |
 | `GET /v1/usage` | Tokens and cost for the calling key |
 | `GET /v1/photos/search` | Stock photos (Pexels) |
 
@@ -84,6 +85,14 @@ called exactly like a model:
 So any OpenAI-compatible client runs one in a single request, over the same
 fallback chain. Agents appear in `/v1/models` and are governed by the calling
 key's allow-list. `agents/` holds the Cinematic Scrollytelling squad.
+
+An agent can also declare `tools:` — HTTP functions the **gateway executes
+server-side** in a bounded tool-call loop, so a YAML file alone gives an agent
+the ability to query a shop, a CRM, any API. The caller changes nothing; a
+caller that sends its own `tools` keeps the plain pass-through. See
+[`agents/README.md`](agents/README.md) for the schema and the safety rails
+(SSRF guard, timeouts, step cap), and `agents/accountcity-support.yaml` for a
+worked example.
 
 ## Console single sign-on
 

@@ -55,6 +55,10 @@ type Server struct {
 	// every request behaves exactly as it did before.
 	memory *memory.Store
 
+	// toolExec runs agent-declared HTTP tools inside the chat tool-call loop
+	// (see tools.go). Built from the environment in New.
+	toolExec *agent.ToolExecutor
+
 	// logins rate-limits console sign-in attempts. See throttle.go.
 	logins *throttle
 }
@@ -94,7 +98,15 @@ func (s *Server) loadManagedAgents() {
 // (dev mode) and a warning is logged by the caller. agents may be nil or empty
 // when no sub-agents are configured.
 func New(r *router.Router, enforcer *policy.Enforcer, tracker *usage.Tracker, agents *agent.Registry, log *slog.Logger) *Server {
-	return &Server{router: r, policy: enforcer, usage: tracker, agents: agents, log: log, logins: newThrottle()}
+	return &Server{router: r, policy: enforcer, usage: tracker, agents: agents, log: log, logins: newThrottle(), toolExec: agent.NewToolExecutor()}
+}
+
+// WithToolExecutor overrides the agent-tool executor — tests use it to permit
+// loopback tool URLs without setting the process-wide env. Separate from New
+// for the same reason as the other attachments.
+func (s *Server) WithToolExecutor(e *agent.ToolExecutor) *Server {
+	s.toolExec = e
+	return s
 }
 
 // WithFlows attaches the flow registry. Separate from New for the same reason
@@ -120,6 +132,7 @@ func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", s.handleHealth)
 	mux.HandleFunc("GET /v1/models", s.auth(s.handleModels))
+	mux.HandleFunc("GET /v1/agents", s.auth(s.handleAgents))
 	mux.HandleFunc("GET /v1/health", s.auth(s.handleKeyHealth))
 	mux.HandleFunc("POST /v1/chat/completions", s.auth(s.handleChat))
 	mux.HandleFunc("POST /v1/responses", s.auth(s.handleResponses))
@@ -489,7 +502,10 @@ func (s *Server) handleChat(w http.ResponseWriter, r *http.Request) {
 	// inject its system prompt and default params and route to its underlying
 	// model. The client-facing name (alias) is still echoed back as the model.
 	routeModel := alias
-	if ag, ok := s.agents.Lookup(alias); ok {
+	var ag agent.Agent
+	isAgent := false
+	if found, ok := s.agents.Lookup(alias); ok {
+		ag, isAgent = found, true
 		applyAgentToChat(ag, &chatReq)
 		routeModel = ag.Model
 		w.Header().Set("X-Nabu-Agent", ag.Name)
@@ -506,6 +522,14 @@ func (s *Server) handleChat(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		w.Header().Set("X-Nabu-Conversation", convID)
+	}
+
+	// Agent tool calling: an agent that declares tools gets the server-side
+	// tool-call loop — unless the caller sent its own tools, in which case the
+	// caller's win and the request passes through untouched (see tools.go).
+	if isAgent && len(ag.Tools) > 0 && !clientSuppliesTools(raw) {
+		s.completeAgentTools(w, r, alias, ag, routeModel, chatReq, convID, newTurns, stream)
+		return
 	}
 
 	if stream {

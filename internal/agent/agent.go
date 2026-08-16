@@ -33,6 +33,14 @@ type Agent struct {
 	Temperature *float64
 	TopP        *float64
 	MaxTokens   *int
+
+	// Tools are functions the gateway executes server-side on the model's
+	// behalf (see tools.go). Empty means a plain prompt agent — the request
+	// flows exactly as before.
+	Tools []Tool
+	// MaxToolSteps bounds the tool-call loop (default DefaultMaxToolSteps,
+	// capped at MaxToolStepsCap).
+	MaxToolSteps int
 }
 
 // Registry is a lookup of agents by name, populated once at startup.
@@ -56,6 +64,12 @@ func (r *Registry) Add(a Agent) error {
 	if strings.TrimSpace(a.Model) == "" {
 		return fmt.Errorf("agent %q has no model", name)
 	}
+	if err := validateTools(a.Tools); err != nil {
+		return fmt.Errorf("agent %q: %w", name, err)
+	}
+	if a.MaxToolSteps < 0 || a.MaxToolSteps > MaxToolStepsCap {
+		return fmt.Errorf("agent %q max_tool_steps %d is outside 0..%d", name, a.MaxToolSteps, MaxToolStepsCap)
+	}
 	if _, dup := r.byName[name]; dup {
 		return fmt.Errorf("duplicate agent %q", name)
 	}
@@ -74,6 +88,12 @@ func (r *Registry) Set(a Agent) error {
 	}
 	if strings.TrimSpace(a.Model) == "" {
 		return fmt.Errorf("agent %q has no model", name)
+	}
+	if err := validateTools(a.Tools); err != nil {
+		return fmt.Errorf("agent %q: %w", name, err)
+	}
+	if a.MaxToolSteps < 0 || a.MaxToolSteps > MaxToolStepsCap {
+		return fmt.Errorf("agent %q max_tool_steps %d is outside 0..%d", name, a.MaxToolSteps, MaxToolStepsCap)
 	}
 	a.Name = name
 	r.byName[name] = a

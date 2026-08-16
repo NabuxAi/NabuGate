@@ -45,6 +45,111 @@ max_tokens: 2048
 Drop the file in, restart the gateway, and the agent is live. `${VAR}` env
 references are expanded, just like the main config.
 
+## Give an agent tools
+
+An agent can also carry **tools**: functions the model may call that **the
+gateway executes server-side** (inspired by NabuChat's HTTP tool). The caller
+sends one ordinary chat request and gets one ordinary answer — the tool
+traffic never leaves NabuGate:
+
+```
+caller ──▶ NabuGate ──▶ model: "call track_order(order_id=42)"
+              │                      ▲
+              ├──▶ GET shop API ◀────┘ result appended as role:tool
+              │                      ▲
+              └──▶ model: "سفارش شما ارسال شد." ──▶ caller
+```
+
+Declare them in the agent file — this is the whole "easy add" story, no code:
+
+```yaml
+name: accountcity-support
+model: nabu-smart
+system: |
+  تو دستیار پشتیبانی فروشگاه هستی. برای وضعیت سفارش از ابزار track_order استفاده کن.
+max_tool_steps: 4        # optional, default 4, max 8
+tools:
+  - name: track_order                 # the function name the model calls
+    type: http                        # the only executor so far
+    description: وضعیت سفارش مشتری را از فروشگاه می‌گیرد
+    method: GET
+    url: "https://shop.example.com/orders/{order_id}"
+    headers:
+      Authorization: "Basic ${SHOP_BASIC}"   # env, like the rest of the config
+    path_params: [order_id]           # substituted into {order_id} in the url
+    parameters:                        # JSON schema = what the model sees
+      type: object
+      properties:
+        order_id: {type: string, description: "شماره سفارش"}
+      required: [order_id]
+    timeout_ms: 8000                   # optional, default 8000, max 15000
+    max_response_bytes: 8192           # optional, truncate the tool result
+```
+
+How a call is built from the model's arguments:
+
+- `path_params` are URL-escaped into `{placeholder}`s in the url.
+- For body methods (POST/PUT/PATCH), `body_template` is sent as JSON with
+  `{{arg}}` placeholders filled; a value that is exactly `"{{arg}}"` keeps the
+  argument's JSON type. Header values also accept `{{arg}}`.
+- Any argument not consumed by the path or the body is appended as a query
+  parameter — so a plain GET tool needs nothing but `parameters`.
+- `${VAR}` in url/headers expands from the gateway environment when the agent
+  file loads (identical to the main config — set the vars before start), and
+  once more at call time.
+
+A complete, working example lives in `accountcity-support.yaml`.
+
+### The rules of the loop
+
+- **Client tools win.** If the caller sends its own `tools`, the gateway
+  injects nothing and runs no loop: the request passes through untouched,
+  exactly as before. Agent tools apply only to requests that bring none.
+- **Bounded.** The loop runs at most `max_tool_steps` rounds (default 4, hard
+  cap 8). A model still asking for tools after that gets one final call with
+  the tools removed, so it answers with what it gathered. Usage is summed over
+  every round-trip and billed once. `X-Nabu-Tool-Calls` counts executions.
+- **Tool failures are answers, not errors.** A timeout, an HTTP 500, an
+  unknown function name — each goes back to the model as the tool result so it
+  can retry or apologise. Only provider failures fail the request.
+- **Streaming is stream-shaped.** Tool calling needs the full exchange before
+  the answer exists, so `stream: true` runs the loop non-streamed and returns
+  the finished answer as one SSE delta. SSE clients keep working; the answer
+  simply arrives all at once.
+- **OpenAI-wire providers only.** The loop needs the OpenAI `tools` /
+  `tool_calls` contract end to end, which the Anthropic and Gemini adapters do
+  not translate. An agent with tools whose `model` routes to such a provider
+  fails fast with a 400 explaining the limitation. `/v1/responses` is not
+  tool-looped either — it keeps its raw proxy behaviour. Inside a `flows/`
+  chain, a step naming a tool-bearing agent runs as a plain prompt agent: the
+  chain drives the conversation, so its tools are simply not offered.
+
+### Safety rails (the executor assumes a hostile model)
+
+- Only `http`/`https`; redirects capped at 3, every hop re-validated.
+- **SSRF guard**: loopback, RFC1918, link-local and other non-public targets
+  are refused at dial time. For a tool that legitimately points inside your
+  own network, set `NABUGATE_TOOL_SSRF_ALLOW=1` on the gateway — deliberately,
+  and only with agent YAML you trust.
+- The caller's `Authorization` header is never forwarded to a tool endpoint;
+  a tool call carries only the headers its YAML declares.
+- Every call is time-boxed (`timeout_ms`, max 15 s) and its result truncated
+  (`max_response_bytes`, max 64 KiB).
+- A broken declaration (bad schema, unknown type, duplicate name) skips the
+  agent with a startup warning — it never fails a request halfway through.
+
+### Discovering tools
+
+`GET /v1/agents` (same auth as everything else) lists agents with their model
+and tool names, scoped to the calling key's allow-list:
+
+```json
+{ "object": "list", "data": [
+  { "name": "accountcity-support", "model": "nabu-smart",
+    "tools": ["track_order", "follow_up_order"], "max_tool_steps": 4 }
+]}
+```
+
 ## The Cinematic Scrollytelling squad
 
 Seven specialists that together produce Apple-style, scroll-driven product

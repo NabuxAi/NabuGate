@@ -187,6 +187,17 @@ type ModelLister interface {
 	ListModels(ctx context.Context) ([]string, error)
 }
 
+// ToolCapableAdapter marks adapters whose Chat speaks the OpenAI tool wire
+// format end to end: a "tools" array goes out with the request and a
+// "tool_calls" array comes back parsed in ChatResponse.ToolCalls. The agent
+// tool loop can only run on such providers; adapters that translate into a
+// different native schema (Anthropic, Gemini) do not implement it, so the
+// server can refuse a tool-bearing agent routed there with a clear error
+// instead of silently dropping the tools.
+type ToolCapableAdapter interface {
+	SupportsTools() bool
+}
+
 // ResponsesAdapter is implemented by OpenAI-wire providers that expose the
 // Responses API (POST /v1/responses). The gateway proxies the request body
 // verbatim (only "model" is rewritten to the resolved upstream model) and

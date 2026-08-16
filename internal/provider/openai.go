@@ -31,6 +31,11 @@ func NewOpenAIAdapter(name, baseURL, apiKey string, extraHeaders map[string]stri
 
 func (a *OpenAIAdapter) Name() string { return a.name }
 
+// SupportsTools implements ToolCapableAdapter: the raw-body forwarding in
+// buildBody carries "tools" upstream untouched and Chat parses "tool_calls"
+// back out, which is everything the agent tool loop needs.
+func (a *OpenAIAdapter) SupportsTools() bool { return true }
+
 type openAIChatResponse struct {
 	Choices []struct {
 		Message struct {
