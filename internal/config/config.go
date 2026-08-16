@@ -3,6 +3,7 @@
 package config
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -84,6 +85,29 @@ type AgentConfig struct {
 	Temperature *float64 `yaml:"temperature"`
 	TopP        *float64 `yaml:"top_p"`
 	MaxTokens   *int     `yaml:"max_tokens"`
+
+	// Tools are server-side functions the agent's model may call (see
+	// agents/README.md). MaxToolSteps bounds the tool-call loop.
+	Tools        []ToolConfig `yaml:"tools"`
+	MaxToolSteps int          `yaml:"max_tool_steps"`
+}
+
+// ToolConfig is one agent tool as written in YAML. Parameters is kept as a
+// free-form map because it is a JSON schema — the gateway does not interpret
+// it, it forwards it to the model verbatim as the function signature.
+type ToolConfig struct {
+	Name         string            `yaml:"name"`
+	Type         string            `yaml:"type"` // "http" (the only executor so far)
+	Description  string            `yaml:"description"`
+	Method       string            `yaml:"method"`
+	URL          string            `yaml:"url"`
+	Headers      map[string]string `yaml:"headers"`
+	PathParams   []string          `yaml:"path_params"`
+	BodyTemplate map[string]any    `yaml:"body_template"`
+	Parameters   map[string]any    `yaml:"parameters"`
+
+	TimeoutMS        int `yaml:"timeout_ms"`
+	MaxResponseBytes int `yaml:"max_response_bytes"`
 }
 
 // ServerConfig holds gateway listen options and the internal API keys that
@@ -447,17 +471,52 @@ func loadFlowFile(path string) (FlowConfig, error) {
 }
 
 // toAgent converts a YAML AgentConfig into a runtime agent.Agent with the given
-// resolved name.
+// resolved name. A tool whose parameters schema cannot be re-encoded as JSON
+// (a YAML quirk such as a non-string map key) is left with empty Parameters,
+// which Tool.Validate then reports as a missing schema at registration — the
+// same "skip and warn" path as every other bad agent field.
 func (ac AgentConfig) toAgent(name string) agent.Agent {
 	return agent.Agent{
-		Name:        name,
-		Description: ac.Description,
-		Model:       ac.Model,
-		System:      ac.System,
-		Temperature: ac.Temperature,
-		TopP:        ac.TopP,
-		MaxTokens:   ac.MaxTokens,
+		Name:         name,
+		Description:  ac.Description,
+		Model:        ac.Model,
+		System:       ac.System,
+		Temperature:  ac.Temperature,
+		TopP:         ac.TopP,
+		MaxTokens:    ac.MaxTokens,
+		Tools:        toolsToAgent(ac.Tools),
+		MaxToolSteps: ac.MaxToolSteps,
 	}
+}
+
+// toolsToAgent converts YAML tool declarations into runtime tools.
+func toolsToAgent(cfgs []ToolConfig) []agent.Tool {
+	if len(cfgs) == 0 {
+		return nil
+	}
+	out := make([]agent.Tool, 0, len(cfgs))
+	for _, tc := range cfgs {
+		var params json.RawMessage
+		if tc.Parameters != nil {
+			if b, err := json.Marshal(tc.Parameters); err == nil {
+				params = b
+			}
+		}
+		out = append(out, agent.Tool{
+			Name:             tc.Name,
+			Type:             tc.Type,
+			Description:      tc.Description,
+			Method:           tc.Method,
+			URL:              tc.URL,
+			Headers:          tc.Headers,
+			PathParams:       tc.PathParams,
+			BodyTemplate:     tc.BodyTemplate,
+			Parameters:       params,
+			TimeoutMS:        tc.TimeoutMS,
+			MaxResponseBytes: tc.MaxResponseBytes,
+		})
+	}
+	return out
 }
 
 // agentFiles lists the *.yaml/*.yml files in dir, sorted for deterministic load

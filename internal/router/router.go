@@ -230,6 +230,32 @@ func (r *Router) KnowsAlias(name string) bool {
 	return ok
 }
 
+// ToolUncapableTargets returns the live targets behind a chat alias whose
+// adapters do NOT speak the OpenAI tool wire format (see
+// provider.ToolCapableAdapter). An agent that declares tools needs every
+// target it might land on to be tool-capable: if one rung of the fallback
+// chain cannot carry tools, a request that fell back to it would silently
+// lose them, which reads as the model ignoring its tools. The caller turns a
+// non-empty result into a clear configuration error. The bool reports whether
+// the alias resolved at all (false = unknown alias).
+func (r *Router) ToolUncapableTargets(alias string) ([]string, bool) {
+	targets, ok := r.resolveChatTargets(alias)
+	if !ok {
+		return nil, false
+	}
+	var out []string
+	for _, t := range targets {
+		adapter, live := r.adapters[t.Provider]
+		if !live {
+			continue // already skipped at call time; not this check's problem
+		}
+		if cap, isAdapter := adapter.(provider.ToolCapableAdapter); !isAdapter || !cap.SupportsTools() {
+			out = append(out, t.Provider)
+		}
+	}
+	return out, true
+}
+
 // Aliases returns the configured public model aliases.
 func (r *Router) Aliases() []string {
 	out := make([]string, 0, len(r.models))

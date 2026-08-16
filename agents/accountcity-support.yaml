@@ -1,0 +1,62 @@
+# AccountCity (اکانت‌سیتی) — support agent with server-side tools.
+#
+# Living documentation for agent tools: the model is offered two functions,
+# and the GATEWAY executes them (see agents/README.md → "Give an agent tools").
+# The caller sends one ordinary chat request; the tool traffic never leaves
+# NabuGate.
+#
+# Required env on the gateway (the YAML references them, nothing works without):
+#   ACCOUNT30T_WOO_BASIC     — WooCommerce REST basic-auth credential (base64 of key:secret)
+#   VENDOR_FOLLOWUP_TOKEN    — bearer token for the vendor follow-up endpoint
+name: accountcity-support
+description: "پشتیبانی فروشگاه اکانت‌سیتی: پیگیری سفارش و ثبت درخواست پیگیری از فروشنده"
+model: nabu-smart
+max_tool_steps: 4
+system: |
+  تو دستیار پشتیبانی فروشگاه «اکانت‌سیتی» هستی.
+
+  - برای وضعیت سفارش همیشه از ابزار track_order استفاده کن؛ از حافظه‌ات حدس نزن.
+  - اگر سفارش بیش از حد معمول تاخیر داشت یا مشتری ناراضی بود، با ابزار
+    follow_up_order برای فروشنده پیام بگذار و به مشتری بگو پیام ثبت شد.
+  - شماره سفارش را از مشتری بپرس اگر نگفته باشد.
+  - فارسیِ طبیعی و کوتاه. قیمت یا وضعیتی که ابزار برنگردانده از خودت نساز.
+tools:
+  - name: track_order
+    type: http
+    description: وضعیت سفارش مشتری را از فروشگاه می‌گیرد
+    method: GET
+    url: "https://account30t.com/wp-json/wc/v3/orders/{order_id}"
+    headers:
+      Authorization: "Basic ${ACCOUNT30T_WOO_BASIC}"
+    path_params: [order_id]
+    parameters:
+      type: object
+      properties:
+        order_id:
+          type: string
+          description: "شماره سفارش"
+      required: [order_id]
+    timeout_ms: 8000
+    max_response_bytes: 8192
+  - name: follow_up_order
+    type: http
+    description: درخواست پیگیری سفارش را برای فروشنده ثبت می‌کند
+    method: POST
+    url: "https://account30t.nabuxai.com/api/vendor-followup"
+    headers:
+      Authorization: "Bearer ${VENDOR_FOLLOWUP_TOKEN}"
+      Content-Type: application/json
+    body_template:
+      order_number: "{{order_number}}"
+      message: "{{message}}"
+      source: nabugate
+    parameters:
+      type: object
+      properties:
+        order_number:
+          type: string
+          description: "شماره سفارش"
+        message:
+          type: string
+          description: "متن پیام برای فروشنده"
+      required: [order_number, message]
