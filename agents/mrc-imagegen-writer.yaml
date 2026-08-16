@@ -1,7 +1,6 @@
-# SOURCE OF TRUTH: NabuxAi/mrc_imagegen -> agents/mrc-imagegen-writer.yaml
-# Tracked here too because the gateway loads agents from this repo at deploy
-# time. Edit it there and copy across; a change made only here will be
-# overwritten by the next sync.
+# SOURCE OF TRUTH. The gateway loads agents from NabuxAi/NabuGate at deploy
+# time, so a copy of this file lives there too. Edit it here, then copy it
+# across — an agent that exists only in this repo never reaches the gateway.
 #
 # The copywriter behind the studio's "بساز" button.
 #
