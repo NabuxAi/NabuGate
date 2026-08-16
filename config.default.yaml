@@ -9,12 +9,19 @@ server:
   api_keys:
     - "${NABU_API_KEY}"
   keys:
-    # NabuWrite. One glob covers its three write-* agents and the write-embed
-    # alias, so the project key cannot reach any other model on the gateway.
+    # NabuWrite. Covers its three write-* agents, write-embed, and nabu-* aliases.
     # Skipped automatically when NABUWRITE_KEY is unset.
     - key: "${NABUWRITE_KEY}"
       project: "nabuwrite"
-      allow: ["write-*"]
+      allow: ["write-*", "nabu-*"]
+      rate_limit: 120
+
+    # Cinematic Website Generator (cinemate).
+    # Allows cine-* agents, standard nabu-* aliases, and photos.
+    # Skipped automatically when CINEMATIC_KEY is unset.
+    - key: "${CINEMATIC_KEY}"
+      project: "cinematic"
+      allow: ["nabu-*", "cine-*"]
       rate_limit: 120
 
     # Dadebaran (dadebaran.ir) presents the gateway catalogue as its model

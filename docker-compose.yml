@@ -16,6 +16,15 @@ services:
       # set NABU_ALLOW_NO_AUTH=1 to explicitly run without auth for local dev).
       - NABU_API_KEY=${NABU_API_KEY:-}
       - NABU_ALLOW_NO_AUTH=${NABU_ALLOW_NO_AUTH:-}
+      # Scoped project keys (Principle of least privilege)
+      - NABUWRITE_KEY=${NABUWRITE_KEY:-}
+      - CINEMATIC_KEY=${CINEMATIC_KEY:-}
+      - NABUDESK_KEY=${NABUDESK_KEY:-}
+      - NABUCHAT_KEY=${NABUCHAT_KEY:-}
+      - NABUVOICE_KEY=${NABUVOICE_KEY:-}
+      - NABUGEN_KEY=${NABUGEN_KEY:-}
+      - NABUSU_KEY=${NABUSU_KEY:-}
+      - ZOOEY_KEY=${ZOOEY_KEY:-}
       # Coolify magic variable: auto-assign a domain for this service and route
       # it to the gateway's port 8080. Coolify fills it in (or use your own
       # domain under Configuration → Domains). Ignored outside Coolify.
