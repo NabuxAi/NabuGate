@@ -1176,6 +1176,22 @@ embeddings:
       - provider: openrouter
         model: "openai/text-embedding-3-small"
 
+  qwen-embed:
+    primary:
+      provider: llamacpp
+      model: "gte-qwen2-local"
+    fallback:
+      - provider: openrouter
+        model: "openai/text-embedding-3-small"
+
+  local-embed:
+    primary:
+      provider: llamacpp
+      model: "gte-qwen2-local"
+    fallback:
+      - provider: openrouter
+        model: "openai/text-embedding-3-small"
+
 # Sub-agents (system prompt + defaults over an alias, addressable as a "model").
 # The Cinematic Scrollytelling squad ships as one YAML file per agent under
 # /app/agents in the image (./agents in the repo). Add your own inline under an

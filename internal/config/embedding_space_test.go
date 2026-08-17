@@ -72,7 +72,11 @@ func TestEveryEmbeddingAliasIsClassified(t *testing.T) {
 	cfg := loadDefaultConfig(t)
 
 	// Aliases whose vectors are consumed immediately and never stored.
-	queryTimeAliases := map[string]bool{"nabu-embed": true}
+	queryTimeAliases := map[string]bool{
+		"nabu-embed":  true,
+		"qwen-embed":  true,
+		"local-embed": true,
+	}
 
 	stored := map[string]bool{}
 	for _, a := range storedIndexAliases {
