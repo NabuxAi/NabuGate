@@ -98,9 +98,6 @@ export class NabuGate implements INodeType {
 				displayName: 'Flow Name or ID',
 				name: 'flowName',
 				type: 'options',
-				typeOptions: {
-					loadOptionsMethod: 'getFlows',
-				},
 				displayOptions: {
 					show: {
 						resource: ['agent'],
@@ -108,7 +105,7 @@ export class NabuGate implements INodeType {
 					},
 				},
 				default: 'seo-audit-team',
-				description: 'Select the multi-agent flow to execute. Choose from the list, or specify an ID using an <a href="https://docs.n8n.io/code-examples/expressions/">expression</a>.',
+				description: 'Select the multi-agent flow to execute. Choose from the list, or specify an ID using an expression.',
 				options: [
 					{ name: 'SEO Audit Team (seo-audit-team)', value: 'seo-audit-team' },
 					{ name: 'Sales Team (sales-team)', value: 'sales-team' },
@@ -381,7 +378,10 @@ export class NabuGate implements INodeType {
 		const returnData: INodeExecutionData[] = [];
 
 		const credentials = await this.getCredentials('nabuGateApi');
-		const baseUrl = ((credentials.baseUrl as string) || 'http://localhost:8080/v1').replace(/\/+$/, '');
+		let baseUrl = ((credentials.baseUrl as string) || 'https://gate.nabuxai.com/v1').replace(/\/+$/, '');
+		if (!baseUrl.endsWith('/v1') && !baseUrl.endsWith('/v1beta')) {
+			baseUrl += '/v1';
+		}
 		const apiKey = credentials.apiKey as string;
 
 		for (let i = 0; i < items.length; i++) {
@@ -430,7 +430,6 @@ export class NabuGate implements INodeType {
 						json: true,
 					});
 
-					// Extract convenient shortcuts
 					const content = responseData?.choices?.[0]?.message?.content || '';
 					responseData = {
 						content,

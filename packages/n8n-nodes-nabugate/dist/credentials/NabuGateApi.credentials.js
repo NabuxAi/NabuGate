@@ -12,8 +12,8 @@ class NabuGateApi {
                 displayName: 'Base URL',
                 name: 'baseUrl',
                 type: 'string',
-                default: 'http://localhost:8080/v1',
-                description: 'Base URL of your NabuGate instance (e.g. http://localhost:8080/v1 or https://gateway.nabuxai.com/v1)',
+                default: 'https://gate.nabuxai.com/v1',
+                description: 'Base URL of your NabuGate gateway instance (e.g. https://gate.nabuxai.com/v1 or http://localhost:8080/v1)',
                 required: true,
             },
             {
@@ -24,7 +24,7 @@ class NabuGateApi {
                     password: true,
                 },
                 default: '',
-                description: 'The API key or Project key configured in NabuGate',
+                description: 'The API key or Project token configured in NabuGate',
                 required: true,
             },
         ];

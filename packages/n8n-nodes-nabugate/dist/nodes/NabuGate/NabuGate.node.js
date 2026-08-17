@@ -324,7 +324,10 @@ class NabuGate {
         const items = this.getInputData();
         const returnData = [];
         const credentials = await this.getCredentials('nabuGateApi');
-        const baseUrl = (credentials.baseUrl || 'http://localhost:8080/v1').replace(/\/+$/, '');
+        let baseUrl = (credentials.baseUrl || 'https://gate.nabuxai.com/v1').replace(/\/+$/, '');
+        if (!baseUrl.endsWith('/v1') && !baseUrl.endsWith('/v1beta')) {
+            baseUrl += '/v1';
+        }
         const apiKey = credentials.apiKey;
 
         for (let i = 0; i < items.length; i++) {

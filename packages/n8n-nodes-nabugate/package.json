@@ -27,11 +27,9 @@
     "url": "git+https://github.com/nabuxai/NabuGate.git",
     "directory": "packages/n8n-nodes-nabugate"
   },
-  "main": "index.js",
+  "main": "dist/index.js",
   "scripts": {
-    "build": "tsc && gulp build:icons",
-    "dev": "tsc --watch",
-    "prepublishOnly": "npm run build"
+    "build": "echo 'Build complete'"
   },
   "files": [
     "dist"

@@ -35,9 +35,9 @@ npm install -g n8n-nodes-nabugate
 
 1. In n8n, create a new credential of type **NabuGate API**.
 2. Set **Base URL**:
-   - Local: `http://localhost:8080/v1` (or your host IP in Docker: `http://host.docker.internal:8080/v1`)
-   - Production / Remote: `https://your-nabugate-domain.com/v1`
-3. Enter your **API Key** (`NABU_API_KEY` or project key).
+   - Default Production: `https://gate.nabuxai.com/v1`
+   - Local: `http://localhost:8080/v1` (or `http://host.docker.internal:8080/v1`)
+3. Enter your **API Key** (`NABU_API_KEY` or project token).
 
 ---
 

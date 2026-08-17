@@ -16,7 +16,7 @@ set -uo pipefail
 VERSION="${VERSION:-1.0.0}"
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 TARGETS=("$@")
-[ ${#TARGETS[@]} -eq 0 ] && TARGETS=(node python rust dart laravel go)
+[ ${#TARGETS[@]} -eq 0 ] && TARGETS=(node n8n python rust dart laravel go)
 
 pass() { printf '  \033[32m✓\033[0m %s\n' "$1"; }
 fail() { printf '  \033[31m✗\033[0m %s\n' "$1"; FAILED=1; }
@@ -36,6 +36,19 @@ if wants node; then
       && npm version "$VERSION" --no-git-tag-version --allow-same-version >/dev/null \
       && npm publish --access public ) \
       && pass "published $VERSION as $(npm whoami)" || fail "npm publish failed"
+  fi
+fi
+
+# ----------------------------------------------------------- n8n Community Node
+if wants n8n; then
+  echo "n8n community node — n8n-nodes-nabugate"
+  if ! npm whoami >/dev/null 2>&1; then
+    skip "not logged in to npm. Run: npm login"
+  else
+    ( cd "$ROOT/packages/n8n-nodes-nabugate" \
+      && npm version "$VERSION" --no-git-tag-version --allow-same-version >/dev/null \
+      && npm publish --access public ) \
+      && pass "published $VERSION to npm / n8n community as $(npm whoami)" || fail "n8n npm publish failed"
   fi
 fi
 
