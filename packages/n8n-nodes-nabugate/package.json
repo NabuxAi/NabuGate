@@ -1,0 +1,54 @@
+{
+  "name": "n8n-nodes-nabugate",
+  "version": "1.0.0",
+  "description": "n8n community node for NabuGate AI gateway & multi-agent flows",
+  "keywords": [
+    "n8n-community-node-package",
+    "n8n-nodes-nabugate",
+    "nabugate",
+    "nabux",
+    "ai",
+    "multi-agent",
+    "llm",
+    "openai",
+    "gemini",
+    "anthropic",
+    "seo"
+  ],
+  "license": "MIT",
+  "homepage": "https://github.com/nabuxai/NabuGate#readme",
+  "author": {
+    "name": "NabuX Team",
+    "email": "support@nabuxai.com",
+    "url": "https://nabuxai.com"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nabuxai/NabuGate.git",
+    "directory": "packages/n8n-nodes-nabugate"
+  },
+  "main": "index.js",
+  "scripts": {
+    "build": "tsc && gulp build:icons",
+    "dev": "tsc --watch",
+    "prepublishOnly": "npm run build"
+  },
+  "files": [
+    "dist"
+  ],
+  "n8n": {
+    "n8nNodesApiVersion": 1,
+    "credentials": [
+      "dist/credentials/NabuGateApi.credentials.js"
+    ],
+    "nodes": [
+      "dist/nodes/NabuGate/NabuGate.node.js"
+    ]
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "gulp": "^4.0.2",
+    "n8n-workflow": "^1.24.0",
+    "typescript": "^5.3.3"
+  }
+}

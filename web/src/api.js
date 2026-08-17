@@ -96,6 +96,38 @@ export const listAdmins = () => req('/admins');
 export const createAdmin = (username, password) =>
   req('/admins', { method: 'POST', body: JSON.stringify({ username, password }) });
 
-// ---- sub-agents -------------------------------------------------------------
+// ---- sub-agents & flows ----------------------------------------------------
 
 export const listAgents = () => req('/agents');
+
+export const saveAgent = (agent) =>
+  req('/agents', {
+    method: 'POST',
+    body: JSON.stringify(agent),
+  });
+
+export const deleteAgent = (name) =>
+  req(`/agents/${encodeURIComponent(name)}`, { method: 'DELETE' });
+
+export const testAgent = (name, message) =>
+  req(`/agents/${encodeURIComponent(name)}/test`, {
+    method: 'POST',
+    body: JSON.stringify({ message }),
+  });
+
+export const listFlows = () => req('/flows');
+
+export const saveFlow = (flow) =>
+  req('/flows', {
+    method: 'POST',
+    body: JSON.stringify(flow),
+  });
+
+export const deleteFlow = (name) =>
+  req(`/flows/${encodeURIComponent(name)}`, { method: 'DELETE' });
+
+export const testFlow = (name, message) =>
+  req(`/flows/${encodeURIComponent(name)}/test`, {
+    method: 'POST',
+    body: JSON.stringify({ message }),
+  });

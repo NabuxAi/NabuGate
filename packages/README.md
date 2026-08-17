@@ -4,9 +4,10 @@ One client per language, all against the same OpenAI-compatible gateway. Every
 package covers the whole surface: chat, streaming, embeddings, images, speech,
 the model catalogue and usage.
 
-| Language | Package | Registry | Published |
+| Language / Platform | Package | Registry | Published |
 |---|---|---|---|
 | Node / TypeScript | `@nabugate/sdk` | npm | yes |
+| n8n Integration | `n8n-nodes-nabugate` | npm / n8n community | yes |
 | Rust | `nabugate` | crates.io | yes |
 | Dart / Flutter | `nabugate_sdk` | pub.dev | yes |
 | Go | `github.com/nabuxai/nabugate-go` | Go modules | yes |
