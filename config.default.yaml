@@ -398,6 +398,13 @@ providers:
     base_url: "${LLAMACPP_BASE_URL}"
     passthrough: true
 
+  # infinity embedding server — high-throughput, low-latency ONNX/PyTorch engine
+  infinity:
+    enabled: true
+    type: openai
+    base_url: "${INFINITY_BASE_URL:-http://infinity-embed:7997}"
+    passthrough: true
+
 # Model registry — a model is an identity, not a provider coordinate.
 #
 # "gpt-5.5" is the same model whether Parspack, AvalAI or GapGPT serves it, and
@@ -1188,6 +1195,14 @@ embeddings:
     primary:
       provider: llamacpp
       model: "gte-qwen2-local"
+    fallback:
+      - provider: openrouter
+        model: "openai/text-embedding-3-small"
+
+  fast-embed:
+    primary:
+      provider: infinity
+      model: "multilingual-minilm"
     fallback:
       - provider: openrouter
         model: "openai/text-embedding-3-small"

@@ -76,6 +76,7 @@ func TestEveryEmbeddingAliasIsClassified(t *testing.T) {
 		"nabu-embed":  true,
 		"qwen-embed":  true,
 		"local-embed": true,
+		"fast-embed":  true,
 	}
 
 	stored := map[string]bool{}
