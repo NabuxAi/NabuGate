@@ -308,6 +308,7 @@ providers:
     enabled: true
     type: openai
     base_url: "${NINEROUTER_BASE_URL}"
+    api_key_env: "NINEROUTER_API_KEY"
     passthrough: true
 
   anthropic:
@@ -882,7 +883,12 @@ models:
   nabu-9router:
     primary:
       provider: 9router
-      model: "anthropic/claude-3-5-sonnet-20241022"
+      model: "gemini/gemini-2.5-flash"
+    fallback:
+      - provider: 9router
+        model: "openrouter/openai/gpt-4o-mini"
+      - provider: 9router
+        model: "gemini/gemini-2.5-pro"
 
   # gamma.app. Three aliases rather than one because the format is chosen by the
   # model name and the three are different artefacts: slides, a written
