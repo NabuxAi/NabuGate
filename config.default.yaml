@@ -57,6 +57,15 @@ server:
       allow: ["nabu-*", "gen-*", "openrouter/*"]
       rate_limit: 240
 
+    # RASAD GCC. rasad-* covers rasad-embed, the single-rung multilingual alias
+    # its Postgres vector column is pinned to. nabu-* covers the chat aliases it
+    # uses for summarising an opportunity. No passthrough glob: RASAD names
+    # portable aliases only.
+    - key: "${RASAD_KEY}"
+      project: "rasad-gcc"
+      allow: ["nabu-*", "rasad-*"]
+      rate_limit: 240
+
     # NabuChat. chat-* covers its no-fallback embedding alias.
     - key: "${NABUCHAT_KEY}"
       project: "nabuchat"
