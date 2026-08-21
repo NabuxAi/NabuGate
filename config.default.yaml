@@ -1112,6 +1112,29 @@ embeddings:
       provider: gemini
       model: "gemini-embedding-001"
 
+  # RASAD GCC's tender and catalog index — 1536 wide.
+  #
+  # Its corpus is Arabic (Omani tender titles, government buyer names) and its
+  # queries are matched against an English seller catalog, so this is exactly the
+  # cross-lingual case documented on chat-embed above: measured through this
+  # gateway, 3-small scored correct cross-lingual pairs 0.189-0.323 while
+  # gemini-embedding-001 scored them 0.663-0.691. 3-small would put nearly every
+  # correct Arabic↔English match below any usable threshold.
+  #
+  # Single rung. The vectors are stored in Postgres, and there is no other
+  # multilingual model in this gateway sharing gemini's geometry — so a fallback
+  # could only write a second space into the same column, which reads as a
+  # plausible score and means nothing. Failing the embed is retryable; a silently
+  # poisoned index is not.
+  #
+  # gemini-embedding-001 defaults to 3072, so THE CALLER MUST SEND
+  # `dimensions: 1536`. RASAD verifies the returned width before every insert and
+  # stores embed_model and embed_dim per row so a stale vector is detectable.
+  rasad-embed:
+    primary:
+      provider: gemini
+      model: "gemini-embedding-001"
+
   # Zooey's semantic-memory index — 768 wide.
   #
   # Its Qdrant collection is declared at `"size": 768`, inherited from the
