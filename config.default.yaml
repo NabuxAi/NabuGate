@@ -412,7 +412,14 @@ providers:
   infinity:
     enabled: true
     type: openai
-    base_url: "${INFINITY_BASE_URL:-http://infinity-embed:7997}"
+    # Literal, not "${INFINITY_BASE_URL:-...}". This file is expanded with Go's
+    # os.ExpandEnv, which is not a shell: it has no :- default form and renders
+    # the whole reference as an empty string when the variable is unset. The
+    # provider was then dropped every boot with "keyless provider needs a
+    # base_url", so every alias pointing at it fell through — rasad-embed-local
+    # had no target at all, and fast-embed silently answered from its openrouter
+    # rung instead of the local engine it names first.
+    base_url: "http://infinity-embed:7997"
     passthrough: true
 
 # Model registry — a model is an identity, not a provider coordinate.
