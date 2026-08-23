@@ -10,7 +10,15 @@ import (
 // Each names a persisted index: NabuChat's Qdrant collection, NabuWrite's
 // pgvector column, NabuDesk's Qdrant collections, NabuGen's content_memory.
 // An alias in this list must resolve to exactly one provider/model pair.
-var storedIndexAliases = []string{"chat-embed", "write-embed", "desk-embed", "gen-embed", "zooey-embed"}
+// nabu-embed-v2 is here despite having no consumer yet, and that is the point:
+// it is single-rung, and listing it holds it to the one-geometry rule from the
+// day it is added rather than from the day someone first points an index at it.
+// A general-purpose alias that later grows a fallback is exactly how write-embed
+// went wrong.
+var storedIndexAliases = []string{
+	"chat-embed", "write-embed", "desk-embed", "gen-embed", "zooey-embed",
+	"rasad-embed", "rasad-embed-local", "nabu-embed-v2",
+}
 
 // A fallback between two embedding models is not a fallback, it is two indexes.
 //

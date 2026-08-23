@@ -834,6 +834,26 @@ models:
       provider: llamacpp
       model: "qwen-local"
 
+  # Google's 3.1 flash-lite. Probed against the live API 2026-07-30: the model
+  # answers, and both the preview id and a stable `gemini-3.1-flash-lite` exist.
+  # The preview id is used because that is what was asked for, but preview ids
+  # get retired — when this one 404s, drop the `-preview` suffix rather than
+  # hunting for a replacement.
+  #
+  # The fallback is a different family on the same key, which is the weaker half
+  # of the rule this file keeps elsewhere: two Gemini models share one quota
+  # bucket, so a 429 takes both. It is still worth having, because a 404 on a
+  # retired preview id is the failure this alias is actually likely to see, and
+  # that one the fallback does answer.
+  nabu-flash-lite:
+    primary:
+      provider: gemini
+      model: "gemini-3.1-flash-lite-preview"
+    fallback:
+      - provider: gemini
+        model: "gemini-2.5-flash-lite"
+      - model: gpt-4.1-nano
+
   nabu-parspack:
     primary:
       provider: parspack
@@ -1269,6 +1289,27 @@ embeddings:
     fallback:
       - provider: openrouter
         model: "openai/text-embedding-3-small"
+
+  # Google's second-generation embedding model.
+  #
+  # Single rung, for the reason every stored-vector alias in this file is single
+  # rung: a second geometry written into the same index fails nothing and
+  # corrupts everything.
+  #
+  # Measured against the live API 2026-07-30: this model defaults to **3072**
+  # dimensions, exactly like gemini-embedding-001, so pgvector cannot build an
+  # HNSW index over its default output — the limit is 2000. It does honour
+  # outputDimensionality, verified at 1536. A caller that stores these vectors
+  # must send `dimensions` itself; no alias can pin it, because the value
+  # travels from the request to the adapter and this file never sees it.
+  #
+  # A stable `gemini-embedding-2` exists alongside this preview id. Prefer it
+  # for anything long-lived: re-embedding a corpus because a preview id was
+  # retired costs the whole index.
+  nabu-embed-v2:
+    primary:
+      provider: gemini
+      model: "gemini-embedding-2-preview"
 
 # Sub-agents (system prompt + defaults over an alias, addressable as a "model").
 # The Cinematic Scrollytelling squad ships as one YAML file per agent under
