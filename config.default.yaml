@@ -1144,6 +1144,24 @@ embeddings:
       provider: gemini
       model: "gemini-embedding-001"
 
+  # RASAD's second index, in its own table and its own space.
+  #
+  # The alias above is served by a free allowance that is spent before most of
+  # the working day, and a search has to embed its own query — so the semantic
+  # layer went dark exactly when it was used. This one reaches the embedding
+  # server already running beside the gateway: no allowance, no cost, and
+  # multilingual, which is what an Arabic corpus searched in English needs.
+  #
+  # 384 wide against the other's 1536, which is why RASAD keeps them in separate
+  # tables rather than one column. Single rung for the same reason rasad-embed
+  # is: a fallback to any other model would put a second geometry into whichever
+  # index this fills, and nothing would fail — the cosine between two spaces is
+  # a number, and the number is noise.
+  rasad-embed-local:
+    primary:
+      provider: infinity
+      model: "multilingual-minilm"
+
   # Zooey's semantic-memory index — 768 wide.
   #
   # Its Qdrant collection is declared at `"size": 768`, inherited from the
