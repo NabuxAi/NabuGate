@@ -143,6 +143,21 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /v1/usage", s.auth(s.handleUsage))
 	mux.HandleFunc("GET /v1/photos/search", s.auth(s.handlePhotoSearch))
 	s.mountConsole(mux)
+	mux.HandleFunc("GET /{$}", func(w http.ResponseWriter, r *http.Request) {
+		if assets, ok := web.Assets(); ok {
+			http.ServeFileFS(w, r, assets, "landing.html")
+		} else {
+			http.Error(w, "Not found", 404)
+		}
+	})
+	
+	mux.HandleFunc("GET /fa", func(w http.ResponseWriter, r *http.Request) {
+		if assets, ok := web.Assets(); ok {
+			http.ServeFileFS(w, r, assets, "landing-fa.html")
+		} else {
+			http.Error(w, "Not found", 404)
+		}
+	})
 	s.mountConsoleAPI(mux)
 	s.mountConversationAPI(mux)
 	return mux

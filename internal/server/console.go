@@ -84,6 +84,18 @@ func (s *Server) consoleAuth(next http.HandlerFunc) http.Handler {
 
 // consoleStatus tells the SPA whether to show a login form or first-run setup,
 // without revealing anything to an unauthenticated visitor beyond that.
+func (s *Server) consoleStatus(w http.ResponseWriter, r *http.Request) {
+	authed := false
+	var info adminstore.SessionInfo
+	if c, err := r.Cookie(consoleCookie); err == nil {
+		info, authed = s.admin.ValidSession(c.Value)
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"needs_setup":   s.admin.NeedsSetup(),
+		"authenticated": authed,
+		"is_admin":      info.IsAdmin,
+	})
+}
 
 type credentials struct {
 	Username string `json:"username"`
@@ -166,9 +178,7 @@ func (s *Server) consoleLogout(w http.ResponseWriter, r *http.Request) {
 // ─────────────────────────── admin accounts ─────────────────────────────────
 
 // listAdmins returns the console account usernames (never hashes).
-func (s *Server) listAdmins(w http.ResponseWriter, r *http.Request) {
-	isAdmin, _ := r.Context().Value(consoleAdminCtxKey{}).(bool)
-	if !isAdmin { writeError(w, http.StatusForbidden, "only admins can do this"); return }
+func (s *Server) listAdmins(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"admins": s.admin.Usernames()})
 }
 
@@ -433,16 +443,11 @@ func (s *Server) patchToken(w http.ResponseWriter, r *http.Request) {
 // These are the real numbers, and they survive a restart — the in-memory
 // tracker behind /v1/usage resets to zero on every redeploy, which made the
 // console look like nothing had ever run.
-func (s *Server) consoleUsage(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusOK, map[string]any{"by_project": s.filterUsage(r, s.admin.Usage())})
+func (s *Server) consoleUsage(w http.ResponseWriter, _ *http.Request) {
+	writeJSON(w, http.StatusOK, map[string]any{"by_project": s.admin.Usage()})
 }
 
 func (s *Server) resetUsage(w http.ResponseWriter, r *http.Request) {
-	isAdmin, _ := r.Context().Value(consoleAdminCtxKey{}).(bool)
-	if !isAdmin {
-		writeError(w, http.StatusForbidden, "only admins can reset usage")
-		return
-	}
 	if err := s.admin.ResetUsage(r.URL.Query().Get("project")); err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -521,28 +526,6 @@ func cleanList(in []string) []string {
 // The console used to render all of this from a mock file, so it described a
 // gateway that did not exist — providers that were never keyed, aliases that had
 // been renamed. Everything here is read from the live router.
-
-func (s *Server) filterUsage(r *http.Request, raw map[string]adminstore.Counters) map[string]adminstore.Counters {
-	isAdmin, _ := r.Context().Value(consoleAdminCtxKey{}).(bool)
-	if isAdmin {
-		return raw
-	}
-	email, _ := r.Context().Value(consoleEmailCtxKey{}).(string)
-	allowed := make(map[string]bool)
-	for _, t := range s.admin.Tokens() {
-		if strings.EqualFold(t.Owner, email) {
-			allowed[t.Name] = true
-		}
-	}
-	out := make(map[string]adminstore.Counters)
-	for k, v := range raw {
-		if allowed[k] {
-			out[k] = v
-		}
-	}
-	return out
-}
-
 func (s *Server) consoleOverview(w http.ResponseWriter, r *http.Request) {
 	type providerInfo struct {
 		Name        string `json:"name"`
@@ -563,20 +546,12 @@ func (s *Server) consoleOverview(w http.ResponseWriter, r *http.Request) {
 	// in the deployment's environment and the gateway never sees them in a form
 	// worth showing — and a console that displayed keys would be a console worth
 	// stealing.
-	isAdmin, _ := r.Context().Value(consoleAdminCtxKey{}).(bool)
-	var configKeys []string
-	if isAdmin {
-		configKeys = s.policy.Projects()
-	} else {
-		configKeys = []string{}
-	}
-
 	writeJSON(w, http.StatusOK, map[string]any{
 		"providers":   providers,
 		"aliases":     aliases,
 		"agents":      s.agents.Names(),
-		"config_keys": configKeys,
-		"usage":       s.filterUsage(r, s.admin.Usage()),
+		"config_keys": s.policy.Projects(),
+		"usage":       s.admin.Usage(),
 	})
 }
 
@@ -610,22 +585,4 @@ func requireAdmin(next http.HandlerFunc) http.HandlerFunc {
 		}
 		next(w, r)
 	}
-}
-package server
-import (
-	"net/http"
-	"nabugate/internal/adminstore"
-)
-
-func (s *Server) consoleStatus(w http.ResponseWriter, r *http.Request) {
-	authed := false
-	var info adminstore.SessionInfo
-	if c, err := r.Cookie(consoleCookie); err == nil {
-		info, authed = s.admin.ValidSession(c.Value)
-	}
-	writeJSON(w, http.StatusOK, map[string]any{
-		"needs_setup":   s.admin.NeedsSetup(),
-		"authenticated": authed,
-		"is_admin":      info.IsAdmin,
-	})
 }
