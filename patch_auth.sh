@@ -1,0 +1,1 @@
+sed -i '' 's/func (s \*Server) listAdmins(w http.ResponseWriter, _ \*http.Request) {/func (s \*Server) listAdmins(w http.ResponseWriter, r \*http.Request) {\n\tisAdmin, _ := r.Context().Value(consoleAdminCtxKey{}).(bool)\n\tif !isAdmin { writeError(w, http.StatusForbidden, "only admins can do this"); return }/g' internal/server/console.go

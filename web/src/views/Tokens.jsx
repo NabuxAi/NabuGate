@@ -20,6 +20,7 @@ export default function Tokens() {
   const [usage, setUsage] = useState({});
   const [error, setError] = useState(null);
   const [creating, setCreating] = useState(false);
+  const [editing, setEditing] = useState(null);
   const [minted, setMinted] = useState(null);
 
   const load = () => {
@@ -61,6 +62,16 @@ export default function Tokens() {
       {error && <div className="card banner-error">{error}</div>}
 
       {minted && <MintedDialog minted={minted} onClose={() => setMinted(null)} />}
+            {editing && (
+        <EditDialog
+          token={editing}
+          onClose={() => setEditing(null)}
+          onSaved={() => {
+            setEditing(null);
+            load();
+          }}
+        />
+      )}
       {creating && (
         <CreateDialog
           onClose={() => setCreating(false)}
@@ -149,6 +160,7 @@ export default function Tokens() {
                     <button className="btn" onClick={() => toggle(t)}>
                       {t.disabled ? 'فعال' : 'غیرفعال'}
                     </button>{' '}
+                    <button className="btn" onClick={() => setEditing(t)}>ویرایش</button>{' '}
                     <button className="btn" onClick={() => remove(t.name)}>حذف</button>
                   </td>
                 </tr>
@@ -270,6 +282,57 @@ function MintedDialog({ minted, onClose }) {
           <button className="btn btn-primary" onClick={onClose}>بستن</button>
         </div>
       </div>
+    </div>
+  );
+}
+
+
+function EditDialog({ token, onClose, onSaved }) {
+  const [origins, setOrigins] = useState((token.allowed_origins || []).join(', '));
+  const [providers, setProviders] = useState((token.providers || []).join(', '));
+  const [error, setError] = useState(null);
+  const [busy, setBusy] = useState(false);
+
+  const split = (s) => s.split(/[\s,،]+/).map((v) => v.trim()).filter(Boolean);
+
+  async function submit(e) {
+    e.preventDefault();
+    setBusy(true);
+    setError(null);
+    try {
+      await api.patchToken(token.name, split(origins), split(providers));
+      onSaved();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <form className="modal card" onClick={(e) => e.stopPropagation()} onSubmit={submit}>
+        <h3>ویرایش توکن «{token.name}»</h3>
+
+        <label className="signin-field">
+          پروایدرهای مجاز
+          <input value={providers} onChange={(e) => setProviders(e.target.value)} placeholder="openai, groq" dir="ltr" />
+          <span className="signin-hint">خالی یعنی همه.</span>
+        </label>
+
+        <label className="signin-field">
+          مبدأ مجاز
+          <input value={origins} onChange={(e) => setOrigins(e.target.value)} placeholder="*.nabuxai.com" dir="ltr" />
+          <span className="signin-hint">خالی یعنی هرجا.</span>
+        </label>
+
+        {error && <p className="signin-error">{error}</p>}
+
+        <div className="modal-actions">
+          <button type="button" className="btn" onClick={onClose}>انصراف</button>
+          <button className="btn btn-primary" disabled={busy}>{busy ? '…' : 'ذخیره'}</button>
+        </div>
+      </form>
     </div>
   );
 }

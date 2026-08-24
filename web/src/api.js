@@ -132,3 +132,9 @@ export const testFlow = (name, message) =>
     method: 'POST',
     body: JSON.stringify({ message }),
   });
+
+export const patchToken = (name, allowedOrigins, providers) =>
+  req(`/tokens/${encodeURIComponent(name)}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ allowed_origins: allowedOrigins, providers }),
+  });

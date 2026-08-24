@@ -1,3 +1,4 @@
+cat << 'INNER' > web/src/components/Sidebar.jsx
 import { nav } from '../data/mock.js';
 
 export default function Sidebar({ current, onNavigate, isAdmin }) {
@@ -47,3 +48,4 @@ export default function Sidebar({ current, onNavigate, isAdmin }) {
     </aside>
   );
 }
+INNER

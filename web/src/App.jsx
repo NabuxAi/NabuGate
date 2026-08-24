@@ -34,8 +34,6 @@ const VIEWS = {
   ),
 };
 
-// The current view lives in the URL hash (#/tokens) so every menu click changes
-// the address bar and each section is a real, shareable, back-button-able link.
 function viewFromHash() {
   const id = (window.location.hash || '').replace(/^#\/?/, '');
   return VIEWS[id] ? id : 'dashboard';
@@ -43,8 +41,6 @@ function viewFromHash() {
 
 export default function App() {
   const [view, setView] = useState(viewFromHash);
-  // null while we ask the gateway; the console must not flash its shell before
-  // we know whether this visitor is allowed to see it.
   const [session, setSession] = useState(null);
 
   const refresh = () =>
@@ -62,7 +58,7 @@ export default function App() {
   }, []);
 
   const navigate = (id) => {
-    window.location.hash = '#/' + id; // updates the URL; hashchange syncs the view.
+    window.location.hash = '#/' + id;
   };
 
   if (session === null) return <div className="app-boot">…</div>;
@@ -70,10 +66,14 @@ export default function App() {
     return <SignIn needsSetup={session.needs_setup} onAuthenticated={refresh} />;
   }
 
-  const render = VIEWS[view] || VIEWS.dashboard;
+  let allowed = ['dashboard', 'integration', 'tokens', 'usage', 'logs'];
+  if (session.is_admin) allowed = Object.keys(VIEWS);
+  const safeView = allowed.includes(view) ? view : 'dashboard';
+  const render = VIEWS[safeView] || VIEWS.dashboard;
+
   return (
     <div className="app">
-      <Sidebar current={view} onNavigate={navigate} />
+      <Sidebar current={safeView} onNavigate={navigate} isAdmin={session.is_admin} />
       {render()}
     </div>
   );
