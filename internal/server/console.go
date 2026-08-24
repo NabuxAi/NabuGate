@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -66,11 +67,18 @@ func (s *Server) mountConsoleAPI(mux *http.ServeMux) {
 func (s *Server) consoleAuth(next http.HandlerFunc) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		c, err := r.Cookie(consoleCookie)
-		if err != nil || !s.admin.ValidSession(c.Value) {
+		if err != nil {
 			writeError(w, http.StatusUnauthorized, "sign in to the console first")
 			return
 		}
-		next(w, r)
+		info, valid := s.admin.ValidSession(c.Value)
+		if !valid {
+			writeError(w, http.StatusUnauthorized, "sign in to the console first")
+			return
+		}
+		ctx := context.WithValue(r.Context(), consoleEmailCtxKey{}, info.Email)
+		ctx = context.WithValue(ctx, consoleAdminCtxKey{}, info.IsAdmin)
+		next(w, r.WithContext(ctx))
 	})
 }
 
@@ -79,7 +87,7 @@ func (s *Server) consoleAuth(next http.HandlerFunc) http.Handler {
 func (s *Server) consoleStatus(w http.ResponseWriter, r *http.Request) {
 	authed := false
 	if c, err := r.Cookie(consoleCookie); err == nil {
-		authed = s.admin.ValidSession(c.Value)
+		_, authed = s.admin.ValidSession(c.Value)
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
 		"needs_setup":   s.admin.NeedsSetup(),
@@ -318,8 +326,26 @@ func (s *Server) testAgent(w http.ResponseWriter, r *http.Request) {
 
 // ─────────────────────────── tokens ─────────────────────────────────────────
 
-func (s *Server) listTokens(w http.ResponseWriter, _ *http.Request) {
-	writeJSON(w, http.StatusOK, map[string]any{"tokens": s.admin.Tokens()})
+func (s *Server) listTokens(w http.ResponseWriter, r *http.Request) {
+	isAdmin, _ := r.Context().Value(consoleAdminCtxKey{}).(bool)
+	email, _ := r.Context().Value(consoleEmailCtxKey{}).(string)
+	
+	allTokens := s.admin.Tokens()
+	if isAdmin {
+		writeJSON(w, http.StatusOK, map[string]any{"tokens": allTokens})
+		return
+	}
+	
+	var userTokens []adminstore.Token
+	for _, t := range allTokens {
+		if strings.EqualFold(t.Owner, email) {
+			userTokens = append(userTokens, t)
+		}
+	}
+	if userTokens == nil {
+		userTokens = []adminstore.Token{}
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"tokens": userTokens})
 }
 
 type tokenRequest struct {
@@ -327,6 +353,7 @@ type tokenRequest struct {
 	Allow          []string `json:"allow"`
 	RateLimit      int      `json:"rate_limit"`
 	AllowedOrigins []string `json:"allowed_origins"`
+	Providers      []string `json:"providers"`
 	Disabled       *bool    `json:"disabled"`
 }
 
@@ -337,7 +364,12 @@ func (s *Server) createToken(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	t, secret, err := s.admin.NewToken(req.Name, cleanList(req.Allow), req.RateLimit, cleanList(req.AllowedOrigins))
+	owner := ""
+	if sessionEmail, ok := r.Context().Value(consoleEmailCtxKey{}).(string); ok {
+		owner = sessionEmail
+	}
+
+	t, secret, err := s.admin.NewToken(req.Name, cleanList(req.Allow), req.RateLimit, cleanList(req.AllowedOrigins), owner, cleanList(req.Providers))
 	if err != nil {
 		status := http.StatusBadRequest
 		if errors.Is(err, adminstore.ErrNameTaken) {
@@ -357,7 +389,12 @@ func (s *Server) createToken(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) deleteToken(w http.ResponseWriter, r *http.Request) {
-	if err := s.admin.DeleteToken(r.PathValue("name")); err != nil {
+	name := r.PathValue("name")
+	if !s.canEditToken(r, name) {
+		writeError(w, http.StatusForbidden, "not authorized to edit this token")
+		return
+	}
+	if err := s.admin.DeleteToken(name); err != nil {
 		writeError(w, http.StatusNotFound, err.Error())
 		return
 	}
@@ -371,6 +408,10 @@ func (s *Server) patchToken(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	name := r.PathValue("name")
+	if !s.canEditToken(r, name) {
+		writeError(w, http.StatusForbidden, "not authorized to edit this token")
+		return
+	}
 
 	if req.Disabled != nil {
 		if err := s.admin.SetTokenDisabled(name, *req.Disabled); err != nil {
@@ -380,6 +421,12 @@ func (s *Server) patchToken(w http.ResponseWriter, r *http.Request) {
 	}
 	if req.AllowedOrigins != nil {
 		if err := s.admin.SetOrigins(name, cleanList(req.AllowedOrigins)); err != nil {
+			writeError(w, http.StatusNotFound, err.Error())
+			return
+		}
+	}
+	if req.Providers != nil {
+		if err := s.admin.SetProviders(name, cleanList(req.Providers)); err != nil {
 			writeError(w, http.StatusNotFound, err.Error())
 			return
 		}
@@ -504,4 +551,25 @@ func (s *Server) consoleOverview(w http.ResponseWriter, r *http.Request) {
 		"config_keys": s.policy.Projects(),
 		"usage":       s.admin.Usage(),
 	})
+}
+
+type consoleEmailCtxKey struct{}
+
+type consoleAdminCtxKey struct{}
+
+func (s *Server) canEditToken(r *http.Request, name string) bool {
+	isAdmin, _ := r.Context().Value(consoleAdminCtxKey{}).(bool)
+	if isAdmin {
+		return true
+	}
+	email, _ := r.Context().Value(consoleEmailCtxKey{}).(string)
+	if email == "" {
+		return false
+	}
+	for _, t := range s.admin.Tokens() {
+		if strings.EqualFold(t.Name, name) {
+			return strings.EqualFold(t.Owner, email)
+		}
+	}
+	return false
 }

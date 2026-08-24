@@ -250,15 +250,11 @@ func (s *Server) consoleNabuCallback(w http.ResponseWriter, r *http.Request) {
 		fail("failed")
 		return
 	}
-	// The allow-list is the authorisation decision. NabuAuth proved who this is;
-	// it says nothing about who may administer this gateway.
-	if !cfg.Admins[strings.ToLower(profile.Email)] {
-		s.log.Warn("console nabuauth sign-in refused: not on the admin allow-list", "email", profile.Email)
-		fail("not_admin")
-		return
-	}
+	
+	email := strings.ToLower(profile.Email)
+	isAdmin := cfg.Admins[email]
 
-	token, expiry, err := s.admin.NewSession()
+	token, expiry, err := s.admin.NewSession(email, isAdmin)
 	if err != nil {
 		s.log.Error("could not issue console session", "error", err)
 		fail("failed")

@@ -341,6 +341,9 @@ func (s *Server) handleModels(w http.ResponseWriter, r *http.Request) {
 		if s.policy.Enabled() && hasPol && !pol.Allows(a.ID) {
 			continue // hide models this key may not use
 		}
+		if hasPol && len(pol.Providers) > 0 && a.Owner != "agent" && a.Owner != "flow" && !contains(pol.Providers, a.Owner) {
+			continue
+		}
 		seen[a.ID] = true
 		data = append(data, map[string]string{"id": a.ID, "object": "model", "owned_by": a.Owner})
 	}
@@ -1011,7 +1014,7 @@ func (s *Server) auth(next http.HandlerFunc) http.HandlerFunc {
 					writeError(w, http.StatusForbidden, "this key is not permitted from this origin")
 					return
 				}
-				pol = policy.Policy{Project: t.Name, Allow: t.Allow, RateLimit: t.RateLimit}
+				pol = policy.Policy{Project: t.Name, Allow: t.Allow, RateLimit: t.RateLimit, Providers: t.Providers}
 				ok = true
 			}
 		}
@@ -1027,7 +1030,9 @@ func (s *Server) auth(next http.HandlerFunc) http.HandlerFunc {
 			writeError(w, http.StatusTooManyRequests, "rate limit exceeded")
 			return
 		}
-		next(w, r.WithContext(context.WithValue(r.Context(), policyCtxKey{}, pol)))
+		ctx := context.WithValue(r.Context(), policyCtxKey{}, pol)
+		ctx = context.WithValue(ctx, router.AllowedProvidersCtxKey{}, pol.Providers)
+		next(w, r.WithContext(ctx))
 	}
 }
 
@@ -1055,4 +1060,13 @@ func writeError(w http.ResponseWriter, status int, msg string) {
 	writeJSON(w, status, map[string]any{
 		"error": map[string]string{"message": msg},
 	})
+}
+
+func contains(slice []string, val string) bool {
+	for _, item := range slice {
+		if item == val {
+			return true
+		}
+	}
+	return false
 }

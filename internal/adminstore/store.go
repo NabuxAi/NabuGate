@@ -71,6 +71,8 @@ type Token struct {
 	// Referer — a browser sets those and cannot forge them cross-site, which is
 	// what makes this useful for a key embedded in a web app.
 	AllowedOrigins []string `json:"allowed_origins"`
+	Owner          string   `json:"owner,omitempty"`
+	Providers      []string `json:"providers,omitempty"`
 
 	Disabled  bool      `json:"disabled"`
 	CreatedAt time.Time `json:"created_at"`
@@ -125,7 +127,8 @@ type state struct {
 	Agents   []AgentRecord        `json:"agents"`
 	Flows    []FlowRecord         `json:"flows"`
 	Usage    map[string]Counters  `json:"usage"`
-	Sessions map[string]time.Time `json:"sessions"` // token hash -> expiry
+	Sessions map[string]time.Time `json:"sessions"`
+	UserSessions map[string]SessionInfo `json:"user_sessions"` // token hash -> expiry
 }
 
 // Store is the persisted gateway state.
@@ -399,7 +402,11 @@ func (s *Store) Authenticate(username, password string) (string, time.Time, erro
 	expiry := time.Now().Add(SessionTTL)
 
 	s.purgeExpiredLocked()
-	s.st.Sessions[hashString(token)] = expiry
+	s.st.UserSessions[hashString(token)] = SessionInfo{
+		Expiry:  expiry,
+		Email:   username,
+		IsAdmin: true,
+	}
 	return token, expiry, s.save()
 }
 
@@ -408,7 +415,7 @@ func (s *Store) Authenticate(username, password string) (string, time.Time, erro
 // Used by the single sign-on callback, where NabuAuth has already established
 // who the person is and the caller has already checked they are allowed in.
 // Nothing here re-authorises: keep that decision at the call site.
-func (s *Store) NewSession() (string, time.Time, error) {
+func (s *Store) NewSession(email string, isAdmin bool) (string, time.Time, error) {
 	raw := make([]byte, 32)
 	if _, err := rand.Read(raw); err != nil {
 		return "", time.Time{}, err
@@ -419,25 +426,38 @@ func (s *Store) NewSession() (string, time.Time, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.purgeExpiredLocked()
-	s.st.Sessions[hashString(token)] = expiry
+	s.st.UserSessions[hashString(token)] = SessionInfo{
+		Expiry:  expiry,
+		Email:   email,
+		IsAdmin: isAdmin,
+	}
 	return token, expiry, s.save()
 }
 
-// ValidSession reports whether a console session token is live.
-func (s *Store) ValidSession(token string) bool {
+// ValidSession reports whether a console session token is live and returns info.
+func (s *Store) ValidSession(token string) (SessionInfo, bool) {
 	if token == "" {
-		return false
+		return SessionInfo{}, false
 	}
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	exp, ok := s.st.Sessions[hashString(token)]
-	return ok && time.Now().Before(exp)
+	info, ok := s.st.UserSessions[hashString(token)]
+	if ok && time.Now().Before(info.Expiry) {
+		return info, true
+	}
+	// Fallback for old sessions
+	exp, okOld := s.st.Sessions[hashString(token)]
+	if okOld && time.Now().Before(exp) {
+		return SessionInfo{Expiry: exp, Email: "admin", IsAdmin: true}, true
+	}
+	return SessionInfo{}, false
 }
 
 func (s *Store) EndSession(token string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	delete(s.st.Sessions, hashString(token))
+	delete(s.st.UserSessions, hashString(token))
 	return s.save()
 }
 
@@ -448,6 +468,11 @@ func (s *Store) purgeExpiredLocked() {
 			delete(s.st.Sessions, h)
 		}
 	}
+	for h, info := range s.st.UserSessions {
+		if now.After(info.Expiry) {
+			delete(s.st.UserSessions, h)
+		}
+	}
 }
 
 // ─────────────────────────── project tokens ────────────────────────────────
@@ -455,7 +480,7 @@ func (s *Store) purgeExpiredLocked() {
 // NewToken mints a project key. The secret is returned once and never stored;
 // only its SHA-256 and a short prefix are kept, so the file cannot be used to
 // impersonate a project.
-func (s *Store) NewToken(name string, allow []string, rateLimit int, origins []string) (Token, string, error) {
+func (s *Store) NewToken(name string, allow []string, rateLimit int, origins []string, owner string, providers []string) (Token, string, error) {
 	name = strings.TrimSpace(name)
 	if name == "" {
 		return Token{}, "", errors.New("a project name is required")
@@ -485,6 +510,8 @@ func (s *Store) NewToken(name string, allow []string, rateLimit int, origins []s
 		Allow:          allow,
 		RateLimit:      rateLimit,
 		AllowedOrigins: origins,
+		Owner:          owner,
+		Providers:      providers,
 		CreatedAt:      time.Now().UTC(),
 	}
 	s.st.Tokens = append(s.st.Tokens, t)
@@ -643,4 +670,23 @@ func (s *Store) Persist() error {
 func hashString(s string) string {
 	sum := sha256.Sum256([]byte(s))
 	return hex.EncodeToString(sum[:])
+}
+
+// SetProviders replaces a token's provider allow-list.
+func (s *Store) SetProviders(name string, providers []string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for i := range s.st.Tokens {
+		if strings.EqualFold(s.st.Tokens[i].Name, name) {
+			s.st.Tokens[i].Providers = providers
+			return s.save()
+		}
+	}
+	return ErrTokenNotFound
+}
+
+type SessionInfo struct {
+	Expiry  time.Time `json:"expiry"`
+	Email   string    `json:"email"`
+	IsAdmin bool      `json:"is_admin"`
 }

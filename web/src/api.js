@@ -52,7 +52,7 @@ export const logout = () => req('/logout', { method: 'POST' });
 
 export const listTokens = () => req('/tokens');
 
-export const createToken = ({ name, allow, rateLimit, allowedOrigins }) =>
+export const createToken = ({ name, allow, rateLimit, allowedOrigins, providers }) =>
   req('/tokens', {
     method: 'POST',
     body: JSON.stringify({
@@ -60,6 +60,7 @@ export const createToken = ({ name, allow, rateLimit, allowedOrigins }) =>
       allow,
       rate_limit: rateLimit,
       allowed_origins: allowedOrigins,
+      providers,
     }),
   });
 

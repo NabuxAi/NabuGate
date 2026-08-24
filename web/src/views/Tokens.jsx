@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 
 import Layout from '../components/Layout.jsx';
 import * as api from '../api.js';
-import { faInt } from '../data/mock.js';
+import { faInt, faDigits } from '../data/mock.js';
 
 /*
  * Per-app tokens.
@@ -79,8 +79,10 @@ export default function Tokens() {
               <th>اپ</th>
               <th style={{ width: 120 }}>توکن</th>
               <th>دسترسی</th>
+              <th>پروایدر مجاز</th>
               <th>مبدأ مجاز</th>
               <th style={{ width: 90 }}>درخواست</th>
+              <th style={{ width: 90 }}>هزینه</th>
               <th style={{ width: 80 }}>ردشده</th>
               <th style={{ width: 130 }} />
             </tr>
@@ -88,7 +90,7 @@ export default function Tokens() {
           <tbody>
             {tokens.length === 0 && (
               <tr>
-                <td colSpan={7} style={{ color: 'var(--ng-muted)', padding: 18 }}>
+                <td colSpan={9} style={{ color: 'var(--ng-muted)', padding: 18 }}>
                   هنوز توکنی ساخته نشده. کلیدهای تعریف‌شده در config.yaml جداگانه کار
                   می‌کنند و اینجا نمایش داده نمی‌شوند.
                 </td>
@@ -116,6 +118,17 @@ export default function Tokens() {
                       ))}
                     </div>
                   </td>
+                                    <td>
+                    {(t.providers || []).length === 0 ? (
+                      <span style={{ color: 'var(--ng-muted)', fontSize: 12 }}>همه</span>
+                    ) : (
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                        {t.providers.map((p) => (
+                          <span key={p} className="tag ltr">{p}</span>
+                        ))}
+                      </div>
+                    )}
+                  </td>
                   <td>
                     {(t.allowed_origins || []).length === 0 ? (
                       <span style={{ color: 'var(--ng-muted)', fontSize: 12 }}>هرجا</span>
@@ -128,6 +141,7 @@ export default function Tokens() {
                     )}
                   </td>
                   <td className="mono">{faInt(u.requests || 0)}</td>
+                                    <td className="mono ltr">{faDigits('$' + (u.cost_usd || 0).toFixed(3))}</td>
                   <td className="mono" style={u.denied ? { color: 'var(--ng-danger, #c53030)' } : undefined}>
                     {faInt(u.denied || 0)}
                   </td>
@@ -151,6 +165,7 @@ function CreateDialog({ onClose, onCreated }) {
   const [name, setName] = useState('');
   const [allow, setAllow] = useState('');
   const [origins, setOrigins] = useState('');
+  const [providers, setProviders] = useState('');
   const [rate, setRate] = useState(120);
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
@@ -167,6 +182,7 @@ function CreateDialog({ onClose, onCreated }) {
         allow: split(allow),
         rateLimit: Number(rate) || 0,
         allowedOrigins: split(origins),
+        providers: split(providers),
       });
       onCreated(r);
     } catch (err) {
@@ -193,6 +209,14 @@ function CreateDialog({ onClose, onCreated }) {
           <span className="signin-hint">
             الگوهای مجاز، با فاصله یا ویرگول. اجباری است: توکنی که به همه‌چیز برسد،
             توکنِ ادمین است.
+          </span>
+        </label>
+
+                <label className="signin-field">
+          پروایدرهای مجاز
+          <input value={providers} onChange={(e) => setProviders(e.target.value)} placeholder="openai, groq" dir="ltr" />
+          <span className="signin-hint">
+            خالی یعنی همه. نام پروایدرها با فاصله یا ویرگول.
           </span>
         </label>
 

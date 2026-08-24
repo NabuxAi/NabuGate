@@ -167,45 +167,45 @@ export default function Agents() {
       {error && <div className="banner-error" style={{ marginBottom: '16px' }}>{error}</div>}
       {success && <div className="banner-success" style={{ marginBottom: '16px', background: '#052e16', border: '1px solid #16a34a', color: '#86efac', padding: '12px 16px', borderRadius: '8px' }}>{success}</div>}
 
-      {/* Tabs */}
-      <div style={{ display: 'flex', gap: '8px', borderBottom: '1px solid var(--border)', paddingBottom: '12px', marginBottom: '24px' }}>
-        <button
-          className={`btn ${tab === 'agents' ? 'btn-primary' : 'btn-secondary'}`}
+      <div className="tabs-container">
+        <div
+          className={`tab-item ${tab === 'agents' ? 'active' : ''}`}
           onClick={() => setTab('agents')}
         >
-          🤖 ساب‌اجنت‌ها ({agents.length})
-        </button>
-        <button
-          className={`btn ${tab === 'flows' ? 'btn-primary' : 'btn-secondary'}`}
+          <span>🤖</span> ساب‌اجنت‌ها ({agents.length})
+        </div>
+        <div
+          className={`tab-item ${tab === 'flows' ? 'active' : ''}`}
           onClick={() => setTab('flows')}
         >
-          🔄 خط‌لوله‌ها / Flows ({flows.length})
-        </button>
-        <button
-          className={`btn ${tab === 'playground' ? 'btn-primary' : 'btn-secondary'}`}
+          <span>🔄</span> خط‌لوله‌ها / Flows ({flows.length})
+        </div>
+        <div
+          className={`tab-item ${tab === 'playground' ? 'active' : ''}`}
           onClick={() => setTab('playground')}
         >
-          ⚡ پلی‌گراند و تست زنده
-        </button>
+          <span>⚡</span> پلی‌گراند و تست زنده
+        </div>
       </div>
 
       {/* TAB 1: AGENTS */}
       {tab === 'agents' && (
         <>
-          <div style={{ display: 'flex', gap: '12px', marginBottom: '20px', flexWrap: 'wrap', alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: '12px', marginBottom: '24px', flexWrap: 'wrap', alignItems: 'center' }}>
             <input
               type="text"
               placeholder="جستجو در ساب‌اجنت‌ها..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="input"
-              style={{ flex: 1, minWidth: '240px' }}
+              style={{ flex: 1, minWidth: '240px', maxWidth: '300px' }}
             />
             <div style={{ display: 'flex', gap: '6px' }}>
               {['all', 'seo', 'cine', 'sales', 'write'].map((sq) => (
                 <button
                   key={sq}
                   className={`btn btn-sm ${squadFilter === sq ? 'btn-primary' : 'btn-secondary'}`}
+                  style={{ borderRadius: '20px', padding: '6px 14px' }}
                   onClick={() => setSquadFilter(sq)}
                 >
                   {sq === 'all' ? 'همه' : sq.toUpperCase()}
@@ -216,31 +216,32 @@ export default function Agents() {
 
           <div className="grid grid-3">
             {filteredAgents.map((a) => (
-              <div key={a.name} className="card" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+              <div key={a.name} className="card" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', transition: 'transform 0.2s', cursor: 'pointer' }} onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-2px)'} onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}>
                 <div>
-                  <div className="card-head" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span className="mono" style={{ fontWeight: 'bold', color: 'var(--accent)' }}>{a.name}</span>
-                    <span className="badge" style={{ fontSize: '0.75rem' }}>{a.model || 'nabu-smart'}</span>
+                  <div className="card-head">
+                    <span className="mono" style={{ fontWeight: '800', color: 'var(--ng-heading)', fontSize: '14px' }}>{a.name}</span>
+                    <span className="pill pill-plain">{a.model || 'nabu-smart'}</span>
                   </div>
-                  <p className="card-sub" style={{ marginTop: '8px', minHeight: '40px' }}>
+                  <p className="card-sub" style={{ minHeight: '40px', lineHeight: '1.5' }}>
                     {a.description || 'بدون توضیح'}
                   </p>
                   {a.system && (
-                    <div style={{ background: 'var(--bg-subtle, #0b1329)', padding: '8px 12px', borderRadius: '6px', fontSize: '0.8rem', color: '#94a3b8', maxHeight: '70px', overflow: 'hidden', margin: '8px 0' }}>
+                    <div style={{ background: 'var(--ng-surface-soft)', border: '1px solid var(--ng-border-faint)', padding: '10px 14px', borderRadius: '8px', fontSize: '12px', color: 'var(--ng-muted)', maxHeight: '70px', overflow: 'hidden', margin: '12px 0', lineHeight: '1.6' }}>
                       {a.system}
                     </div>
                   )}
                 </div>
-                <div style={{ display: 'flex', gap: '6px', marginTop: '16px', borderTop: '1px solid var(--border)', paddingTop: '12px' }}>
+                <div style={{ display: 'flex', gap: '8px', marginTop: '16px', borderTop: '1px solid var(--ng-border-faint)', paddingTop: '16px' }}>
                   <button
-                    className="btn btn-sm btn-secondary"
-                    style={{ flex: 1 }}
+                    className="btn btn-ghost"
+                    style={{ flex: 1, justifyContent: 'center' }}
                     onClick={() => setEditingAgent({ ...a })}
                   >
                     ✏️ ویرایش
                   </button>
                   <button
-                    className="btn btn-sm btn-secondary"
+                    className="btn btn-ghost"
+                    style={{ flex: 1, justifyContent: 'center' }}
                     onClick={() => {
                       setTestTarget(a.name);
                       setTestType('agent');
@@ -250,8 +251,10 @@ export default function Agents() {
                     ⚡ تست
                   </button>
                   <button
-                    className="btn btn-sm btn-danger"
+                    className="btn btn-ghost"
+                    style={{ color: '#ef4444', borderColor: 'transparent' }}
                     onClick={() => handleDeleteAgent(a.name)}
+                    title="حذف"
                   >
                     🗑️
                   </button>
@@ -264,48 +267,49 @@ export default function Agents() {
 
       {/* TAB 2: FLOWS */}
       {tab === 'flows' && (
-        <div className="grid grid-2">
+        <div className="grid grid-2-wide">
           {flows.map((f) => (
-            <div key={f.name} className="card">
-              <div className="card-head" style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span className="mono" style={{ fontWeight: 'bold', color: '#38bdf8' }}>{f.name}</span>
-                <span className="badge">{f.steps?.length || 0} گام</span>
-              </div>
-              <p className="card-sub" style={{ margin: '8px 0' }}>{f.description || 'بدون توضیح'}</p>
-
-              {/* Visual Pipeline */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', margin: '14px 0', background: 'var(--bg-subtle, #0f172a)', padding: '12px', borderRadius: '8px' }}>
-                {f.steps?.map((step, idx) => (
-                  <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <div style={{ background: '#1e293b', border: '1px solid #334155', borderRadius: '6px', padding: '4px 10px', fontSize: '0.85rem' }}>
-                      <div style={{ color: '#94a3b8', fontSize: '0.7rem' }}>گام {idx + 1}</div>
-                      <span className="mono" style={{ color: '#e2e8f0' }}>{step.agent}</span>
+            <div key={f.name} className="card" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+              <div>
+                <div className="card-head">
+                  <span className="mono" style={{ fontWeight: '800', color: 'var(--ng-heading)', fontSize: '14px' }}>{f.name}</span>
+                </div>
+                <p className="card-sub" style={{ lineHeight: '1.5' }}>
+                  {f.description || 'بدون توضیح'}
+                </p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '16px', background: 'var(--ng-surface-soft)', padding: '12px', borderRadius: '8px' }}>
+                  <strong style={{ fontSize: '11.5px', color: 'var(--ng-slate-700)' }}>مراحل (Steps):</strong>
+                  {f.steps?.map((st, i) => (
+                    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12.5px' }}>
+                      <span style={{ width: '20px', height: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--ng-accent)', color: '#fff', borderRadius: '50%', fontSize: '11px', fontWeight: 'bold' }}>{i + 1}</span>
+                      <span className="mono" style={{ color: 'var(--ng-heading)', fontWeight: '600' }}>{st.agent}</span>
+                      {st.label && <span style={{ color: 'var(--ng-muted)', fontSize: '11px' }}>({st.label})</span>}
                     </div>
-                    {idx < f.steps.length - 1 && <span style={{ color: '#64748b' }}>➔</span>}
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
-
-              <div style={{ display: 'flex', gap: '8px', marginTop: '16px' }}>
+              <div style={{ display: 'flex', gap: '8px', marginTop: '16px', borderTop: '1px solid var(--ng-border-faint)', paddingTop: '16px' }}>
                 <button
-                  className="btn btn-sm btn-secondary"
-                  style={{ flex: 1 }}
+                  className="btn btn-ghost"
+                  style={{ flex: 1, justifyContent: 'center' }}
                   onClick={() => setEditingFlow({ ...f })}
                 >
-                  ✏️ ویرایش فلو
+                  ✏️ ویرایش
                 </button>
                 <button
-                  className="btn btn-sm btn-primary"
+                  className="btn btn-ghost"
+                  style={{ flex: 1, justifyContent: 'center' }}
                   onClick={() => {
                     setTestTarget(f.name);
                     setTestType('flow');
                     setTab('playground');
                   }}
                 >
-                  ⚡ تست زنده
+                  ⚡ اجرای فلو
                 </button>
                 <button
-                  className="btn btn-sm btn-danger"
+                  className="btn btn-ghost"
+                  style={{ color: '#ef4444', borderColor: 'transparent' }}
                   onClick={() => handleDeleteFlow(f.name)}
                 >
                   🗑️
@@ -318,12 +322,21 @@ export default function Agents() {
 
       {/* TAB 3: PLAYGROUND */}
       {tab === 'playground' && (
-        <div className="card" style={{ maxWidth: '800px', margin: '0 auto' }}>
-          <h3 style={{ marginBottom: '16px' }}>⚡ پلی‌گراند اجرای زنده</h3>
+        <div className="playground-card">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '24px' }}>
+            <div style={{ background: 'var(--ng-accent)', color: 'white', padding: '10px', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              ⚡
+            </div>
+            <div>
+              <h3 style={{ margin: 0, fontSize: '18px', color: 'var(--ng-heading)' }}>پلی‌گراند اجرای زنده</h3>
+              <p style={{ margin: '4px 0 0 0', fontSize: '12.5px', color: 'var(--ng-muted)' }}>اجرای سریع ایجنت‌ها و خط‌لوله‌ها برای تست پرامپت و خروجی.</p>
+            </div>
+          </div>
+
           <form onSubmit={handleRunTest}>
-            <div style={{ display: 'flex', gap: '12px', marginBottom: '16px' }}>
+            <div style={{ display: 'flex', gap: '16px', marginBottom: '20px' }}>
               <div style={{ flex: 1 }}>
-                <label className="label">نوع هدف</label>
+                <label className="label">نوع هدف (Target Type)</label>
                 <select
                   className="input"
                   value={testType}
@@ -337,9 +350,9 @@ export default function Agents() {
                 </select>
               </div>
               <div style={{ flex: 2 }}>
-                <label className="label">نام ایجنت / فلو</label>
+                <label className="label">نام ایجنت / خط‌لوله</label>
                 <select
-                  className="input"
+                  className="input mono"
                   value={testTarget}
                   onChange={(e) => setTestTarget(e.target.value)}
                 >
@@ -350,11 +363,11 @@ export default function Agents() {
               </div>
             </div>
 
-            <div style={{ marginBottom: '16px' }}>
-              <label className="label">ورودی / متن مقاله / پرامپت</label>
+            <div style={{ marginBottom: '24px' }}>
+              <label className="label">ورودی / متن مقاله / پرامپت (Input)</label>
               <textarea
                 className="input"
-                rows={5}
+                rows={6}
                 placeholder="متن خود را برای ارسال به ایجنت یا فلو وارد کنید..."
                 value={testPrompt}
                 onChange={(e) => setTestPrompt(e.target.value)}
@@ -362,23 +375,25 @@ export default function Agents() {
               />
             </div>
 
-            <button type="submit" className="btn btn-primary" disabled={testRunning} style={{ width: '100%' }}>
+            <button type="submit" className="btn btn-primary animated-btn" disabled={testRunning} style={{ width: '100%', fontSize: '14px', padding: '14px' }}>
               {testRunning ? '⏳ در حال اجرا و پردازش...' : '🚀 ارسال و اجرای آنی'}
             </button>
           </form>
 
           {testResponse && (
-            <div style={{ marginTop: '24px', borderTop: '1px solid var(--border)', paddingTop: '16px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                <h4>پاسخ دریافتی:</h4>
+            <div style={{ marginTop: '32px', borderTop: '1px solid var(--ng-border-faint)', paddingTop: '24px', animation: 'fadeIn 0.4s ease-out' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                <h4 style={{ margin: 0, color: 'var(--ng-heading)', fontSize: '15px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ color: 'var(--ng-ok-text)' }}>●</span> پاسخ دریافتی:
+                </h4>
                 <button
-                  className="btn btn-sm btn-secondary"
+                  className="btn btn-ghost"
                   onClick={() => navigator.clipboard.writeText(testResponse)}
                 >
-                  📋 کپی پاسخ
+                  📋 کپی متن
                 </button>
               </div>
-              <pre style={{ background: '#0b1329', padding: '16px', borderRadius: '8px', overflow: 'auto', maxHeight: '400px', whiteSpace: 'pre-wrap', direction: 'rtl', textAlign: 'right', fontSize: '0.9rem', color: '#e2e8f0', border: '1px solid #1e293b' }}>
+              <pre className="response-box">
                 {testResponse}
               </pre>
             </div>
@@ -388,11 +403,13 @@ export default function Agents() {
 
       {/* EDIT AGENT MODAL */}
       {editingAgent && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px' }}>
-          <div className="card" style={{ maxWidth: '640px', width: '100%', maxHeight: '90vh', overflowY: 'auto' }}>
-            <h3>{editingAgent.name ? `ویرایش ساب‌اجنت ${editingAgent.name}` : 'ساخت ساب‌اجنت جدید'}</h3>
-            <form onSubmit={handleSaveAgent} style={{ marginTop: '16px' }}>
-              <div style={{ marginBottom: '12px' }}>
+        <div className="modal-backdrop">
+          <div className="card modal glass-card" style={{ maxWidth: '680px' }}>
+            <h3 style={{ borderBottom: '1px solid var(--ng-border-faint)', paddingBottom: '16px', marginBottom: '20px' }}>
+              {editingAgent.name ? `ویرایش ساب‌اجنت ${editingAgent.name}` : 'ساخت ساب‌اجنت جدید'}
+            </h3>
+            <form onSubmit={handleSaveAgent}>
+              <div style={{ marginBottom: '16px' }}>
                 <label className="label">نام ایجنت (Slug)</label>
                 <input
                   type="text"
@@ -402,7 +419,7 @@ export default function Agents() {
                   required
                 />
               </div>
-              <div style={{ marginBottom: '12px' }}>
+              <div style={{ marginBottom: '16px' }}>
                 <label className="label">توضیحات</label>
                 <input
                   type="text"
@@ -411,11 +428,11 @@ export default function Agents() {
                   onChange={(e) => setEditingAgent({ ...editingAgent, description: e.target.value })}
                 />
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: '16px', marginBottom: '20px' }}>
                 <div>
                   <label className="label">مدل پایه (Model Alias)</label>
                   <select
-                    className="input"
+                    className="input mono"
                     value={editingAgent.model || 'nabu-smart'}
                     onChange={(e) => setEditingAgent({ ...editingAgent, model: e.target.value })}
                   >
@@ -462,11 +479,13 @@ export default function Agents() {
 
       {/* EDIT FLOW MODAL */}
       {editingFlow && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px' }}>
-          <div className="card" style={{ maxWidth: '680px', width: '100%', maxHeight: '90vh', overflowY: 'auto' }}>
-            <h3>{editingFlow.name ? `ویرایش خط‌لوله ${editingFlow.name}` : 'ساخت خط‌لوله جدید'}</h3>
-            <form onSubmit={handleSaveFlow} style={{ marginTop: '16px' }}>
-              <div style={{ marginBottom: '12px' }}>
+        <div className="modal-backdrop">
+          <div className="card modal glass-card" style={{ maxWidth: '680px' }}>
+            <h3 style={{ borderBottom: '1px solid var(--ng-border-faint)', paddingBottom: '16px', marginBottom: '20px' }}>
+              {editingFlow.name ? `ویرایش خط‌لوله ${editingFlow.name}` : 'ساخت خط‌لوله جدید'}
+            </h3>
+            <form onSubmit={handleSaveFlow}>
+              <div style={{ marginBottom: '16px' }}>
                 <label className="label">نام خط‌لوله (Flow Name)</label>
                 <input
                   type="text"
@@ -486,62 +505,67 @@ export default function Agents() {
                 />
               </div>
 
-              <div style={{ marginBottom: '16px' }}>
-                <label className="label">گام‌های خط‌لوله (Steps)</label>
-                {editingFlow.steps?.map((st, i) => (
-                  <div key={i} style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '8px', background: '#0b1329', padding: '8px 12px', borderRadius: '6px' }}>
-                    <span style={{ fontSize: '0.8rem', color: '#94a3b8' }}>گام {i + 1}:</span>
-                    <select
-                      className="input"
-                      style={{ flex: 2 }}
-                      value={st.agent}
-                      onChange={(e) => {
-                        const newSteps = [...editingFlow.steps];
-                        newSteps[i].agent = e.target.value;
-                        setEditingFlow({ ...editingFlow, steps: newSteps });
-                      }}
-                    >
-                      {agents.map((a) => (
-                        <option key={a.name} value={a.name}>{a.name}</option>
-                      ))}
-                    </select>
-                    <input
-                      type="text"
-                      placeholder="عنوان گام"
-                      className="input"
-                      style={{ flex: 2 }}
-                      value={st.label || ''}
-                      onChange={(e) => {
-                        const newSteps = [...editingFlow.steps];
-                        newSteps[i].label = e.target.value;
-                        setEditingFlow({ ...editingFlow, steps: newSteps });
-                      }}
-                    />
-                    <button
-                      type="button"
-                      className="btn btn-sm btn-danger"
-                      onClick={() => {
-                        const newSteps = editingFlow.steps.filter((_, idx) => idx !== i);
-                        setEditingFlow({ ...editingFlow, steps: newSteps });
-                      }}
-                    >
-                      ❌
-                    </button>
-                  </div>
-                ))}
-                <button
-                  type="button"
-                  className="btn btn-sm btn-secondary"
-                  style={{ marginTop: '8px' }}
-                  onClick={() =>
-                    setEditingFlow({
-                      ...editingFlow,
-                      steps: [...(editingFlow.steps || []), { agent: agents[0]?.name || 'seo-content-auditor', label: `گام ${(editingFlow.steps?.length || 0) + 1}` }],
-                    })
-                  }
-                >
-                  + افزودن گام جدید
-                </button>
+              <div style={{ marginBottom: '24px' }}>
+                <label className="label" style={{ marginBottom: '12px' }}>گام‌های خط‌لوله (Steps)</label>
+                <div style={{ background: 'var(--ng-surface-soft)', padding: '16px', borderRadius: '12px', border: '1px solid var(--ng-border-faint)' }}>
+                  {editingFlow.steps?.map((st, i) => (
+                    <div key={i} style={{ display: 'flex', gap: '12px', alignItems: 'center', marginBottom: '12px' }}>
+                      <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '24px', height: '24px', background: 'var(--ng-surface)', borderRadius: '50%', color: 'var(--ng-muted)', fontSize: '11px', fontWeight: 'bold', border: '1px solid var(--ng-border-faint)' }}>
+                        {i + 1}
+                      </span>
+                      <select
+                        className="input mono"
+                        style={{ flex: 2, padding: '8px 12px' }}
+                        value={st.agent}
+                        onChange={(e) => {
+                          const newSteps = [...editingFlow.steps];
+                          newSteps[i].agent = e.target.value;
+                          setEditingFlow({ ...editingFlow, steps: newSteps });
+                        }}
+                      >
+                        {agents.map((a) => (
+                          <option key={a.name} value={a.name}>{a.name}</option>
+                        ))}
+                      </select>
+                      <input
+                        type="text"
+                        placeholder="عنوان گام"
+                        className="input"
+                        style={{ flex: 2, padding: '8px 12px' }}
+                        value={st.label || ''}
+                        onChange={(e) => {
+                          const newSteps = [...editingFlow.steps];
+                          newSteps[i].label = e.target.value;
+                          setEditingFlow({ ...editingFlow, steps: newSteps });
+                        }}
+                      />
+                      <button
+                        type="button"
+                        className="btn btn-ghost"
+                        style={{ padding: '8px', color: '#ef4444' }}
+                        onClick={() => {
+                          const newSteps = editingFlow.steps.filter((_, idx) => idx !== i);
+                          setEditingFlow({ ...editingFlow, steps: newSteps });
+                        }}
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  ))}
+                  <button
+                    type="button"
+                    className="btn btn-ghost"
+                    style={{ width: '100%', border: '1px dashed var(--ng-border-faint)', color: 'var(--ng-heading)' }}
+                    onClick={() =>
+                      setEditingFlow({
+                        ...editingFlow,
+                        steps: [...(editingFlow.steps || []), { agent: agents[0]?.name || 'seo-content-auditor', label: `گام ${(editingFlow.steps?.length || 0) + 1}` }],
+                      })
+                    }
+                  >
+                    + افزودن گام جدید
+                  </button>
+                </div>
               </div>
 
               <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>

@@ -24,6 +24,22 @@ const discoveryTTL = 5 * time.Minute
 
 // Router holds the live adapters and the alias routing tables (one per
 // capability: chat, images, audio).
+
+// AllowedProvidersCtxKey is the context key for a []string of allowed provider names.
+type AllowedProvidersCtxKey struct{}
+
+func providerAllowed(ctx context.Context, p string) bool {
+	if allowed, ok := ctx.Value(AllowedProvidersCtxKey{}).([]string); ok && len(allowed) > 0 {
+		for _, item := range allowed {
+			if item == p {
+				return true
+			}
+		}
+		return false
+	}
+	return true
+}
+
 type Router struct {
 	adapters      map[string]provider.Adapter
 	models        map[string]config.ModelRoute
@@ -415,6 +431,11 @@ func (r *Router) Image(ctx context.Context, alias string, req provider.ImageRequ
 			continue
 		}
 
+
+		if !providerAllowed(ctx, t.Provider) {
+			failures.add(t.Provider, t.Model, fmt.Errorf("provider not allowed by token policy"))
+			continue
+		}
 		req.Model = t.Model
 		start := time.Now()
 		resp, err := imgAdapter.Image(ctx, req)
@@ -461,6 +482,11 @@ func (r *Router) Speech(ctx context.Context, alias string, req provider.SpeechRe
 			continue
 		}
 
+
+		if !providerAllowed(ctx, t.Provider) {
+			failures.add(t.Provider, t.Model, fmt.Errorf("provider not allowed by token policy"))
+			continue
+		}
 		req.Model = t.Model
 		start := time.Now()
 		resp, err := spAdapter.Speech(ctx, req)
@@ -531,6 +557,11 @@ func (r *Router) Embed(ctx context.Context, alias string, req provider.Embedding
 			continue
 		}
 
+
+		if !providerAllowed(ctx, t.Provider) {
+			failures.add(t.Provider, t.Model, fmt.Errorf("provider not allowed by token policy"))
+			continue
+		}
 		req.Model = t.Model
 		start := time.Now()
 		resp, err := embAdapter.Embed(ctx, req)
@@ -694,6 +725,11 @@ func (r *Router) Responses(ctx context.Context, model string, body map[string]js
 			continue
 		}
 
+
+		if !providerAllowed(ctx, t.Provider) {
+			failures.add(t.Provider, t.Model, fmt.Errorf("provider not allowed by token policy"))
+			continue
+		}
 		body["model"], _ = json.Marshal(t.Model)
 		raw, err := json.Marshal(body)
 		if err != nil {
@@ -769,6 +805,11 @@ func (r *Router) Transcribe(ctx context.Context, alias string, req provider.Tran
 			continue
 		}
 
+
+		if !providerAllowed(ctx, t.Provider) {
+			failures.add(t.Provider, t.Model, fmt.Errorf("provider not allowed by token policy"))
+			continue
+		}
 		req.Model = t.Model
 		start := time.Now()
 		resp, err := trAdapter.Transcribe(ctx, req)
