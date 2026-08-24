@@ -208,37 +208,39 @@ providers:
 models:
   nabu-fast:
     primary:
-      provider: dahl
-      model: "MiniMaxAI/MiniMax-M2.7"
+      provider: 9router
+      model: "gemini-2.5-flash"
     fallback:
+      - provider: dahl
+        model: "MiniMaxAI/MiniMax-M2.7"
       - provider: groq
         model: "llama-3.1-70b-versatile"
       - provider: openai
         model: "gpt-4o-mini"
       - provider: anthropic
         model: "claude-3-5-haiku-latest"
-      - provider: llamacpp
-        model: "qwen-local"
 
   nabu-smart:
     primary:
-      provider: dahl
-      model: "moonshotai/Kimi-K2.6"
+      provider: 9router
+      model: "gemini-2.5-pro"
     fallback:
+      - provider: 9router
+        model: "gemini-2.5-flash"
+      - provider: dahl
+        model: "moonshotai/Kimi-K2.6"
       - provider: openai
         model: "gpt-4o"
       - provider: anthropic
         model: "claude-3-5-sonnet-latest"
-      - provider: gemini
-        model: "gemini-1.5-pro"
-      - provider: llamacpp
-        model: "qwen-local"
 
   nabu-cheap:
     primary:
-      provider: openrouter
-      model: "meta-llama/llama-3.1-8b-instruct"
+      provider: 9router
+      model: "gemini-2.5-flash"
     fallback:
+      - provider: openrouter
+        model: "meta-llama/llama-3.1-8b-instruct"
       - provider: groq
         model: "llama-3.1-8b-instant"
       - provider: dahl
