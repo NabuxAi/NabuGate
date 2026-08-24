@@ -16,8 +16,10 @@ import Integration from './views/Integration.jsx';
 import Account from './views/Account.jsx';
 import Plans from './views/Plans.jsx';
 import Teams from './views/Teams.jsx';
+import Landing from './views/Landing.jsx';
 
 const VIEWS = {
+  landing: () => <Landing lang={window.location.pathname.startsWith('/fa') ? 'fa' : 'en'} />,
   dashboard: () => <Dashboard />,
   providers: () => <Providers />,
   models: () => <Models />,
@@ -51,7 +53,7 @@ const VIEWS = {
 
 function viewFromHash() {
   const id = (window.location.hash || '').replace(/^#\/?/, '');
-  return VIEWS[id] ? id : 'dashboard';
+  return id ? (VIEWS[id] ? id : 'dashboard') : 'landing';
 }
 
 export default function App() {
@@ -77,12 +79,15 @@ export default function App() {
   };
 
   if (session === null) return <div className="app-boot">…</div>;
+  if (!session.authenticated && view === 'landing') {
+    return VIEWS.landing();
+  }
   if (!session.authenticated) {
     return <SignIn needsSetup={session.needs_setup} onAuthenticated={refresh} />;
   }
 
   let allowed = [
-    'dashboard', 'integration', 'tokens', 'usage', 'logs', 'account', 'plans', 'teams',
+    'dashboard', 'integration', 'models', 'tokens', 'usage', 'logs', 'account', 'plans', 'teams',
     'subscriptions', 'requests', 'invitations', 'payments', 'referrals', 'profile', 'security', 'support', 'help'
   ];
   if (session.is_admin) allowed = Object.keys(VIEWS);

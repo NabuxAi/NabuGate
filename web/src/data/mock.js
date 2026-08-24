@@ -12,6 +12,7 @@ export const navGroups = [
     title: 'توسعه‌دهنده',
     items: [
       { id: 'tokens', label: 'کلیدهای API', icon: '🔑' },
+      { id: 'models', label: 'مدل‌ها', icon: '🧠' },
       { id: 'requests', label: 'درخواست‌ها', icon: '📄' },
       { id: 'integration', label: 'راهنمای توسعه', icon: '📖' },
     ]
@@ -43,7 +44,6 @@ export const navGroups = [
     title: 'مدیریت (ادمین)',
     adminOnly: true,
     items: [
-      { id: 'models', label: 'مدل‌ها', icon: '🧠' },
       { id: 'users', label: 'کاربران', icon: '👑' },
       { id: 'providers', label: 'پروایدرها', icon: '🔌' },
     ]
