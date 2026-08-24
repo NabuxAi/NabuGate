@@ -12,6 +12,7 @@ import Usage from './views/Usage.jsx';
 import Agents from './views/Agents.jsx';
 import Users from './views/Users.jsx';
 import Placeholder from './views/Placeholder.jsx';
+import Integration from './views/Integration.jsx';
 
 const VIEWS = {
   dashboard: () => <Dashboard />,
@@ -22,6 +23,7 @@ const VIEWS = {
   usage: () => <Usage />,
   agents: () => <Agents />,
   users: () => <Users />,
+  integration: () => <Integration />,
   logs: () => (
     <Placeholder
       title="لاگ‌ها"

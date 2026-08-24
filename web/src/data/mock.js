@@ -98,6 +98,7 @@ export const totalToday = '$14.22';
 
 export const nav = [
   { id: 'dashboard', label: 'داشبورد', icon: '▦' },
+  { id: 'integration', label: 'اتصال و کدها', icon: '⎘' },
   { id: 'providers', label: 'پرووایدرها', icon: '◉' },
   { id: 'models', label: 'مدل‌ها و آلیاس‌ها', icon: '✦' },
   { id: 'tokens', label: 'توکن هر اپ', icon: '⚿' },
