@@ -3,7 +3,7 @@ import { nav } from '../data/mock.js';
 export default function Sidebar({ current, onNavigate, isAdmin }) {
   const visibleNav = nav.filter(item => {
     if (!isAdmin) {
-      return ['dashboard', 'integration', 'tokens', 'usage', 'logs'].includes(item.id);
+      return ['dashboard', 'integration', 'tokens', 'usage', 'logs', 'account', 'models', 'plans', 'teams'].includes(item.id);
     }
     return true;
   });

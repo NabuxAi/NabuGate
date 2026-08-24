@@ -1,70 +1,65 @@
-/*
- * NabuGate console design tokens.
- *
- * Distilled from the NabuDesk design system (indigo→violet brand, slate
- * neutrals, emerald/amber/rose/sky statuses, Inter+Vazirmatn, RTL-first) and
- * tuned to the NabuGate console mockup, which leads with a blue accent (#2563eb)
- * over the slate base. Keep values here; components reference the vars.
+/* 
+ * NabuGate Dark Mode tokens based on Jarvis Console 
  */
 :root {
   /* Brand / accent */
   --ng-accent: #2563eb;
-  --ng-accent-strong: #1d4ed8;
-  --ng-accent-soft: #eff6ff;
-  --ng-accent-border: #bfdbfe;
-  --ng-brand-grad: linear-gradient(135deg, #4338ca 0%, #2563eb 100%);
+  --ng-accent-strong: #3b82f6;
+  --ng-accent-soft: rgba(37, 99, 235, 0.15);
+  --ng-accent-border: rgba(37, 99, 235, 0.3);
+  --ng-brand-grad: linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%);
 
-  /* Surfaces & lines */
-  --ng-bg: #f5f7fb;
-  --ng-bg-veil: linear-gradient(180deg, rgba(37, 99, 235, 0.08), transparent 240px);
-  --ng-surface: #ffffff;
-  --ng-surface-soft: #f8fafc;
-  --ng-surface-softer: #fbfcfe;
-  --ng-border: #e6ecf5;
-  --ng-border-card: #dde6f0;
-  --ng-border-faint: #eef2f8;
-  --ng-divider: #f1f5fb;
+  /* Surfaces & lines (Dark) */
+  --ng-bg: #0b1020;
+  --ng-bg-veil: transparent;
+  --ng-surface: #10162a;
+  --ng-surface-soft: #141c33;
+  --ng-surface-softer: #19223e;
+  --ng-border: #1c2742;
+  --ng-border-card: #222f4d;
+  --ng-border-faint: #19223e;
+  --ng-divider: #1c2742;
 
-  /* Text */
-  --ng-text: #172033;
-  --ng-heading: #111827;
-  --ng-heading-ink: #0f172a;
-  --ng-muted: #637083;
-  --ng-subtle: #94a3b8;
-  --ng-slate-600: #475569;
-  --ng-slate-700: #334155;
+  /* Text (Dark) */
+  --ng-text: #e2e8f0;
+  --ng-heading: #f8fafc;
+  --ng-heading-ink: #ffffff;
+  --ng-muted: #94a3b8;
+  --ng-subtle: #64748b;
+  --ng-slate-600: #94a3b8;
+  --ng-slate-700: #cbd5e1;
 
   /* Status — success (emerald) */
   --ng-ok: #10b981;
-  --ng-ok-text: #0f766e;
-  --ng-ok-surface: #ecfdf9;
-  --ng-ok-border: #b7e4dc;
+  --ng-ok-text: #10b981;
+  --ng-ok-surface: rgba(16, 185, 129, 0.1);
+  --ng-ok-border: rgba(16, 185, 129, 0.2);
   /* Status — warn (amber) */
-  --ng-warn-text: #92400e;
-  --ng-warn-surface: #fffbeb;
-  --ng-warn-border: #fde68a;
+  --ng-warn-text: #f59e0b;
+  --ng-warn-surface: rgba(245, 158, 11, 0.1);
+  --ng-warn-border: rgba(245, 158, 11, 0.2);
   /* Accent chip (info / primary target) */
-  --ng-info-text: #1d4ed8;
-  --ng-info-surface: #eff6ff;
-  --ng-info-border: #bfdbfe;
+  --ng-info-text: #60a5fa;
+  --ng-info-surface: rgba(59, 130, 246, 0.1);
+  --ng-info-border: rgba(59, 130, 246, 0.2);
   /* Passthrough (violet) */
-  --ng-pass-text: #6d28d9;
-  --ng-pass-surface: #f5f3ff;
-  --ng-pass-border: #ddd6fe;
+  --ng-pass-text: #a78bfa;
+  --ng-pass-surface: rgba(139, 92, 246, 0.1);
+  --ng-pass-border: rgba(139, 92, 246, 0.2);
   /* Idle dot */
-  --ng-idle: #cbd5e1;
+  --ng-idle: #334155;
 
   /* Shape */
   --ng-radius-sm: 6px;
-  --ng-radius: 8px;
+  --ng-radius: 12px;
   --ng-radius-pill: 999px;
 
   /* Elevation */
-  --ng-shadow-xs: 0 1px 2px rgba(15, 23, 42, 0.05);
-  --ng-shadow-stat: 0 8px 22px rgba(15, 23, 42, 0.05);
-  --ng-shadow-card: 0 10px 28px rgba(15, 23, 42, 0.07);
-  --ng-shadow-brand: 0 12px 28px rgba(67, 56, 202, 0.28);
-  --ng-shadow-btn: 0 12px 24px rgba(37, 99, 235, 0.2);
+  --ng-shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --ng-shadow-stat: 0 8px 22px rgba(0, 0, 0, 0.4);
+  --ng-shadow-card: 0 10px 28px rgba(0, 0, 0, 0.5);
+  --ng-shadow-brand: 0 12px 28px rgba(37, 99, 235, 0.2);
+  --ng-shadow-btn: 0 12px 24px rgba(37, 99, 235, 0.15);
 
   /* Type */
   --ng-font: 'Vazirmatn', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;

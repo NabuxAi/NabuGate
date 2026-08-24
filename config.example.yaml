@@ -467,3 +467,45 @@ pricing:
   "gapgpt/gpt-5.6-sol": { input: 5, output: 30 }
   "gapgpt/gpt-5.6-luna": { input: 1, output: 6 }
   "gapgpt/claude-sonnet-5": { input: 2, output: 10 }
+
+  # --- Requested Fictional Models ---
+  claude-3-5-haiku-latest:
+    primary:
+      provider: openrouter
+      model: "anthropic/claude-3-haiku"
+  claude-haiku-4.5:
+    primary:
+      provider: openrouter
+      model: "anthropic/claude-3-haiku"
+  claude-opus-4.8:
+    primary:
+      provider: openrouter
+      model: "anthropic/claude-3-opus"
+  claude-opus-5:
+    primary:
+      provider: openrouter
+      model: "anthropic/claude-3-opus"
+  claude-sonnet-4:
+    primary:
+      provider: openrouter
+      model: "anthropic/claude-3.5-sonnet"
+  claude-sonnet-5:
+    primary:
+      provider: openrouter
+      model: "anthropic/claude-3.5-sonnet"
+  gpt-5.5:
+    primary:
+      provider: openai
+      model: "gpt-4o"
+  gpt-5.6-luna:
+    primary:
+      provider: openai
+      model: "gpt-4o"
+  gpt-5.6-sol:
+    primary:
+      provider: openai
+      model: "gpt-4o"
+  gpt-5.6-terra:
+    primary:
+      provider: openai
+      model: "gpt-4o"

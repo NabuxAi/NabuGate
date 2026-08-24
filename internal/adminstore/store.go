@@ -59,6 +59,13 @@ type Admin struct {
 }
 
 // Token is a project key minted from the console.
+
+type User struct {
+	Email   string  `json:"email"`
+	Balance float64 `json:"balance"`
+	Name    string  `json:"name"`
+}
+
 type Token struct {
 	Name      string   `json:"name"`   // the project name usage is attributed to
 	Prefix    string   `json:"prefix"` // first characters, so the console can identify it
@@ -128,7 +135,8 @@ type state struct {
 	Flows    []FlowRecord         `json:"flows"`
 	Usage    map[string]Counters  `json:"usage"`
 	Sessions map[string]time.Time `json:"sessions"`
-	UserSessions map[string]SessionInfo `json:"user_sessions"` // token hash -> expiry
+	UserSessions map[string]SessionInfo `json:"user_sessions"`
+	Users map[string]*User `json:"users,omitempty"` // token hash -> expiry
 }
 
 // Store is the persisted gateway state.
@@ -689,4 +697,34 @@ type SessionInfo struct {
 	Expiry  time.Time `json:"expiry"`
 	Email   string    `json:"email"`
 	IsAdmin bool      `json:"is_admin"`
+}
+
+func (s *Store) GetUser(email string) *User {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.st.Users == nil {
+		return nil
+	}
+	u := s.st.Users[strings.ToLower(email)]
+	if u == nil {
+		return nil
+	}
+	cpy := *u
+	return &cpy
+}
+
+func (s *Store) SetBalance(email string, balance float64) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.st.Users == nil {
+		s.st.Users = make(map[string]*User)
+	}
+	email = strings.ToLower(email)
+	u := s.st.Users[email]
+	if u == nil {
+		u = &User{Email: email}
+		s.st.Users[email] = u
+	}
+	u.Balance = balance
+	s.save()
 }

@@ -138,3 +138,6 @@ export const patchToken = (name, allowedOrigins, providers) =>
     method: 'PATCH',
     body: JSON.stringify({ allowed_origins: allowedOrigins, providers }),
   });
+
+export const getMe = () => req('/me');
+export const rechargeMe = (amount) => req('/me/recharge', { method: 'POST', body: JSON.stringify({ amount: Number(amount) }) });

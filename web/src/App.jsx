@@ -13,6 +13,9 @@ import Agents from './views/Agents.jsx';
 import Users from './views/Users.jsx';
 import Placeholder from './views/Placeholder.jsx';
 import Integration from './views/Integration.jsx';
+import Account from './views/Account.jsx';
+import Plans from './views/Plans.jsx';
+import Teams from './views/Teams.jsx';
 
 const VIEWS = {
   dashboard: () => <Dashboard />,
@@ -24,6 +27,9 @@ const VIEWS = {
   agents: () => <Agents />,
   users: () => <Users />,
   integration: () => <Integration />,
+  account: () => <Account />,
+  plans: () => <Plans />,
+  teams: () => <Teams />,
   logs: () => (
     <Placeholder
       title="لاگ‌ها"
@@ -66,7 +72,7 @@ export default function App() {
     return <SignIn needsSetup={session.needs_setup} onAuthenticated={refresh} />;
   }
 
-  let allowed = ['dashboard', 'integration', 'tokens', 'usage', 'logs'];
+  let allowed = ['dashboard', 'integration', 'tokens', 'usage', 'logs', 'account', 'models', 'plans', 'teams'];
   if (session.is_admin) allowed = Object.keys(VIEWS);
   const safeView = allowed.includes(view) ? view : 'dashboard';
   const render = VIEWS[safeView] || VIEWS.dashboard;

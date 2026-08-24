@@ -39,7 +39,9 @@ func (s *Server) mountConsoleAPI(mux *http.ServeMux) {
 	mux.HandleFunc("GET /admin/api/nabu", s.consoleNabuStart)
 	mux.HandleFunc("GET /admin/api/nabu/callback", s.consoleNabuCallback)
 
-	mux.Handle("GET /admin/api/tokens", s.consoleAuth(s.listTokens))
+		mux.Handle("GET /admin/api/tokens", s.consoleAuth(s.listTokens))
+	mux.Handle("GET /admin/api/me", s.consoleAuth(s.getMe))
+	mux.Handle("POST /admin/api/me/recharge", s.consoleAuth(s.rechargeMe))
 	mux.Handle("POST /admin/api/tokens", s.consoleAuth(s.createToken))
 	mux.Handle("DELETE /admin/api/tokens/{name}", s.consoleAuth(s.deleteToken))
 	mux.Handle("PATCH /admin/api/tokens/{name}", s.consoleAuth(s.patchToken))
@@ -526,6 +528,34 @@ func cleanList(in []string) []string {
 // The console used to render all of this from a mock file, so it described a
 // gateway that did not exist — providers that were never keyed, aliases that had
 // been renamed. Everything here is read from the live router.
+
+func (s *Server) getMe(w http.ResponseWriter, r *http.Request) {
+	email, _ := r.Context().Value(consoleEmailCtxKey{}).(string)
+	user := s.admin.GetUser(email)
+	if user == nil {
+		user = &adminstore.User{Email: email, Balance: 0}
+	}
+	writeJSON(w, http.StatusOK, user)
+}
+
+func (s *Server) rechargeMe(w http.ResponseWriter, r *http.Request) {
+	email, _ := r.Context().Value(consoleEmailCtxKey{}).(string)
+	var req struct {
+		Amount float64 `json:"amount"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid amount")
+		return
+	}
+	user := s.admin.GetUser(email)
+	newBalance := req.Amount
+	if user != nil {
+		newBalance += user.Balance
+	}
+	s.admin.SetBalance(email, newBalance)
+	writeJSON(w, http.StatusOK, map[string]any{"balance": newBalance})
+}
+
 func (s *Server) consoleOverview(w http.ResponseWriter, r *http.Request) {
 	type providerInfo struct {
 		Name        string `json:"name"`
@@ -537,8 +567,27 @@ func (s *Server) consoleOverview(w http.ResponseWriter, r *http.Request) {
 		providers = append(providers, providerInfo{Name: name, Passthrough: s.router.IsPassthrough(name)})
 	}
 
+	isAdmin, _ := r.Context().Value(consoleAdminCtxKey{}).(bool)
+	email, _ := r.Context().Value(consoleEmailCtxKey{}).(string)
+	
+	allowedProviders := make(map[string]bool)
+	if !isAdmin {
+		for _, t := range s.admin.Tokens() {
+			if strings.EqualFold(t.Owner, email) {
+				for _, p := range t.Providers {
+					allowedProviders[p] = true
+				}
+			}
+		}
+	}
+
 	aliases := make([]map[string]any, 0)
 	for _, a := range s.router.AliasInfos() {
+		if !isAdmin && len(allowedProviders) > 0 && a.Owner != "agent" && a.Owner != "flow" {
+			if !allowedProviders[a.Owner] {
+				continue
+			}
+		}
 		aliases = append(aliases, map[string]any{"id": a.ID, "owner": a.Owner})
 	}
 
