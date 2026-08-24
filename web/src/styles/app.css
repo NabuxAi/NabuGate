@@ -563,3 +563,159 @@ select.input {
   color: var(--ng-slate-500);
   margin: 6px 12px 4px;
 }
+
+/* Landing Page Styles */
+.landing-page {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background-color: var(--ng-bg);
+  color: var(--ng-fg);
+  font-family: inherit;
+}
+
+.landing-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 2rem;
+  border-bottom: 1px solid var(--ng-border);
+}
+
+.landing-header .logo {
+  font-size: 1.5rem;
+  font-weight: bold;
+  letter-spacing: -0.5px;
+}
+
+.landing-header nav {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+}
+
+.landing-header nav a {
+  color: var(--ng-muted);
+  text-decoration: none;
+  font-size: 0.95rem;
+  transition: color 0.2s;
+}
+
+.landing-header nav a:hover {
+  color: var(--ng-fg);
+}
+
+.landing-header nav .btn-primary {
+  background-color: var(--ng-fg);
+  color: var(--ng-bg);
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  font-weight: 500;
+}
+
+.landing-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 4rem 2rem;
+}
+
+.hero {
+  text-align: center;
+  max-width: 800px;
+  margin-bottom: 5rem;
+}
+
+.hero h1 {
+  font-size: 3.5rem;
+  line-height: 1.2;
+  margin-bottom: 1.5rem;
+  font-weight: 700;
+}
+
+.hero p {
+  font-size: 1.25rem;
+  color: var(--ng-muted);
+  margin-bottom: 2.5rem;
+}
+
+.hero-actions {
+  display: flex;
+  justify-content: center;
+  gap: 1rem;
+}
+
+.btn-primary {
+  background-color: var(--ng-fg);
+  color: var(--ng-bg);
+  padding: 0.75rem 1.5rem;
+  border-radius: 8px;
+  text-decoration: none;
+  font-weight: 500;
+  transition: opacity 0.2s;
+}
+
+.btn-primary:hover {
+  opacity: 0.9;
+}
+
+.btn-secondary {
+  background-color: var(--ng-surface);
+  border: 1px solid var(--ng-border);
+  color: var(--ng-fg);
+  padding: 0.75rem 1.5rem;
+  border-radius: 8px;
+  text-decoration: none;
+  font-weight: 500;
+  transition: border-color 0.2s;
+}
+
+.btn-secondary:hover {
+  border-color: var(--ng-muted);
+}
+
+.features {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 2rem;
+  max-width: 1000px;
+  width: 100%;
+}
+
+.feature {
+  background-color: var(--ng-surface);
+  border: 1px solid var(--ng-border);
+  padding: 2rem;
+  border-radius: 12px;
+}
+
+.feature h3 {
+  font-size: 1.2rem;
+  margin-bottom: 1rem;
+}
+
+.feature p {
+  color: var(--ng-muted);
+  line-height: 1.5;
+}
+
+.landing-footer {
+  padding: 2rem;
+  border-top: 1px solid var(--ng-border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  color: var(--ng-muted);
+  font-size: 0.9rem;
+}
+
+.lang-switcher a {
+  color: var(--ng-muted);
+  text-decoration: none;
+  margin: 0 0.5rem;
+}
+
+.lang-switcher a:hover {
+  color: var(--ng-fg);
+}
