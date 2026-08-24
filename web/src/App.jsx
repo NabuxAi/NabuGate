@@ -30,6 +30,15 @@ const VIEWS = {
   account: () => <Account />,
   plans: () => <Plans />,
   teams: () => <Teams />,
+  subscriptions: () => <Placeholder title="اشتراک‌ها" subtitle="مدیریت اشتراک‌های فعال شما" icon="💼" />,
+  requests: () => <Placeholder title="درخواست‌ها" subtitle="گزارش درخواست‌های ارسالی به API" icon="📄" />,
+  invitations: () => <Placeholder title="دعوت‌نامه‌ها" subtitle="دعوت‌نامه‌های ارسالی و دریافتی" icon="✉️" />,
+  payments: () => <Placeholder title="پرداخت‌ها" subtitle="تاریخچه پرداخت‌ها و فاکتورها" icon="💳" />,
+  referrals: () => <Placeholder title="دعوت دوستان" subtitle="لینک دعوت و پاداش‌ها" icon="🎁" />,
+  profile: () => <Placeholder title="پروفایل" subtitle="تنظیمات پروفایل کاربری" icon="👤" />,
+  security: () => <Placeholder title="امنیت" subtitle="تنظیمات امنیتی و رمز عبور" icon="🛡️" />,
+  support: () => <Placeholder title="پشتیبانی" subtitle="تیکت‌ها و ارتباط با پشتیبانی" icon="⚙️" />,
+  help: () => <Placeholder title="راهنما" subtitle="مستندات و آموزش‌ها" icon="❓" />,
   logs: () => (
     <Placeholder
       title="لاگ‌ها"
@@ -72,7 +81,10 @@ export default function App() {
     return <SignIn needsSetup={session.needs_setup} onAuthenticated={refresh} />;
   }
 
-  let allowed = ['dashboard', 'integration', 'tokens', 'usage', 'logs', 'account', 'models', 'plans', 'teams'];
+  let allowed = [
+    'dashboard', 'integration', 'tokens', 'usage', 'logs', 'account', 'plans', 'teams',
+    'subscriptions', 'requests', 'invitations', 'payments', 'referrals', 'profile', 'security', 'support', 'help'
+  ];
   if (session.is_admin) allowed = Object.keys(VIEWS);
   const safeView = allowed.includes(view) ? view : 'dashboard';
   const render = VIEWS[safeView] || VIEWS.dashboard;

@@ -550,3 +550,16 @@ select.input {
   border-bottom: 2px solid var(--ng-accent);
 }
 
+
+.nav-group {
+  margin-bottom: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.nav-group-title {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--ng-slate-500);
+  margin: 6px 12px 4px;
+}

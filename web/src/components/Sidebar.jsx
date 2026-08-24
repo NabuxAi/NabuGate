@@ -1,40 +1,41 @@
-import { nav } from '../data/mock.js';
+import { navGroups } from '../data/mock.js';
 
 export default function Sidebar({ current, onNavigate, isAdmin }) {
-  const visibleNav = nav.filter(item => {
-    if (!isAdmin) {
-      return ['dashboard', 'integration', 'tokens', 'usage', 'logs', 'account', 'models', 'plans', 'teams'].includes(item.id);
-    }
-    return true;
-  });
-
   return (
     <aside className="sidebar">
       <div className="brand">
-        <div className="brand-mark" aria-hidden="true">
-          ⛃
-        </div>
+        <div className="brand-mark" aria-hidden="true">✨</div>
         <div style={{ minWidth: 0 }}>
-          <div className="brand-name">NabuGate</div>
-          <div className="brand-sub">دروازهٔ هوش مصنوعی</div>
+          <div className="brand-name">Console Jarvis</div>
         </div>
       </div>
 
       <nav className="nav">
-        {visibleNav.map((item) => (
-          <button
-            key={item.id}
-            type="button"
-            className={'nav-item' + (current === item.id ? ' active' : '')}
-            aria-current={current === item.id ? 'page' : undefined}
-            onClick={() => onNavigate(item.id)}
-          >
-            <span className="ic" aria-hidden="true">
-              {item.icon}
-            </span>
-            {item.label}
-          </button>
-        ))}
+        {navGroups.map((group, i) => {
+          if (group.adminOnly && !isAdmin) return null;
+          return (
+            <div key={i} className="nav-group">
+              <div className="nav-group-title">{group.title}</div>
+              {group.items.map((item) => {
+                // If you want some items to be hidden from non-admins, you can filter them here if needed.
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    className={'nav-item' + (current === item.id ? ' active' : '')}
+                    aria-current={current === item.id ? 'page' : undefined}
+                    onClick={() => onNavigate(item.id)}
+                  >
+                    <span className="ic" aria-hidden="true">
+                      {item.icon}
+                    </span>
+                    {item.label}
+                  </button>
+                );
+              })}
+            </div>
+          );
+        })}
       </nav>
 
       <div className="svc">
