@@ -16,8 +16,8 @@ type KeyConfig struct {
 	Key       string   `yaml:"key"`
 	Project   string   `yaml:"project"`
 	Allow     []string `yaml:"allow"`      // alias globs; "*" (or empty) allows all
-	RateLimit int
-	Providers []string      `yaml:"rate_limit"` // requests per minute; 0 = unlimited
+	RateLimit int      `yaml:"rate_limit"` // requests per minute; 0 = unlimited
+	Providers []string `yaml:"providers"`
 }
 
 // Policy is the resolved access policy attached to a key.
