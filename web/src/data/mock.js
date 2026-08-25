@@ -3,39 +3,20 @@ export const navGroups = [
     title: 'مرور کلی',
     items: [
       { id: 'dashboard', label: 'داشبورد', icon: '⊞' },
-      { id: 'plans', label: 'پلن‌ها', icon: '✨' },
-      { id: 'subscriptions', label: 'اشتراک‌ها', icon: '💼' },
+      { id: 'plans', label: 'خرید و شارژ', icon: '✨' },
     ]
   },
   {
     title: 'توسعه‌دهنده',
     items: [
       { id: 'tokens', label: 'کلیدهای API', icon: '🔑' },
-      { id: 'requests', label: 'درخواست‌ها', icon: '📄' },
-      { id: 'integration', label: 'راهنمای توسعه', icon: '📖' },
-    ]
-  },
-  {
-    title: 'تیم‌ها',
-    items: [
-      { id: 'teams', label: 'تیم‌های من', icon: '👥' },
-      { id: 'invitations', label: 'دعوت‌نامه‌ها', icon: '✉️' },
+      { id: 'models', label: 'مدل‌ها', icon: '🧠' },
     ]
   },
   {
     title: 'حساب کاربری',
     items: [
-      { id: 'payments', label: 'پرداخت‌ها', icon: '💳' },
-      { id: 'referrals', label: 'دعوت دوستان', icon: '🎁' },
       { id: 'profile', label: 'پروفایل', icon: '👤' },
-      { id: 'security', label: 'امنیت', icon: '🛡️' },
-      { id: 'support', label: 'پشتیبانی', icon: '⚙️' },
-    ]
-  },
-  {
-    title: 'آموزش',
-    items: [
-      { id: 'help', label: 'راهنما', icon: '❓' },
     ]
   },
   {
@@ -43,7 +24,6 @@ export const navGroups = [
     adminOnly: true,
     items: [
       { id: 'usage', label: 'مصرف کل', icon: '◴' },
-      { id: 'models', label: 'مدل‌ها', icon: '🧠' },
       { id: 'users', label: 'کاربران', icon: '👑' },
       { id: 'providers', label: 'پروایدرها', icon: '🔌' },
       { id: 'agents', label: 'عامل‌ها', icon: '🤖' },
