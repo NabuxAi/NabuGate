@@ -8,7 +8,7 @@ import (
 )
 
 func loginRequest(remoteAddr, xff string) *http.Request {
-	r := httptest.NewRequest(http.MethodPost, "/admin/api/login", nil)
+	r := httptest.NewRequest(http.MethodPost, "/api/login", nil)
 	r.RemoteAddr = remoteAddr
 	if xff != "" {
 		r.Header.Set("X-Forwarded-For", xff)

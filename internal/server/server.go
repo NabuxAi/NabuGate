@@ -182,6 +182,11 @@ func (s *Server) mountConsole(mux *http.ServeMux) {
 	mux.HandleFunc("GET /admin", func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/admin/", http.StatusMovedPermanently)
 	})
+
+	mux.Handle("GET /panel/", http.StripPrefix("/panel/", spaFileServer(assets, fileServer)))
+	mux.HandleFunc("GET /panel", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "/panel/", http.StatusMovedPermanently)
+	})
 }
 
 // spaFileServer serves static files from the console bundle and falls back to

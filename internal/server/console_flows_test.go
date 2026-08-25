@@ -92,7 +92,7 @@ func TestConsoleCreatesAFlowThatIsImmediatelyCallable(t *testing.T) {
 	up := newHTTPServer(t, h)
 	ts, _, session := consoleFlowServer(t, up.URL)
 
-	resp, out := consoleDo(t, ts, session, http.MethodPost, "/admin/api/flows",
+	resp, out := consoleDo(t, ts, session, http.MethodPost, "/api/flows",
 		`{"name":"mine","steps":[{"agent":"writer"},{"agent":"reviewer","label":"check"}]}`)
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("save status = %d: %v", resp.StatusCode, out)
@@ -117,7 +117,7 @@ func TestConsoleRefusesAStepNamingNothing(t *testing.T) {
 	up := newHTTPServer(t, h)
 	ts, _, session := consoleFlowServer(t, up.URL)
 
-	resp, out := consoleDo(t, ts, session, http.MethodPost, "/admin/api/flows",
+	resp, out := consoleDo(t, ts, session, http.MethodPost, "/api/flows",
 		`{"name":"broken","steps":[{"agent":"writer"},{"agent":"typo-here"}]}`)
 
 	if resp.StatusCode != http.StatusBadRequest {
@@ -135,7 +135,7 @@ func TestConsoleRefusesAFlowThatNamesItself(t *testing.T) {
 	up := newHTTPServer(t, h)
 	ts, _, session := consoleFlowServer(t, up.URL)
 
-	resp, _ := consoleDo(t, ts, session, http.MethodPost, "/admin/api/flows",
+	resp, _ := consoleDo(t, ts, session, http.MethodPost, "/api/flows",
 		`{"name":"ouroboros","steps":[{"agent":"ouroboros"}]}`)
 
 	if resp.StatusCode != http.StatusBadRequest {
@@ -150,7 +150,7 @@ func TestConsoleRefusesAnEmptyFlow(t *testing.T) {
 	up := newHTTPServer(t, h)
 	ts, _, session := consoleFlowServer(t, up.URL)
 
-	resp, _ := consoleDo(t, ts, session, http.MethodPost, "/admin/api/flows", `{"name":"hollow","steps":[]}`)
+	resp, _ := consoleDo(t, ts, session, http.MethodPost, "/api/flows", `{"name":"hollow","steps":[]}`)
 	if resp.StatusCode != http.StatusBadRequest {
 		t.Errorf("status = %d, want 400", resp.StatusCode)
 	}
@@ -209,7 +209,7 @@ func TestConsoleWillNotDeleteABakedFlow(t *testing.T) {
 
 	_ = srv.flows.Add(flow.Flow{Name: "baked", Steps: []flow.Step{{Agent: "writer"}}})
 
-	resp, _ := consoleDo(t, ts, session, http.MethodDelete, "/admin/api/flows/baked", "")
+	resp, _ := consoleDo(t, ts, session, http.MethodDelete, "/api/flows/baked", "")
 	if resp.StatusCode != http.StatusBadRequest {
 		t.Errorf("status = %d, want 400", resp.StatusCode)
 	}
@@ -225,10 +225,10 @@ func TestConsoleTestRunReturnsEveryStep(t *testing.T) {
 	up := newHTTPServer(t, h)
 	ts, _, session := consoleFlowServer(t, up.URL)
 
-	consoleDo(t, ts, session, http.MethodPost, "/admin/api/flows",
+	consoleDo(t, ts, session, http.MethodPost, "/api/flows",
 		`{"name":"mine","steps":[{"agent":"writer"},{"agent":"reviewer"}]}`)
 
-	resp, out := consoleDo(t, ts, session, http.MethodPost, "/admin/api/flows/mine/test", `{"message":"brief"}`)
+	resp, out := consoleDo(t, ts, session, http.MethodPost, "/api/flows/mine/test", `{"message":"brief"}`)
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("status = %d: %v", resp.StatusCode, out)
 	}
@@ -253,10 +253,10 @@ func TestConsoleFlowsNeedASession(t *testing.T) {
 	ts, _, _ := consoleFlowServer(t, up.URL)
 
 	for _, c := range []struct{ method, path, body string }{
-		{http.MethodGet, "/admin/api/flows", ""},
-		{http.MethodPost, "/admin/api/flows", `{"name":"x","steps":[{"agent":"writer"}]}`},
-		{http.MethodDelete, "/admin/api/flows/x", ""},
-		{http.MethodPost, "/admin/api/flows/x/test", `{"message":"hi"}`},
+		{http.MethodGet, "/api/flows", ""},
+		{http.MethodPost, "/api/flows", `{"name":"x","steps":[{"agent":"writer"}]}`},
+		{http.MethodDelete, "/api/flows/x", ""},
+		{http.MethodPost, "/api/flows/x/test", `{"message":"hi"}`},
 	} {
 		req, _ := http.NewRequest(c.method, ts.URL+c.path, strings.NewReader(c.body))
 		req.Header.Set("Content-Type", "application/json")

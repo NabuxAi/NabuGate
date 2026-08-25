@@ -17,7 +17,7 @@ export default function Landing({ lang = 'fa' }) {
         <nav>
           <a href="#/pricing" className="nav-link">{isFa ? 'قیمت‌گذاری' : 'Pricing'}</a>
           <a href="#/docs" className="nav-link">{isFa ? 'مستندات' : 'Docs'}</a>
-          <a href="#/dashboard" className="btn-primary-outline">{isFa ? 'ورود به کنسول' : 'Go to Console'}</a>
+          <a href="/panel/" className="btn-primary-outline">{isFa ? 'ورود به کنسول' : 'Go to Console'}</a>
         </nav>
       </header>
       
@@ -38,7 +38,7 @@ export default function Landing({ lang = 'fa' }) {
               : 'Seamlessly connect to all advanced models (OpenAI, Anthropic, Gemini, Groq) with a single API key and optimize your costs.'}
           </p>
           <div className="hero-actions">
-            <a href="#/dashboard" className="btn-primary-glow">
+            <a href="/panel/" className="btn-primary-glow">
               {isFa ? 'ساخت کلید API رایگان' : 'Create Free API Key'}
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" style={{ marginLeft: isFa ? 0 : 8, marginRight: isFa ? 8 : 0 }}>
                 <path d={isFa ? "M19 12H5M12 19L5 12L12 5" : "M5 12H19M12 5L19 12L12 19"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>

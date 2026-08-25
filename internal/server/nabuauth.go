@@ -94,7 +94,7 @@ func (c nabuAuthConfig) redirectURI(r *http.Request) string {
 	if r.TLS != nil || strings.EqualFold(r.Header.Get("X-Forwarded-Proto"), "https") {
 		scheme = "https"
 	}
-	return fmt.Sprintf("%s://%s/admin/api/nabu/callback", scheme, r.Host)
+	return fmt.Sprintf("%s://%s/api/nabu/callback", scheme, r.Host)
 }
 
 func b64u(raw []byte) string { return base64.RawURLEncoding.EncodeToString(raw) }
@@ -184,7 +184,7 @@ func (s *Server) consoleNabuStart(w http.ResponseWriter, r *http.Request) {
 	http.SetCookie(w, &http.Cookie{
 		Name:  consoleNabuFlowCookie,
 		Value: cookieValue,
-		Path:  "/admin",
+		Path:  "/",
 		// HttpOnly so no script on the page can read the verifier. SameSite=Lax
 		// rather than Strict, because the cookie must survive the redirect back
 		// from NabuAuth — Strict would drop it and every sign-in would fail.
@@ -216,7 +216,7 @@ func (s *Server) consoleNabuCallback(w http.ResponseWriter, r *http.Request) {
 
 	clearFlow := func() {
 		http.SetCookie(w, &http.Cookie{
-			Name: consoleNabuFlowCookie, Value: "", Path: "/admin",
+			Name: consoleNabuFlowCookie, Value: "", Path: "/",
 			HttpOnly: true, Secure: requestIsHTTPS(r), SameSite: http.SameSiteLaxMode, MaxAge: -1,
 		})
 	}
@@ -264,7 +264,7 @@ func (s *Server) consoleNabuCallback(w http.ResponseWriter, r *http.Request) {
 	http.SetCookie(w, &http.Cookie{
 		Name:     consoleCookie,
 		Value:    token,
-		Path:     "/admin",
+		Path:     "/",
 		HttpOnly: true,
 		Secure:   requestIsHTTPS(r),
 		SameSite: http.SameSiteStrictMode,

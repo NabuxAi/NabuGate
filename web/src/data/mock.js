@@ -5,14 +5,12 @@ export const navGroups = [
       { id: 'dashboard', label: 'داشبورد', icon: '⊞' },
       { id: 'plans', label: 'پلن‌ها', icon: '✨' },
       { id: 'subscriptions', label: 'اشتراک‌ها', icon: '💼' },
-      { id: 'usage', label: 'مصرف', icon: '◴' },
     ]
   },
   {
     title: 'توسعه‌دهنده',
     items: [
       { id: 'tokens', label: 'کلیدهای API', icon: '🔑' },
-      { id: 'models', label: 'مدل‌ها', icon: '🧠' },
       { id: 'requests', label: 'درخواست‌ها', icon: '📄' },
       { id: 'integration', label: 'راهنمای توسعه', icon: '📖' },
     ]
@@ -41,11 +39,16 @@ export const navGroups = [
     ]
   },
   {
-    title: 'مدیریت (ادمین)',
+    title: 'مدیریت کل (ادمین)',
     adminOnly: true,
     items: [
+      { id: 'usage', label: 'مصرف کل', icon: '◴' },
+      { id: 'models', label: 'مدل‌ها', icon: '🧠' },
       { id: 'users', label: 'کاربران', icon: '👑' },
       { id: 'providers', label: 'پروایدرها', icon: '🔌' },
+      { id: 'agents', label: 'عامل‌ها', icon: '🤖' },
+      { id: 'keys', label: 'کلیدهای سیستم', icon: '🔐' },
+      { id: 'logs', label: 'لاگ‌ها', icon: '➤' },
     ]
   }
 ];

@@ -4,7 +4,7 @@
  * The console used to render entirely from src/data/mock.js, so every number it
  * showed was invented. These call the gateway for real.
  *
- * Authentication is a session cookie set by /admin/api/login, not a gateway
+ * Authentication is a session cookie set by /api/login, not a gateway
  * key: the console must never hold one, because a key in a browser is a key
  * anyone with the URL can read.
  */

@@ -60,6 +60,9 @@ export default function App() {
   const [view, setView] = useState(viewFromHash);
   const [session, setSession] = useState(null);
 
+  const isPanel = window.location.pathname.startsWith('/panel');
+  const isAdminPath = window.location.pathname.startsWith('/admin');
+
   const refresh = () =>
     api
       .status()
@@ -79,24 +82,30 @@ export default function App() {
   };
 
   if (session === null) return <div className="app-boot">…</div>;
-  if (!session.authenticated && view === 'landing') {
+  if (!session.authenticated && view === 'landing' && !isPanel && !isAdminPath) {
     return VIEWS.landing();
   }
   if (!session.authenticated) {
     return <SignIn needsSetup={session.needs_setup} onAuthenticated={refresh} />;
   }
 
+  // Determine allowed views based on whether they are in /panel/ or /admin/
   let allowed = [
-    'dashboard', 'integration', 'models', 'tokens', 'usage', 'logs', 'account', 'plans', 'teams',
+    'dashboard', 'integration', 'tokens', 'account', 'plans', 'teams',
     'subscriptions', 'requests', 'invitations', 'payments', 'referrals', 'profile', 'security', 'support', 'help'
   ];
-  if (session.is_admin) allowed = Object.keys(VIEWS);
+
+  const effectivelyAdmin = isAdminPath && session.is_admin;
+  if (effectivelyAdmin) {
+    allowed = Object.keys(VIEWS);
+  }
+
   const safeView = allowed.includes(view) ? view : 'dashboard';
   const render = VIEWS[safeView] || VIEWS.dashboard;
 
   return (
     <div className="app">
-      <Sidebar current={safeView} onNavigate={navigate} isAdmin={session.is_admin} />
+      <Sidebar current={safeView} onNavigate={navigate} effectivelyAdmin={effectivelyAdmin} isPanel={isPanel} />
       {render()}
     </div>
   );

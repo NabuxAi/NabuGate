@@ -15,7 +15,7 @@ import (
 
 const consoleCookie = "nabugate_console"
 
-// mountConsoleAPI adds the console's own endpoints under /admin/api/.
+// mountConsoleAPI adds the console's own endpoints under /api/.
 //
 // These are separate from /v1/*: the gateway API is authenticated by a project
 // key, while the console is authenticated by a human logging in. Sharing one
@@ -27,42 +27,42 @@ func (s *Server) mountConsoleAPI(mux *http.ServeMux) {
 		return
 	}
 
-	mux.HandleFunc("GET /admin/api/status", s.consoleStatus)
-	mux.HandleFunc("POST /admin/api/setup", s.consoleSetup)
-	mux.HandleFunc("POST /admin/api/login", s.consoleLogin)
-	mux.HandleFunc("POST /admin/api/logout", s.consoleLogout)
+	mux.HandleFunc("GET /api/status", s.consoleStatus)
+	mux.HandleFunc("POST /api/setup", s.consoleSetup)
+	mux.HandleFunc("POST /api/login", s.consoleLogin)
+	mux.HandleFunc("POST /api/logout", s.consoleLogout)
 
 	// Single sign-on with a Nabu account, restricted to an explicit admin
 	// allow-list. Browser redirects rather than JSON: the browser is handed to
 	// NabuAuth and comes back with a code.
-	mux.HandleFunc("GET /admin/api/nabu/status", s.consoleNabuStatus)
-	mux.HandleFunc("GET /admin/api/nabu", s.consoleNabuStart)
-	mux.HandleFunc("GET /admin/api/nabu/callback", s.consoleNabuCallback)
+	mux.HandleFunc("GET /api/nabu/status", s.consoleNabuStatus)
+	mux.HandleFunc("GET /api/nabu", s.consoleNabuStart)
+	mux.HandleFunc("GET /api/nabu/callback", s.consoleNabuCallback)
 
-		mux.Handle("GET /admin/api/tokens", s.consoleAuth(s.listTokens))
-	mux.Handle("GET /admin/api/me", s.consoleAuth(s.getMe))
-	mux.Handle("POST /admin/api/me/recharge", s.consoleAuth(s.rechargeMe))
-	mux.Handle("POST /admin/api/tokens", s.consoleAuth(s.createToken))
-	mux.Handle("DELETE /admin/api/tokens/{name}", s.consoleAuth(s.deleteToken))
-	mux.Handle("PATCH /admin/api/tokens/{name}", s.consoleAuth(s.patchToken))
+		mux.Handle("GET /api/tokens", s.consoleAuth(s.listTokens))
+	mux.Handle("GET /api/me", s.consoleAuth(s.getMe))
+	mux.Handle("POST /api/me/recharge", s.consoleAuth(s.rechargeMe))
+	mux.Handle("POST /api/tokens", s.consoleAuth(s.createToken))
+	mux.Handle("DELETE /api/tokens/{name}", s.consoleAuth(s.deleteToken))
+	mux.Handle("PATCH /api/tokens/{name}", s.consoleAuth(s.patchToken))
 
-	mux.Handle("GET /admin/api/overview", s.consoleAuth(s.consoleOverview))
-	mux.Handle("GET /admin/api/usage", s.consoleAuth(s.consoleUsage))
-	mux.Handle("POST /admin/api/usage/reset", s.consoleAuth(s.resetUsage))
+	mux.Handle("GET /api/overview", s.consoleAuth(s.consoleOverview))
+	mux.Handle("GET /api/usage", s.consoleAuth(s.consoleUsage))
+	mux.Handle("POST /api/usage/reset", s.consoleAuth(s.resetUsage))
 
-	mux.Handle("GET /admin/api/admins", s.consoleAuth(requireAdmin(s.listAdmins)))
-	mux.Handle("POST /admin/api/admins", s.consoleAuth(requireAdmin(s.createAdmin)))
+	mux.Handle("GET /api/admins", s.consoleAuth(requireAdmin(s.listAdmins)))
+	mux.Handle("POST /api/admins", s.consoleAuth(requireAdmin(s.createAdmin)))
 
-	mux.Handle("GET /admin/api/agents", s.consoleAuth(requireAdmin(s.listAgents)))
-	mux.Handle("POST /admin/api/agents", s.consoleAuth(requireAdmin(s.saveAgent)))
-	mux.Handle("PATCH /admin/api/agents/{name}", s.consoleAuth(requireAdmin(s.saveAgent)))
-	mux.Handle("DELETE /admin/api/agents/{name}", s.consoleAuth(requireAdmin(s.deleteAgent)))
-	mux.Handle("POST /admin/api/agents/{name}/test", s.consoleAuth(requireAdmin(s.testAgent)))
-	mux.Handle("GET /admin/api/flows", s.consoleAuth(requireAdmin(s.listFlows)))
-	mux.Handle("POST /admin/api/flows", s.consoleAuth(requireAdmin(s.saveFlow)))
-	mux.Handle("PATCH /admin/api/flows/{name}", s.consoleAuth(requireAdmin(s.saveFlow)))
-	mux.Handle("DELETE /admin/api/flows/{name}", s.consoleAuth(requireAdmin(s.deleteFlow)))
-	mux.Handle("POST /admin/api/flows/{name}/test", s.consoleAuth(requireAdmin(s.testFlow)))
+	mux.Handle("GET /api/agents", s.consoleAuth(requireAdmin(s.listAgents)))
+	mux.Handle("POST /api/agents", s.consoleAuth(requireAdmin(s.saveAgent)))
+	mux.Handle("PATCH /api/agents/{name}", s.consoleAuth(requireAdmin(s.saveAgent)))
+	mux.Handle("DELETE /api/agents/{name}", s.consoleAuth(requireAdmin(s.deleteAgent)))
+	mux.Handle("POST /api/agents/{name}/test", s.consoleAuth(requireAdmin(s.testAgent)))
+	mux.Handle("GET /api/flows", s.consoleAuth(requireAdmin(s.listFlows)))
+	mux.Handle("POST /api/flows", s.consoleAuth(requireAdmin(s.saveFlow)))
+	mux.Handle("PATCH /api/flows/{name}", s.consoleAuth(requireAdmin(s.saveFlow)))
+	mux.Handle("DELETE /api/flows/{name}", s.consoleAuth(requireAdmin(s.deleteFlow)))
+	mux.Handle("POST /api/flows/{name}/test", s.consoleAuth(requireAdmin(s.testFlow)))
 }
 
 // consoleAuth gates a console endpoint on a live login session.
@@ -154,7 +154,7 @@ func (s *Server) startConsoleSession(w http.ResponseWriter, r *http.Request, use
 	http.SetCookie(w, &http.Cookie{
 		Name:  consoleCookie,
 		Value: token,
-		Path:  "/admin",
+		Path:  "/",
 		// HttpOnly so no script on the page can read it, and SameSite=Strict
 		// because the console has no cross-site use at all.
 		HttpOnly: true,
@@ -171,7 +171,7 @@ func (s *Server) consoleLogout(w http.ResponseWriter, r *http.Request) {
 		_ = s.admin.EndSession(c.Value)
 	}
 	http.SetCookie(w, &http.Cookie{
-		Name: consoleCookie, Value: "", Path: "/admin",
+		Name: consoleCookie, Value: "", Path: "/",
 		HttpOnly: true, SameSite: http.SameSiteStrictMode, MaxAge: -1,
 	})
 	w.WriteHeader(http.StatusNoContent)

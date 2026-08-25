@@ -1,23 +1,25 @@
 import { navGroups } from '../data/mock.js';
 
-export default function Sidebar({ current, onNavigate, isAdmin }) {
+export default function Sidebar({ current, onNavigate, effectivelyAdmin, isPanel }) {
   return (
     <aside className="sidebar">
       <div className="brand">
         <div className="brand-mark" aria-hidden="true">✨</div>
-        <div style={{ minWidth: 0 }}>
-          <div className="brand-name">Console Jarvis</div>
+        <div style={{ minWidth: 0, display: 'flex', flexDirection: 'column', gap: 4 }}>
+          <div className="brand-name">NabuGate</div>
+          <span style={{ fontSize: 10, background: effectivelyAdmin ? 'var(--ng-error)' : 'var(--ng-ok)', color: effectivelyAdmin ? 'var(--ng-error-text)' : 'var(--ng-ok-text)', padding: '2px 6px', borderRadius: 10, width: 'fit-content' }}>
+            {effectivelyAdmin ? 'مدیریت کل' : 'پنل کاربری'}
+          </span>
         </div>
       </div>
 
       <nav className="nav">
         {navGroups.map((group, i) => {
-          if (group.adminOnly && !isAdmin) return null;
+          if (group.adminOnly && !effectivelyAdmin) return null;
           return (
             <div key={i} className="nav-group">
               <div className="nav-group-title">{group.title}</div>
               {group.items.map((item) => {
-                // If you want some items to be hidden from non-admins, you can filter them here if needed.
                 return (
                   <button
                     key={item.id}

@@ -111,9 +111,9 @@ func TestConsoleFlowCookieExpires(t *testing.T) {
 
 func TestConsoleRedirectURIDerivedFromRequest(t *testing.T) {
 	cfg := testNabuConfig()
-	r := httptest.NewRequest(http.MethodGet, "http://gate.test/admin/api/nabu", nil)
+	r := httptest.NewRequest(http.MethodGet, "http://gate.test/api/nabu", nil)
 	r.Header.Set("X-Forwarded-Proto", "https")
-	if got := cfg.redirectURI(r); got != "https://gate.test/admin/api/nabu/callback" {
+	if got := cfg.redirectURI(r); got != "https://gate.test/api/nabu/callback" {
 		t.Fatalf("redirect uri = %q", got)
 	}
 	cfg.RedirectURI = "https://gate.test/custom"
