@@ -296,7 +296,6 @@ func (s *Server) consoleNabuCallback(w http.ResponseWriter, r *http.Request) {
 		MaxAge:   int(time.Until(expiry).Seconds()),
 	})
 
-	dest := flow.ReturnTo
 	if dest == "" {
 		dest = "/panel/"
 	}
