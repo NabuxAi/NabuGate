@@ -1,13 +1,23 @@
-import React from 'react';
+import React, { useState } from 'react';
 import '../styles/landing.css';
 
 export default function Docs({ lang = 'fa' }) {
   const isFa = lang === 'fa';
-  
+  const [activeTab, setActiveTab] = useState('intro');
+
+  const tabs = [
+    { id: 'intro', title: isFa ? 'معرفی' : 'Introduction' },
+    { id: 'env', title: isFa ? 'متغیرهای محیطی' : 'Environment Variables' },
+    { id: 'cursor', title: isFa ? 'اتصال به Cursor' : 'Cursor Integration' },
+    { id: 'claude-code', title: isFa ? 'اتصال به Claude Code' : 'Claude Code Integration' },
+    { id: 'cline', title: isFa ? 'اتصال به Cline' : 'Cline Integration' },
+    { id: 'sdk', title: isFa ? 'کتابخانه رسمی (SDK)' : 'Official SDKs' },
+  ];
+
   return (
     <div className={`landing-body ${isFa ? 'rtl' : 'ltr'}`} dir={isFa ? 'rtl' : 'ltr'}>
       <header className="jv-header">
-        <div className="jv-container">
+        <div className="jv-container" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', height: '4rem' }}>
           <a href="/" className="jv-logo">
             <svg viewBox="0 0 40 40" width="36" height="36" role="img" aria-label="NabuGate" fill="none" xmlns="http://www.w3.org/2000/svg">
               <rect x="1" y="1" width="38" height="38" rx="11" fill="url(#jv-bg)"></rect>
@@ -41,67 +51,106 @@ export default function Docs({ lang = 'fa' }) {
           <div className="jv-actions">
             <a href="/panel/login" className="jv-btn jv-btn-primary">
               {isFa ? 'شروع استفاده' : 'Get Started'}
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M7 17V7h10"></path><path d="M17 17 7 7"></path></svg>
             </a>
           </div>
         </div>
       </header>
       
-      <main style={{ flex: 1, padding: '40px 20px', background: '#0a0e17' }}>
-        <div style={{ maxWidth: 800, margin: '0 auto', color: 'rgba(255, 255, 255, 0.8)', lineHeight: 1.8 }}>
-          <h1 style={{ fontSize: 32, marginBottom: 24, fontWeight: 'bold', color: '#fff' }}>مستندات و آموزش اتصال</h1>
-          <p style={{ color: 'rgba(255, 255, 255, 0.6)', marginBottom: 40, fontSize: 16 }}>
-            درگاه NabuGate کاملاً با استاندارد OpenAI سازگار است. برای استفاده از آن کافی‌ست آدرس پایه (Base URL) و کلید دسترسی (API Key) خود را در هر ابزاری که از OpenAI پشتیبانی می‌کند وارد کنید.
-          </p>
+      <main style={{ flex: 1, display: 'flex', maxWidth: 1200, margin: '0 auto', width: '100%', padding: '40px 20px', gap: '40px' }}>
+        {/* Sidebar */}
+        <aside style={{ width: '250px', flexShrink: 0, borderRight: isFa ? 'none' : '1px solid rgba(255,255,255,0.1)', borderLeft: isFa ? '1px solid rgba(255,255,255,0.1)' : 'none', paddingRight: isFa ? 0 : 20, paddingLeft: isFa ? 20 : 0 }}>
+          <h3 style={{ fontSize: 14, color: '#9ca3af', marginBottom: 16, textTransform: 'uppercase', letterSpacing: '1px' }}>{isFa ? 'فهرست مستندات' : 'Documentation'}</h3>
+          <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {tabs.map(tab => (
+              <li key={tab.id}>
+                <button 
+                  onClick={() => setActiveTab(tab.id)}
+                  style={{
+                    width: '100%', textAlign: isFa ? 'right' : 'left', padding: '8px 12px',
+                    background: activeTab === tab.id ? 'rgba(59, 130, 246, 0.1)' : 'transparent',
+                    color: activeTab === tab.id ? '#60a5fa' : '#d1d5db',
+                    border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 14,
+                    fontWeight: activeTab === tab.id ? 600 : 400, transition: 'all 0.2s'
+                  }}
+                >
+                  {tab.title}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </aside>
 
-          <section style={{ marginBottom: 40 }} id="env">
-            <h2 style={{ fontSize: 24, marginBottom: 16, paddingBottom: 8, borderBottom: '1px solid rgba(255,255,255,0.1)', color: '#fff' }}>متغیرهای محیطی سیستم</h2>
-            <p style={{ marginBottom: 16 }}>
-              ساده‌ترین راه برای تنظیم سراسری در اکثر ابزارها و SDK ها:
-            </p>
-            <pre dir="ltr" style={{ background: 'rgba(255,255,255,0.03)', padding: 16, borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', fontSize: 14, color: '#fff' }}>
+        {/* Content */}
+        <div style={{ flex: 1, color: 'rgba(255, 255, 255, 0.8)', lineHeight: 1.8 }}>
+          {activeTab === 'intro' && (
+            <div className="docs-content fade-in">
+              <h1 style={{ fontSize: 32, marginBottom: 24, fontWeight: 'bold', color: '#fff' }}>{isFa ? 'مستندات و آموزش اتصال' : 'Documentation & Integration'}</h1>
+              <p style={{ color: 'rgba(255, 255, 255, 0.6)', marginBottom: 24, fontSize: 16 }}>
+                درگاه NabuGate کاملاً با استاندارد OpenAI سازگار است. برای استفاده از آن کافی‌ست آدرس پایه (Base URL) و کلید دسترسی (API Key) خود را در هر ابزاری که از OpenAI پشتیبانی می‌کند وارد کنید.
+              </p>
+              <div style={{ padding: 16, background: 'rgba(59, 130, 246, 0.1)', border: '1px solid rgba(59, 130, 246, 0.2)', borderRadius: 8, color: '#93c5fd' }}>
+                <strong>نکته مهم:</strong> برای اتصال به سرویس‌های ما، شما هیچ نیازی به تغییر کد یا نصب پکیج‌های جدید ندارید. فقط کافیست Endpoint مربوط به OpenAI را در کد خود تغییر دهید.
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'env' && (
+            <div className="docs-content fade-in">
+              <h1 style={{ fontSize: 28, marginBottom: 24, color: '#fff' }}>متغیرهای محیطی سیستم (Environment Variables)</h1>
+              <p style={{ marginBottom: 16 }}>
+                ساده‌ترین راه برای تنظیم سراسری در اکثر ابزارها و SDK ها، استفاده از متغیرهای محیطی است:
+              </p>
+              <pre dir="ltr" style={{ background: 'rgba(0,0,0,0.3)', padding: 16, borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', fontSize: 14, color: '#fff' }}>
 export OPENAI_BASE_URL="https://gate.nabuxai.com/v1"
 export OPENAI_API_KEY="ng_xxxxxxxxxxxxxxxxxxxx"
-            </pre>
-          </section>
+              </pre>
+            </div>
+          )}
 
-          <section style={{ marginBottom: 40 }} id="cursor">
-            <h2 style={{ fontSize: 24, marginBottom: 16, paddingBottom: 8, borderBottom: '1px solid rgba(255,255,255,0.1)', color: '#fff' }}>اتصال به Cursor</h2>
-            <ol style={{ paddingInlineStart: 24, display: 'flex', flexDirection: 'column', gap: 12 }}>
-              <li>تنظیمات (Settings) Cursor را باز کنید.</li>
-              <li>به بخش <strong>Models</strong> بروید.</li>
-              <li>در قسمت <strong>OpenAI API Key</strong> کلید دریافتی خود را وارد کنید.</li>
-              <li>گزینه <strong>Override OpenAI Base URL</strong> را فعال کنید و آدرس <code>https://gate.nabuxai.com/v1</code> را وارد نمایید.</li>
-              <li>حالا می‌توانید نام مدل‌های دلخواه خود (مثل <code>gpt-4o</code> یا <code>claude-3-5-sonnet</code>) را تایپ کرده و استفاده کنید.</li>
-            </ol>
-          </section>
+          {activeTab === 'cursor' && (
+            <div className="docs-content fade-in">
+              <h1 style={{ fontSize: 28, marginBottom: 24, color: '#fff' }}>اتصال به Cursor</h1>
+              <ol style={{ paddingInlineStart: 24, display: 'flex', flexDirection: 'column', gap: 12 }}>
+                <li>تنظیمات (Settings) Cursor را باز کنید.</li>
+                <li>به بخش <strong>Models</strong> بروید.</li>
+                <li>در قسمت <strong>OpenAI API Key</strong> کلید دریافتی خود را وارد کنید.</li>
+                <li>گزینه <strong>Override OpenAI Base URL</strong> را فعال کنید و آدرس <code>https://gate.nabuxai.com/v1</code> را وارد نمایید.</li>
+                <li>حالا می‌توانید نام مدل‌های دلخواه خود (مثل <code>gpt-4o</code> یا <code>claude-3-5-sonnet</code>) را تایپ کرده و استفاده کنید.</li>
+              </ol>
+            </div>
+          )}
 
-          <section style={{ marginBottom: 40 }} id="claude-code">
-            <h2 style={{ fontSize: 24, marginBottom: 16, paddingBottom: 8, borderBottom: '1px solid rgba(255,255,255,0.1)', color: '#fff' }}>اتصال به Claude Code</h2>
-            <p style={{ marginBottom: 16 }}>
-              در محیط ترمینال کافی‌ست از سویچ‌های خط فرمان استفاده کنید یا تنظیمات سراسری انجام دهید:
-            </p>
-            <pre dir="ltr" style={{ background: 'rgba(255,255,255,0.03)', padding: 16, borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', fontSize: 14, color: '#fff' }}>
+          {activeTab === 'claude-code' && (
+            <div className="docs-content fade-in">
+              <h1 style={{ fontSize: 28, marginBottom: 24, color: '#fff' }}>اتصال به Claude Code</h1>
+              <p style={{ marginBottom: 16 }}>
+                در محیط ترمینال کافی‌ست از سویچ‌های خط فرمان استفاده کنید یا تنظیمات سراسری انجام دهید:
+              </p>
+              <pre dir="ltr" style={{ background: 'rgba(0,0,0,0.3)', padding: 16, borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', fontSize: 14, color: '#fff' }}>
 claude -p openai -m claude-3-5-sonnet
-            </pre>
-            <p style={{ marginTop: 16 }}>
-              دقت کنید متغیرهای محیطی که در بالا اشاره شد باید در ترمینال شما در دسترس باشند.
-            </p>
-          </section>
+              </pre>
+              <p style={{ marginTop: 16 }}>
+                دقت کنید متغیرهای محیطی که در بالا اشاره شد باید در ترمینال شما در دسترس باشند.
+              </p>
+            </div>
+          )}
           
-          <section style={{ marginBottom: 40 }} id="cline">
-            <h2 style={{ fontSize: 24, marginBottom: 16, paddingBottom: 8, borderBottom: '1px solid rgba(255,255,255,0.1)', color: '#fff' }}>اتصال به Cline (افزونه VS Code)</h2>
-            <ol style={{ paddingInlineStart: 24, display: 'flex', flexDirection: 'column', gap: 12 }}>
-              <li>در تنظیمات افزونه Cline، بخش <strong>API Provider</strong> را روی <code>OpenAI Compatible</code> قرار دهید.</li>
-              <li>فیلد <strong>Base URL</strong> را روی <code>https://gate.nabuxai.com/v1</code> تنظیم کنید.</li>
-              <li>کلید دسترسی را در فیلد <strong>API Key</strong> قرار دهید.</li>
-              <li>نام مدل (Model ID) را دقیقاً مطابق با لیست مدل‌های ما وارد کنید.</li>
-            </ol>
-          </section>
+          {activeTab === 'cline' && (
+            <div className="docs-content fade-in">
+              <h1 style={{ fontSize: 28, marginBottom: 24, color: '#fff' }}>اتصال به Cline (افزونه VS Code)</h1>
+              <ol style={{ paddingInlineStart: 24, display: 'flex', flexDirection: 'column', gap: 12 }}>
+                <li>در تنظیمات افزونه Cline، بخش <strong>API Provider</strong> را روی <code>OpenAI Compatible</code> قرار دهید.</li>
+                <li>فیلد <strong>Base URL</strong> را روی <code>https://gate.nabuxai.com/v1</code> تنظیم کنید.</li>
+                <li>کلید دسترسی را در فیلد <strong>API Key</strong> قرار دهید.</li>
+                <li>نام مدل (Model ID) را دقیقاً مطابق با لیست مدل‌های ما وارد کنید.</li>
+              </ol>
+            </div>
+          )}
 
-          <section style={{ marginBottom: 40 }} id="sdk">
-            <h2 style={{ fontSize: 24, marginBottom: 16, paddingBottom: 8, borderBottom: '1px solid rgba(255,255,255,0.1)', color: '#fff' }}>استفاده در کتابخانه رسمی Python / Node</h2>
-            <pre dir="ltr" style={{ background: 'rgba(255,255,255,0.03)', padding: 16, borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', fontSize: 14, color: '#fff' }}>
+          {activeTab === 'sdk' && (
+            <div className="docs-content fade-in">
+              <h1 style={{ fontSize: 28, marginBottom: 24, color: '#fff' }}>استفاده در کتابخانه رسمی Python / Node</h1>
+              <pre dir="ltr" style={{ background: 'rgba(0,0,0,0.3)', padding: 16, borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', fontSize: 14, color: '#fff' }}>
 {`// Javascript / Node.js
 import OpenAI from "openai";
 
@@ -114,8 +163,9 @@ const response = await client.chat.completions.create({
   model: "claude-3-5-sonnet",
   messages: [{ role: "user", content: "سلام!" }],
 });`}
-            </pre>
-          </section>
+              </pre>
+            </div>
+          )}
         </div>
       </main>
       

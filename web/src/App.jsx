@@ -21,6 +21,7 @@ import Account from './views/Account.jsx';
 import Plans from './views/Plans.jsx';
 import Teams from './views/Teams.jsx';
 import Landing from './views/Landing.jsx';
+import Docs from './views/Docs.jsx';
 
 const VIEWS = {
   landing: () => <Landing lang={window.location.pathname.startsWith('/fa') ? 'fa' : 'en'} />,
