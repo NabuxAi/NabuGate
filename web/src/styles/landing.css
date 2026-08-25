@@ -505,3 +505,70 @@
   color: #6b7280;
   font-size: 0.875rem;
 }
+.jv-dev-setup {
+  max-width: 600px;
+  margin: 40px auto 0;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: #0a0e17;
+  overflow: hidden;
+}
+.jv-dev-header {
+  padding: 10px 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  font-family: monospace;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.5);
+  text-align: left;
+}
+.jv-dev-body {
+  padding: 16px;
+  text-align: left;
+}
+.jv-dev-body pre {
+  margin: 0;
+  font-family: monospace;
+  font-size: 14px;
+  color: #fff;
+  line-height: 1.6;
+}
+
+.jv-tools-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  margin-top: 40px;
+}
+.jv-tool-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 20px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.03);
+  text-decoration: none;
+  color: #fff;
+  transition: all 0.2s;
+}
+.jv-tool-card:hover {
+  border-color: rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.05);
+}
+.jv-tool-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #a855f7;
+}
+.jv-tool-card strong {
+  font-size: 16px;
+}
+.jv-tool-card small {
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 12px;
+}

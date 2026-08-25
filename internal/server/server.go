@@ -142,22 +142,24 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /v1/embeddings", s.auth(s.handleEmbeddings))
 	mux.HandleFunc("GET /v1/usage", s.auth(s.handleUsage))
 	mux.HandleFunc("GET /v1/photos/search", s.auth(s.handlePhotoSearch))
-	s.mountConsole(mux)
-	mux.HandleFunc("GET /{$}", func(w http.ResponseWriter, r *http.Request) {
-		if assets, ok := web.Assets(); ok {
-			http.ServeFileFS(w, r, assets, "landing.html")
-		} else {
-			http.Error(w, "Not found", 404)
-		}
-	})
 	
-	mux.HandleFunc("GET /fa", func(w http.ResponseWriter, r *http.Request) {
-		if assets, ok := web.Assets(); ok {
-			http.ServeFileFS(w, r, assets, "landing-fa.html")
-		} else {
-			http.Error(w, "Not found", 404)
+	if assets, ok := web.Assets(); ok {
+		fileServer := http.FileServer(http.FS(assets))
+		mux.Handle("GET /", spaFileServer(assets, fileServer))
+	}
+
+	mux.HandleFunc("GET /api/public/models", func(w http.ResponseWriter, r *http.Request) {
+		infos := s.router.AliasInfos()
+		infos = append(infos, s.router.CatalogModels(r.Context())...)
+		
+		names := make([]string, 0, len(infos))
+		for _, info := range infos {
+			names = append(names, info.ID)
 		}
+		writeJSON(w, http.StatusOK, names)
 	})
+
+	s.mountConsole(mux)
 	s.mountConsoleAPI(mux)
 	s.mountConversationAPI(mux)
 	return mux

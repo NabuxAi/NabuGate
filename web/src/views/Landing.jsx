@@ -1,9 +1,39 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
+import * as api from '../api.js';
 import '../styles/landing.css';
 
 export default function Landing({ lang = 'fa' }) {
   const isFa = lang === 'fa';
-  
+  const [models, setModels] = useState([]);
+  const [ping, setPing] = useState(true);
+
+  useEffect(() => {
+    api.publicModels().then(names => setModels(names || [])).catch(() => {});
+    
+    // Simulate ping dot blinking
+    const iv = setInterval(() => setPing(p => !p), 1000);
+    return () => clearInterval(iv);
+  }, []);
+
+  const getModelColor = (name) => {
+    const l = name.toLowerCase();
+    if (l.includes('gpt')) return { bg: 'rgba(16, 185, 129, 0.16)', border: 'rgba(16, 185, 129, 0.4)' };
+    if (l.includes('claude')) return { bg: 'rgba(249, 115, 22, 0.16)', border: 'rgba(249, 115, 22, 0.4)' };
+    if (l.includes('gemini')) return { bg: 'rgba(59, 130, 246, 0.16)', border: 'rgba(59, 130, 246, 0.4)' };
+    if (l.includes('deepseek')) return { bg: 'rgba(99, 102, 241, 0.16)', border: 'rgba(99, 102, 241, 0.4)' };
+    return { bg: 'rgba(255, 255, 255, 0.1)', border: 'rgba(255, 255, 255, 0.2)' };
+  };
+
+  const getModelIcon = (name) => {
+    const l = name.toLowerCase();
+    if (l.includes('gpt')) return <svg viewBox="0 0 24 24" width="16" height="16" xmlns="http://www.w3.org/2000/svg"><g><circle cx="12" cy="12" r="2.4" fill="#fff"></circle><circle cx="12" cy="4.5" r="1.8" fill="#fff" fillOpacity="0.9"></circle><circle cx="5.5" cy="16" r="1.8" fill="#fff" fillOpacity="0.9"></circle><circle cx="18.5" cy="16" r="1.8" fill="#fff" fillOpacity="0.9"></circle><path d="M12 6.3v3.3M10.4 13.4 7 15M13.6 13.4 17 15" stroke="#fff" strokeWidth="1.6" strokeLinecap="round" fill="none"></path></g></svg>;
+    if (l.includes('claude')) return <svg viewBox="0 0 24 24" width="16" height="16" xmlns="http://www.w3.org/2000/svg"><g stroke="#fff" strokeWidth="1.6" strokeLinecap="round" fill="none"><path d="M12 3v18M5 6.5l14 11M19 6.5l-14 11"></path></g></svg>;
+    if (l.includes('gemini')) return <svg viewBox="0 0 24 24" width="16" height="16" xmlns="http://www.w3.org/2000/svg"><g><path d="M12 3c.4 4.6 1.4 5.6 6 6-4.6.4-5.6 1.4-6 6-.4-4.6-1.4-5.6-6-6 4.6-.4 5.6-1.4 6-6Z" fill="#fff"></path><path d="M18.5 14.5c.2 2 .6 2.4 2.5 2.6-1.9.2-2.3.6-2.5 2.5-.2-1.9-.6-2.3-2.5-2.5 1.9-.2 2.3-.6 2.5-2.6Z" fill="#fff" fillOpacity="0.8"></path></g></svg>;
+    return <svg viewBox="0 0 24 24" width="16" height="16" xmlns="http://www.w3.org/2000/svg"><g stroke="#fff" strokeWidth="1.6" strokeLinecap="round" fill="none"><circle cx="12" cy="12" r="6.5"></circle><path d="M5.5 12a6.5 6.5 0 0 0 11 4.6" strokeOpacity="0.5"></path><circle cx="17.4" cy="9" r="1.7" fill="#fff" stroke="none"></circle></g></svg>;
+  };
+
+  const displayModels = models.length > 0 ? models.slice(0, 4) : ['gpt-4o', 'claude-3-5-sonnet', 'gemini-1.5-pro', 'deepseek-coder'];
+
   return (
     <div className={`landing-body ${isFa ? 'rtl' : 'ltr'}`} dir={isFa ? 'rtl' : 'ltr'}>
       <header className="jv-header">
@@ -34,7 +64,7 @@ export default function Landing({ lang = 'fa' }) {
           </a>
           <nav className="jv-nav hidden-mobile">
             <a href="/" className="active">{isFa ? 'صفحه اصلی' : 'Home'}</a>
-            <a href="#/pricing">{isFa ? 'پلن‌ها' : 'Pricing'}</a>
+            <a href="#/plans">{isFa ? 'پلن‌ها' : 'Pricing'}</a>
             <a href="#/models">{isFa ? 'مدل‌ها' : 'Models'}</a>
             <a href="#/docs">{isFa ? 'مستندات' : 'Docs'}</a>
           </nav>
@@ -43,7 +73,7 @@ export default function Landing({ lang = 'fa' }) {
               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"></path><polyline points="10 17 15 12 10 7"></polyline><line x1="15" x2="3" y1="12" y2="12"></line></svg>
               {isFa ? 'ورود به کنسول' : 'Login'}
             </a>
-            <a href="#/signup" className="jv-btn jv-btn-primary">
+            <a href="#/login" className="jv-btn jv-btn-primary">
               {isFa ? 'شروع استفاده' : 'Get Started'}
               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M7 17V7h10"></path><path d="M17 17 7 7"></path></svg>
             </a>
@@ -70,11 +100,11 @@ export default function Landing({ lang = 'fa' }) {
                   : 'NabuGate provides access to GPT, Claude, Gemini, Groq, and DeepSeek via a single OpenAI-compatible gateway. Manage your subscription, API keys, and usage from one console.'}
               </p>
               <div className="jv-hero-btns">
-                <a href="#/signup" className="jv-btn jv-btn-primary">
+                <a href="#/login" className="jv-btn jv-btn-primary">
                   {isFa ? 'شروع استفاده' : 'Get Started'}
                   <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M7 17V7h10"></path><path d="M17 17 7 7"></path></svg>
                 </a>
-                <a href="#/pricing" className="jv-btn jv-btn-outline">{isFa ? 'مشاهده پلن‌ها' : 'View Plans'}</a>
+                <a href="#/plans" className="jv-btn jv-btn-outline">{isFa ? 'مشاهده پلن‌ها' : 'View Plans'}</a>
               </div>
               <div className="jv-tools">
                 <span>{isFa ? 'سازگار با ابزارهای محبوب توسعه‌دهندگان:' : 'Compatible with popular developer tools:'}</span>
@@ -98,9 +128,9 @@ export default function Landing({ lang = 'fa' }) {
                     <span className="jv-dot-yellow"></span>
                     <span className="jv-dot-green"></span>
                   </div>
-                  <span className="jv-endpoint" dir="ltr">https://api.nabuxai.com/v1</span>
+                  <span className="jv-endpoint" dir="ltr">https://gate.nabuxai.com/v1</span>
                   <div className="jv-status">
-                    <div className="jv-ping"><span className="jv-ping-circle"></span><span className="jv-ping-dot"></span></div>
+                    <div className="jv-ping"><span className="jv-ping-circle" style={{ opacity: ping ? 1 : 0.2 }}></span></div>
                     {isFa ? 'آنلاین' : 'Online'}
                   </div>
                 </div>
@@ -114,39 +144,23 @@ export default function Landing({ lang = 'fa' }) {
                 </div>
                 
                 <div className="jv-models-grid">
-                  <div className="jv-model-card">
-                    <div className="jv-model-icon" style={{ background: 'rgba(16, 185, 129, 0.16)', borderColor: 'rgba(16, 185, 129, 0.4)' }}>
-                      <svg viewBox="0 0 24 24" width="16" height="16" xmlns="http://www.w3.org/2000/svg"><g><circle cx="12" cy="12" r="2.4" fill="#fff"></circle><circle cx="12" cy="4.5" r="1.8" fill="#fff" fillOpacity="0.9"></circle><circle cx="5.5" cy="16" r="1.8" fill="#fff" fillOpacity="0.9"></circle><circle cx="18.5" cy="16" r="1.8" fill="#fff" fillOpacity="0.9"></circle><path d="M12 6.3v3.3M10.4 13.4 7 15M13.6 13.4 17 15" stroke="#fff" strokeWidth="1.6" strokeLinecap="round" fill="none"></path></g></svg>
+                  {displayModels.map((m, i) => (
+                    <div className="jv-model-card" key={i}>
+                      <div className="jv-model-icon" style={{ background: getModelColor(m).bg, borderColor: getModelColor(m).border }}>
+                        {getModelIcon(m)}
+                      </div>
+                      <div className="jv-model-info" style={{ overflow: 'hidden' }}>
+                        <strong dir="ltr" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m}</strong>
+                        <small>{isFa ? 'فعال' : 'Active'}</small>
+                      </div>
                     </div>
-                    <div className="jv-model-info">
-                      <strong dir="ltr">GPT</strong>
-                      <small>{isFa ? 'فعال' : 'Active'}</small>
-                    </div>
-                  </div>
-                  <div className="jv-model-card">
-                    <div className="jv-model-icon" style={{ background: 'rgba(249, 115, 22, 0.16)', borderColor: 'rgba(249, 115, 22, 0.4)' }}>
-                      <svg viewBox="0 0 24 24" width="16" height="16" xmlns="http://www.w3.org/2000/svg"><g stroke="#fff" strokeWidth="1.6" strokeLinecap="round" fill="none"><path d="M12 3v18M5 6.5l14 11M19 6.5l-14 11"></path></g></svg>
-                    </div>
-                    <div className="jv-model-info">
-                      <strong dir="ltr">Claude</strong>
-                      <small>{isFa ? 'آماده' : 'Ready'}</small>
-                    </div>
-                  </div>
-                  <div className="jv-model-card">
-                    <div className="jv-model-icon" style={{ background: 'rgba(59, 130, 246, 0.16)', borderColor: 'rgba(59, 130, 246, 0.4)' }}>
-                      <svg viewBox="0 0 24 24" width="16" height="16" xmlns="http://www.w3.org/2000/svg"><g><path d="M12 3c.4 4.6 1.4 5.6 6 6-4.6.4-5.6 1.4-6 6-.4-4.6-1.4-5.6-6-6 4.6-.4 5.6-1.4 6-6Z" fill="#fff"></path><path d="M18.5 14.5c.2 2 .6 2.4 2.5 2.6-1.9.2-2.3.6-2.5 2.5-.2-1.9-.6-2.3-2.5-2.5 1.9-.2 2.3-.6 2.5-2.6Z" fill="#fff" fillOpacity="0.8"></path></g></svg>
-                    </div>
-                    <div className="jv-model-info">
-                      <strong dir="ltr">Gemini</strong>
-                      <small>{isFa ? 'آماده' : 'Ready'}</small>
-                    </div>
-                  </div>
+                  ))}
                 </div>
                 
                 <div className="jv-code-block">
                   <pre dir="ltr">
 <span style={{ color: '#8b5cf6' }}>await</span> client.chat.completions.create(&#123;
-  model: <span style={{ color: '#10b981' }}>"GPT_4o"</span>,
+  model: <span style={{ color: '#10b981' }}>"{displayModels[0] || 'gpt-4o'}"</span>,
   messages,
 &#125;)
                   </pre>
@@ -156,7 +170,7 @@ export default function Landing({ lang = 'fa' }) {
           </div>
         </section>
 
-        <section className="jv-section bg-alt">
+        <section className="jv-section bg-alt" id="how-it-works">
           <div className="jv-container">
             <div className="jv-section-header">
               <span className="jv-badge">{isFa ? 'چطور کار می‌کند' : 'How it works'}</span>
@@ -189,6 +203,40 @@ export default function Landing({ lang = 'fa' }) {
                 <h3>{isFa ? 'دریافت کلید و اتصال' : 'Get Key & Connect'}</h3>
                 <p>{isFa ? 'یک کلید API بسازید، آدرس پایهٔ درگاه را تنظیم کنید و ابزارهای خود را وصل کنید.' : 'Create an API key, set the base URL, and connect your tools.'}</p>
               </div>
+            </div>
+          </div>
+        </section>
+        
+        <section className="jv-section" id="developer-tools">
+          <div className="jv-container">
+            <div className="jv-section-header">
+              <span className="jv-badge">{isFa ? 'ابزارهای توسعه‌دهندگان' : 'Developer Tools'}</span>
+              <h2>{isFa ? 'با ابزارهایی که هر روز استفاده می‌کنید کار می‌کند' : 'Works with the tools you use every day'}</h2>
+              <p>{isFa ? 'درگاه با استاندارد OpenAI سازگار است؛ کافی است آدرس پایه و کلید را تنظیم کنید.' : 'The gateway is fully compatible with OpenAI standards. Just set your base URL and API key.'}</p>
+            </div>
+            
+            <div className="jv-dev-setup">
+              <div className="jv-dev-header">
+                <span dir="ltr">bash · متغیرهای محیطی</span>
+              </div>
+              <div className="jv-dev-body">
+                <pre dir="ltr">
+export OPENAI_BASE_URL="https://gate.nabuxai.com/v1"
+export OPENAI_API_KEY="ng_xxxxxxxxxxxxxxxxxxxx"
+                </pre>
+              </div>
+            </div>
+            
+            <div className="jv-tools-grid">
+              {['Claude Code', 'Codex', 'VS Code', 'Cursor', 'Cline', 'Roo Code', 'OpenAI SDK'].map(t => (
+                <a href="#/docs" className="jv-tool-card" key={t}>
+                  <div className="jv-tool-icon">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="4 17 10 11 4 5"></polyline><line x1="12" x2="20" y1="19" y2="19"></line></svg>
+                  </div>
+                  <strong dir="ltr">{t}</strong>
+                  <small>{isFa ? 'سازگار کامل' : 'Fully Compatible'}</small>
+                </a>
+              ))}
             </div>
           </div>
         </section>

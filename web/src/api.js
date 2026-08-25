@@ -4,6 +4,12 @@
 
 const BASE = '/api';
 
+async function reqPublic(path) {
+  const res = await fetch(path);
+  if (!res.ok) return [];
+  return res.json();
+}
+
 async function req(path, options = {}) {
   // Prevent aggressive browser caching for GET requests
   const url = (options.method && options.method !== 'GET') ? BASE + path : BASE + path + (path.includes('?') ? '&' : '?') + '_t=' + Date.now();
@@ -36,6 +42,8 @@ async function req(path, options = {}) {
 
 export const status = () => req('/status');
 export const statusNabu = () => req("/nabu/status");
+export const publicModels = () => reqPublic("/api/public/models");
+
 
 
 export const setup = (username, password) =>

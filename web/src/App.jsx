@@ -22,6 +22,8 @@ import Landing from './views/Landing.jsx';
 
 const VIEWS = {
   landing: () => <Landing lang={window.location.pathname.startsWith('/fa') ? 'fa' : 'en'} />,
+  docs: () => <Docs />,
+
   dashboard: () => <Dashboard />,
   providers: () => <Providers />,
   models: () => <Models />,
@@ -84,8 +86,13 @@ export default function App() {
   };
 
   if (session === null) return <div className="app-boot">…</div>;
-  if (!session.authenticated && view === 'landing' && !isPanel && !isAdminPath) {
-    return VIEWS.landing();
+  if (!session.authenticated && (view === 'landing' || view === 'docs') && !isPanel && !isAdminPath) {
+    const View = VIEWS[view];
+    return (
+      <div className="app">
+        <View />
+      </div>
+    );
   }
   if (!session.authenticated) {
     return <SignIn needsSetup={session.needs_setup} onAuthenticated={refresh} />;
