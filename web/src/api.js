@@ -150,3 +150,6 @@ export const patchToken = (name, allowedOrigins, providers) =>
 
 export const getMe = () => req('/me');
 export const rechargeMe = (amount) => req('/me/recharge', { method: 'POST', body: JSON.stringify({ amount: Number(amount) }) });
+
+export const listUsers = () => get('/api/users');
+export const adminRechargeUser = (email, amount) => post('/api/users/recharge', { email, amount: Number(amount) });

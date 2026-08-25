@@ -866,3 +866,14 @@ func (s *Store) AuthenticateUser(email, password string) (string, time.Time, err
 	s.save()
 	return token, expiry, nil
 }
+
+// ListUsers returns a list of all registered users
+func (s *Store) ListUsers() []User {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	var out []User
+	for _, u := range s.st.Users {
+		out = append(out, *u)
+	}
+	return out
+}

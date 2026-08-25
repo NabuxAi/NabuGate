@@ -1,38 +1,40 @@
 import { useEffect, useState } from 'react';
-
 import Layout from '../components/Layout.jsx';
 import * as api from '../api.js';
 
-/*
- * Admin accounts. Lists the console usernames and lets a signed-in admin add
- * another. Passwords are never shown or returned — only PBKDF2 hashes are stored.
- */
 export default function Users() {
+  const [users, setUsers] = useState([]);
   const [admins, setAdmins] = useState([]);
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
   const [error, setError] = useState(null);
-  const [ok, setOk] = useState(null);
+  
+  // Recharge form state
+  const [selectedUser, setSelectedUser] = useState('');
+  const [amount, setAmount] = useState('');
   const [busy, setBusy] = useState(false);
+  const [ok, setOk] = useState(null);
 
-  const load = () =>
-    api
-      .listAdmins()
+  const load = () => {
+    api.listAdmins()
       .then((r) => setAdmins(r.admins || []))
       .catch((e) => setError(e.message));
 
+    api.listUsers()
+      .then((r) => setUsers(r.users || []))
+      .catch((e) => setError(e.message));
+  };
+
   useEffect(load, []);
 
-  const submit = async (e) => {
+  const handleRecharge = async (e) => {
     e.preventDefault();
     setError(null);
     setOk(null);
     setBusy(true);
     try {
-      await api.createAdmin(username.trim(), password);
-      setOk(`کاربر «${username.trim().toLowerCase()}» اضافه شد.`);
-      setUsername('');
-      setPassword('');
+      await api.adminRechargeUser(selectedUser, amount);
+      setOk(`موجودی کاربر ${selectedUser} با موفقیت افزایش یافت.`);
+      setSelectedUser('');
+      setAmount('');
       await load();
     } catch (err) {
       setError(err.message);
@@ -43,39 +45,76 @@ export default function Users() {
 
   return (
     <Layout
-      title="کاربران ادمین"
-      subtitle="حساب‌های کنسول — افزودن ادمین جدید و مشاهدهٔ فهرست"
+      title="کاربران سیستم"
+      subtitle="مدیریت کاربران، مدیران، و افزایش دستی موجودی"
     >
-      <div className="card">
-        <div className="card-head">افزودن ادمین جدید</div>
-        {error && <div className="banner-error">{error}</div>}
-        {ok && <p className="card-sub" style={{ color: '#38c172' }}>{ok}</p>}
-        <form onSubmit={submit} className="rows" style={{ maxWidth: 420 }}>
-          <input
-            className="signin-field"
-            placeholder="نام کاربری"
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-            autoComplete="off"
-            dir="ltr"
-          />
-          <input
-            className="signin-field"
-            type="password"
-            placeholder="گذرواژه (حداقل ۱۰ کاراکتر)"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            autoComplete="new-password"
-            dir="ltr"
-          />
-          <button className="btn btn-primary" type="submit" disabled={busy}>
-            {busy ? '…' : 'افزودن ادمین'}
-          </button>
-        </form>
+      {error && <div className="card banner-error">{error}</div>}
+      {ok && <div className="card" style={{ background: 'var(--ng-ok-soft)', color: 'var(--ng-ok-text)', border: '1px solid var(--ng-ok)', padding: 16 }}>{ok}</div>}
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 24, marginBottom: 24 }}>
+        <div className="card">
+          <div className="card-head">لیست کاربران (مشتریان)</div>
+          <table className="tbl">
+            <thead>
+              <tr>
+                <th>ایمیل</th>
+                <th>موجودی (تومان)</th>
+                <th>تراکنش‌ها</th>
+              </tr>
+            </thead>
+            <tbody>
+              {users.length === 0 && (
+                <tr><td colSpan={3} style={{ color: 'var(--ng-muted)', padding: 18 }}>کاربری یافت نشد.</td></tr>
+              )}
+              {users.map(u => (
+                <tr key={u.email}>
+                  <td style={{ fontWeight: 700 }} dir="ltr">{u.email}</td>
+                  <td className="mono">{Number(u.balance || 0).toLocaleString('fa-IR')}</td>
+                  <td className="mono">{u.payments ? u.payments.length : 0}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="card" style={{ display: 'flex', flexDirection: 'column' }}>
+          <div className="card-head">افزایش دستی موجودی کاربر</div>
+          <p style={{ color: 'var(--ng-muted)', fontSize: 13, marginBottom: 16 }}>از این بخش می‌توانید حساب یک کاربر را بدون نیاز به پرداخت بانکی شارژ کنید (مثلاً برای تست یا هدیه).</p>
+          <form onSubmit={handleRecharge} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <label style={{ fontSize: 13 }}>
+              ایمیل کاربر:
+              <input
+                className="signin-field"
+                placeholder="user@example.com"
+                value={selectedUser}
+                onChange={(e) => setSelectedUser(e.target.value)}
+                dir="ltr"
+                required
+                style={{ width: '100%', marginTop: 8 }}
+              />
+            </label>
+            <label style={{ fontSize: 13 }}>
+              مبلغ (تومان):
+              <input
+                className="signin-field"
+                type="number"
+                placeholder="50000"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                dir="ltr"
+                required
+                style={{ width: '100%', marginTop: 8 }}
+              />
+            </label>
+            <button className="btn btn-primary" type="submit" disabled={busy} style={{ marginTop: 12 }}>
+              {busy ? 'در حال اعمال...' : 'اعمال شارژ حساب'}
+            </button>
+          </form>
+        </div>
       </div>
 
       <div className="card">
-        <div className="card-head">ادمین‌های فعلی ({admins.length})</div>
+        <div className="card-head">لیست مدیران سیستم ({admins.length})</div>
         <div className="rows">
           {admins.map((u) => (
             <div key={u} className="row">
@@ -83,7 +122,7 @@ export default function Users() {
               <span className="tag tag-primary">ادمین</span>
             </div>
           ))}
-          {admins.length === 0 && <p className="card-sub">هنوز ادمینی وجود ندارد.</p>}
+          {admins.length === 0 && <p className="card-sub">هیچ ادمینی جز مدیر اصلی وجود ندارد.</p>}
         </div>
       </div>
     </Layout>

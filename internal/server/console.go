@@ -55,6 +55,8 @@ func (s *Server) mountConsoleAPI(mux *http.ServeMux) {
 	mux.Handle("POST /api/usage/reset", s.consoleAuth(s.resetUsage))
 
 	mux.Handle("GET /api/admins", s.consoleAuth(requireAdmin(s.listAdmins)))
+	mux.Handle("GET /api/users", s.consoleAuth(requireAdmin(s.listUsers)))
+	mux.Handle("POST /api/users/recharge", s.consoleAuth(requireAdmin(s.adminRechargeUser)))
 	mux.Handle("POST /api/admins", s.consoleAuth(requireAdmin(s.createAdmin)))
 
 	mux.Handle("GET /api/agents", s.consoleAuth(requireAdmin(s.listAgents)))
@@ -657,4 +659,30 @@ func (s *Server) consoleSignup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.startConsoleSession(w, r, c.Username, c.Password)
+}
+
+func (s *Server) listUsers(w http.ResponseWriter, _ *http.Request) {
+	if s.admin == nil {
+		writeJSON(w, http.StatusOK, map[string]any{"users": []any{}})
+		return
+	}
+	users := s.admin.ListUsers()
+	writeJSON(w, http.StatusOK, map[string]any{"users": users})
+}
+
+func (s *Server) adminRechargeUser(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Email  string  `json:"email"`
+		Amount float64 `json:"amount"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid body")
+		return
+	}
+	if s.admin == nil {
+		writeError(w, http.StatusInternalServerError, "no admin store")
+		return
+	}
+	s.admin.AddPayment(body.Email, body.Amount, "admin-recharge", "manual-"+fmt.Sprint(time.Now().UnixNano()))
+	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
