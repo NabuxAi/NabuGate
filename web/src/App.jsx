@@ -11,6 +11,8 @@ import Keys from './views/Keys.jsx';
 import Usage from './views/Usage.jsx';
 import Agents from './views/Agents.jsx';
 import Users from './views/Users.jsx';
+import Profile from "./views/Profile.jsx";
+import Payments from "./views/Payments.jsx";
 import Placeholder from './views/Placeholder.jsx';
 import Integration from './views/Integration.jsx';
 import Account from './views/Account.jsx';
@@ -35,9 +37,9 @@ const VIEWS = {
   subscriptions: () => <Placeholder title="اشتراک‌ها" subtitle="مدیریت اشتراک‌های فعال شما" icon="💼" />,
   requests: () => <Placeholder title="درخواست‌ها" subtitle="گزارش درخواست‌های ارسالی به API" icon="📄" />,
   invitations: () => <Placeholder title="دعوت‌نامه‌ها" subtitle="دعوت‌نامه‌های ارسالی و دریافتی" icon="✉️" />,
-  payments: () => <Placeholder title="پرداخت‌ها" subtitle="تاریخچه پرداخت‌ها و فاکتورها" icon="💳" />,
+  payments: () => <Payments />,
   referrals: () => <Placeholder title="دعوت دوستان" subtitle="لینک دعوت و پاداش‌ها" icon="🎁" />,
-  profile: () => <Placeholder title="پروفایل" subtitle="تنظیمات پروفایل کاربری" icon="👤" />,
+  profile: () => <Profile />,
   security: () => <Placeholder title="امنیت" subtitle="تنظیمات امنیتی و رمز عبور" icon="🛡️" />,
   support: () => <Placeholder title="پشتیبانی" subtitle="تیکت‌ها و ارتباط با پشتیبانی" icon="⚙️" />,
   help: () => <Placeholder title="راهنما" subtitle="مستندات و آموزش‌ها" icon="❓" />,

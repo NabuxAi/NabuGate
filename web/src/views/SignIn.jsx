@@ -16,8 +16,9 @@ export default function SignIn({ needsSetup, onAuthenticated }) {
   const [confirm, setConfirm] = useState('');
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
+  const [mode, setMode] = useState(needsSetup ? 'setup' : 'login'); // 'setup', 'login', 'signup'
 
-  const creating = needsSetup;
+  const creating = mode === 'setup' || mode === 'signup';
 
   async function submit(e) {
     e.preventDefault();
@@ -29,11 +30,12 @@ export default function SignIn({ needsSetup, onAuthenticated }) {
     }
     setBusy(true);
     try {
-      if (creating) await api.setup(username, password);
+      if (mode === 'setup') await api.setup(username, password);
+      else if (mode === 'signup') await api.signup(username, password);
       else await api.login(username, password);
       onAuthenticated();
     } catch (err) {
-      setError(err.message || 'ورود ناموفق بود.');
+      setError(err.message || 'عملیات ناموفق بود.');
     } finally {
       setBusy(false);
     }
@@ -47,15 +49,21 @@ export default function SignIn({ needsSetup, onAuthenticated }) {
           <span>دروازهٔ مرکزی هوش مصنوعی</span>
         </div>
 
-        {creating && (
+        {mode === 'setup' && (
           <p className="signin-note">
             هنوز حسابی ساخته نشده. اولین حساب را همین‌جا بساز — بعد از آن این فرم
             بسته می‌شود و کسی نمی‌تواند از بیرون حساب اضافه کند.
           </p>
         )}
 
+        {mode === 'signup' && (
+          <p className="signin-note">
+            ایجاد حساب کاربری جدید
+          </p>
+        )}
+
         <label className="signin-field">
-          نام کاربری
+          {mode === 'setup' ? 'نام کاربری' : 'ایمیل'}
           <input
             value={username}
             onChange={(e) => setUsername(e.target.value)}
@@ -99,8 +107,22 @@ export default function SignIn({ needsSetup, onAuthenticated }) {
         {error && <p className="signin-error">{error}</p>}
 
         <button className="btn btn-primary signin-submit" disabled={busy}>
-          {busy ? '…' : creating ? 'ساخت حساب مدیر' : 'ورود'}
+          {busy ? '…' : mode === 'setup' ? 'ساخت حساب مدیر' : mode === 'signup' ? 'ثبت‌نام' : 'ورود'}
         </button>
+        
+        {!needsSetup && (
+          <div style={{ marginTop: 16, textAlign: 'center', fontSize: 13 }}>
+            {mode === 'login' ? (
+              <a href="#" onClick={(e) => { e.preventDefault(); setMode('signup'); setError(null); }}>
+                حساب کاربری ندارید؟ ثبت‌نام کنید
+              </a>
+            ) : (
+              <a href="#" onClick={(e) => { e.preventDefault(); setMode('login'); setError(null); }}>
+                قبلاً ثبت‌نام کرده‌اید؟ وارد شوید
+              </a>
+            )}
+          </div>
+        )}
       </form>
     </div>
   );

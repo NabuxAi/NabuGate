@@ -1,0 +1,15 @@
+@@ -52,6 +52,14 @@
+ // Token is a project key minted from the console.
+ 
++type Payment struct {
++	ID        string    `json:"id"`
++	Amount    float64   `json:"amount"`
++	Status    string    `json:"status"`
++	CreatedAt time.Time `json:"created_at"`
++}
++
+ type User struct {
+ 	Email    string    `json:"email"`
+ 	Balance  float64   `json:"balance"`
+ 	Name     string    `json:"name"`
++	Payments []Payment `json:"payments,omitempty"`

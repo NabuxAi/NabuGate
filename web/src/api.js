@@ -39,6 +39,9 @@ export const status = () => req('/status');
 export const setup = (username, password) =>
   req('/setup', { method: 'POST', body: JSON.stringify({ username, password }) });
 
+export const signup = (username, password) =>
+  req("/signup", { method: "POST", body: JSON.stringify({ username, password }) });
+
 export const login = (username, password) =>
   req('/login', { method: 'POST', body: JSON.stringify({ username, password }) });
 

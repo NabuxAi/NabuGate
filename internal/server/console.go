@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"errors"
 	"net/http"
 	"net/url"
@@ -30,6 +31,8 @@ func (s *Server) mountConsoleAPI(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/status", s.consoleStatus)
 	mux.HandleFunc("POST /api/setup", s.consoleSetup)
 	mux.HandleFunc("POST /api/login", s.consoleLogin)
+	mux.HandleFunc("POST /api/signup", s.consoleSignup)
+
 	mux.HandleFunc("POST /api/logout", s.consoleLogout)
 
 	// Single sign-on with a Nabu account, restricted to an explicit admin
@@ -144,10 +147,14 @@ func (s *Server) startConsoleSession(w http.ResponseWriter, r *http.Request, use
 
 	token, expiry, err := s.admin.Authenticate(user, pass)
 	if err != nil {
-		s.logins.fail(key)
-		s.log.Warn("console sign-in failed", "username", user, "ip", clientIP(r))
-		writeError(w, http.StatusUnauthorized, "invalid username or password")
-		return
+		// Fallback to user login
+		token, expiry, err = s.admin.AuthenticateUser(user, pass)
+		if err != nil {
+			s.logins.fail(key)
+			s.log.Warn("console sign-in failed", "username", user, "ip", clientIP(r))
+			writeError(w, http.StatusUnauthorized, "invalid username or password")
+			return
+		}
 	}
 	s.logins.reset(key)
 
@@ -547,12 +554,9 @@ func (s *Server) rechargeMe(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid amount")
 		return
 	}
-	user := s.admin.GetUser(email)
-	newBalance := req.Amount
-	if user != nil {
-		newBalance += user.Balance
-	}
-	s.admin.SetBalance(email, newBalance)
+	// generate a fake transaction ID for simulation
+	txID := fmt.Sprintf("tr_%d", time.Now().UnixNano())
+	newBalance := s.admin.AddPayment(email, req.Amount, "success", txID)
 	writeJSON(w, http.StatusOK, map[string]any{"balance": newBalance})
 }
 
@@ -634,4 +638,16 @@ func requireAdmin(next http.HandlerFunc) http.HandlerFunc {
 		}
 		next(w, r)
 	}
+}
+func (s *Server) consoleSignup(w http.ResponseWriter, r *http.Request) {
+	var c credentials
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<16)).Decode(&c); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid JSON body")
+		return
+	}
+	if err := s.admin.SignupUser(c.Username, c.Password); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	s.startConsoleSession(w, r, c.Username, c.Password)
 }

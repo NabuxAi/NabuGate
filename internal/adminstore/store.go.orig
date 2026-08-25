@@ -60,21 +60,10 @@ type Admin struct {
 
 // Token is a project key minted from the console.
 
-type Payment struct {
-	ID        string    `json:"id"`
-	Amount    float64   `json:"amount"`
-	Status    string    `json:"status"`
-	CreatedAt time.Time `json:"created_at"`
-}
-
 type User struct {
-	Email    string    `json:"email"`
-	Salt     string    `json:"salt"`
-	Hash     string    `json:"hash"`
-
-	Balance  float64   `json:"balance"`
-	Name     string    `json:"name"`
-	Payments []Payment `json:"payments,omitempty"`
+	Email   string  `json:"email"`
+	Balance float64 `json:"balance"`
+	Name    string  `json:"name"`
 }
 
 type Token struct {
@@ -724,7 +713,7 @@ func (s *Store) GetUser(email string) *User {
 	return &cpy
 }
 
-func (s *Store) AddPayment(email string, amount float64, status string, id string) float64 {
+func (s *Store) SetBalance(email string, balance float64) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.st.Users == nil {
@@ -736,91 +725,6 @@ func (s *Store) AddPayment(email string, amount float64, status string, id strin
 		u = &User{Email: email}
 		s.st.Users[email] = u
 	}
-	if status == "success" {
-		u.Balance += amount
-	}
-	u.Payments = append(u.Payments, Payment{
-		ID:        id,
-		Amount:    amount,
-		Status:    status,
-		CreatedAt: time.Now(),
-	})
+	u.Balance = balance
 	s.save()
-	return u.Balance
-}
-func (s *Store) SignupUser(email, password string) error {
-	email = strings.TrimSpace(strings.ToLower(email))
-	if email == "" || password == "" {
-		return errors.New("ایمیل یا رمز عبور نامعتبر است")
-	}
-
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	
-	if s.st.Users == nil {
-		s.st.Users = make(map[string]*User)
-	}
-	if _, exists := s.st.Users[email]; exists {
-		return errors.New("کاربری با این ایمیل قبلاً ثبت نام کرده است")
-	}
-
-	salt := make([]byte, saltLen)
-	if _, err := rand.Read(salt); err != nil {
-		return err
-	}
-
-	hash, err := pbkdf2.Key(sha256.New, password, salt, pbkdfIterations, pbkdfKeyLen)
-	if err != nil {
-		return err
-	}
-
-	s.st.Users[email] = &User{
-		Email: email,
-		Salt:  base64.RawStdEncoding.EncodeToString(salt),
-		Hash:  base64.RawStdEncoding.EncodeToString(hash),
-	}
-	s.save()
-	return nil
-}
-
-func (s *Store) AuthenticateUser(email, password string) (string, time.Time, error) {
-	email = strings.TrimSpace(strings.ToLower(email))
-
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	if s.st.Users == nil {
-		return "", time.Time{}, ErrBadCredentials
-	}
-	found := s.st.Users[email]
-	if found == nil || found.Salt == "" || found.Hash == "" {
-		return "", time.Time{}, ErrBadCredentials
-	}
-
-	salt, _ := base64.RawStdEncoding.DecodeString(found.Salt)
-	storedHash, _ := base64.RawStdEncoding.DecodeString(found.Hash)
-
-	key, err := pbkdf2.Key(sha256.New, password, salt, pbkdfIterations, pbkdfKeyLen)
-	if err != nil {
-		return "", time.Time{}, err
-	}
-	if subtle.ConstantTimeCompare(key, storedHash) != 1 {
-		return "", time.Time{}, ErrBadCredentials
-	}
-
-	tok := make([]byte, 32)
-	rand.Read(tok)
-	token := hex.EncodeToString(tok)
-	expiry := time.Now().Add(SessionTTL)
-	
-	if s.st.UserSessions == nil {
-		s.st.UserSessions = make(map[string]SessionInfo)
-	}
-	s.st.UserSessions[token] = SessionInfo{
-		Expiry:  expiry,
-		Email:   email,
-		IsAdmin: false,
-	}
-	s.save()
-	return token, expiry, nil
 }
