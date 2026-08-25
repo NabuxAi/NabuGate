@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import * as api from '../api.js';
+import { useTheme } from '../useTheme.js';
 
 /*
  * The console's gate.
@@ -46,8 +47,15 @@ export default function SignIn({ needsSetup, onAuthenticated }) {
   const ssoClass = "btn btn-outline";
   const ssoStyle = { width: '100%', marginBottom: 12, display: 'flex', justifyContent: 'center', gap: 8 };
 
+  const { theme, toggleTheme } = useTheme();
+
   return (
     <div className="signin">
+      <div style={{ position: 'absolute', top: 20, left: 20, zIndex: 10 }}>
+        <button onClick={toggleTheme} className="btn btn-outline" style={{ background: 'var(--ng-surface)', padding: '6px 12px', fontSize: 14 }}>
+          {theme === 'dark' ? '☀️ روز' : '🌙 شب'}
+        </button>
+      </div>
       <form className="signin-card card" onSubmit={submit}>
         <div className="signin-brand">
           NabuGate

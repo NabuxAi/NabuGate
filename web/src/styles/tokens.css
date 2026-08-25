@@ -72,3 +72,44 @@
   --ng-sidebar-w: 250px;
   --ng-topbar-h: 64px;
 }
+
+[data-theme="light"] {
+  --ng-accent: #2563eb;
+  --ng-accent-strong: #1d4ed8;
+  --ng-accent-soft: rgba(37, 99, 235, 0.1);
+  --ng-accent-border: rgba(37, 99, 235, 0.2);
+  --ng-brand-grad: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+
+  --ng-bg: #f8fafc;
+  --ng-bg-veil: transparent;
+  --ng-surface: #ffffff;
+  --ng-surface-soft: #f1f5f9;
+  --ng-surface-softer: #e2e8f0;
+  --ng-border: #e2e8f0;
+  --ng-border-card: #cbd5e1;
+  --ng-border-faint: #f1f5f9;
+  --ng-divider: #e2e8f0;
+
+  --ng-text: #334155;
+  --ng-heading: #0f172a;
+  --ng-fg: #0f172a;
+  --ng-muted: #64748b;
+  --ng-muted-dark: #475569;
+
+  --ng-bg-hover: #f1f5f9;
+  --ng-bg-active: #e2e8f0;
+  --ng-shadow: 0 4px 6px -1px rgba(0,0,0,0.05), 0 2px 4px -1px rgba(0,0,0,0.03);
+  --ng-shadow-soft: 0 1px 3px 0 rgba(0,0,0,0.05);
+
+  --ng-danger: #ef4444;
+  --ng-danger-bg: #fee2e2;
+  --ng-danger-text: #b91c1c;
+
+  --ng-warning: #f59e0b;
+  --ng-warning-bg: #fef3c7;
+  --ng-warning-text: #b45309;
+
+  --ng-success: #10b981;
+  --ng-success-bg: #d1fae5;
+  --ng-success-text: #047857;
+}

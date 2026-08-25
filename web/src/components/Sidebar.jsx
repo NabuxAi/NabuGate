@@ -1,13 +1,16 @@
 import { navGroups } from '../data/mock.js';
+import { useTheme } from '../useTheme.js';
 
 export default function Sidebar({ current, onNavigate, effectivelyAdmin, isPanel }) {
+  const { theme, toggleTheme } = useTheme();
+
   return (
     <aside className="sidebar">
       <div className="brand">
         <div className="brand-mark" aria-hidden="true">✨</div>
         <div style={{ minWidth: 0, display: 'flex', flexDirection: 'column', gap: 4 }}>
           <div className="brand-name">NabuGate</div>
-          <span style={{ fontSize: 10, background: effectivelyAdmin ? 'var(--ng-error)' : 'var(--ng-ok)', color: effectivelyAdmin ? 'var(--ng-error-text)' : 'var(--ng-ok-text)', padding: '2px 6px', borderRadius: 10, width: 'fit-content' }}>
+          <span style={{ fontSize: 10, background: effectivelyAdmin ? 'var(--ng-danger)' : 'var(--ng-success)', color: effectivelyAdmin ? 'var(--ng-bg)' : 'var(--ng-bg)', padding: '2px 6px', borderRadius: 10, width: 'fit-content' }}>
             {effectivelyAdmin ? 'مدیریت کل' : 'پنل کاربری'}
           </span>
         </div>
@@ -39,6 +42,12 @@ export default function Sidebar({ current, onNavigate, effectivelyAdmin, isPanel
           );
         })}
       </nav>
+
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '0 24px 16px', color: 'var(--ng-muted)' }}>
+        <button onClick={toggleTheme} className="btn" style={{ flex: 1, justifyContent: 'center', background: 'var(--ng-bg-hover)', border: '1px solid var(--ng-border)' }}>
+          {theme === 'dark' ? '☀️ روز' : '🌙 شب'}
+        </button>
+      </div>
 
       <div className="svc">
         <span className="dot dot-ok dot-ok-ring" aria-hidden="true" />

@@ -41,6 +41,7 @@ func (s *Server) mountConsoleAPI(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/nabu/status", s.consoleNabuStatus)
 	mux.HandleFunc("GET /api/nabu", s.consoleNabuStart)
 	mux.HandleFunc("GET /api/nabu/callback", s.consoleNabuCallback)
+	mux.HandleFunc("GET /admin/api/nabu/callback", s.consoleNabuCallback)
 
 		mux.Handle("GET /api/tokens", s.consoleAuth(s.listTokens))
 	mux.Handle("GET /api/me", s.consoleAuth(s.getMe))

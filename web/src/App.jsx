@@ -61,6 +61,8 @@ function viewFromHash() {
 }
 
 export default function App() {
+  useTheme();
+
   const [view, setView] = useState(viewFromHash);
   const [session, setSession] = useState(null);
 
