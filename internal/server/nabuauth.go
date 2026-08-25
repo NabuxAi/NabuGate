@@ -231,32 +231,47 @@ func (s *Server) consoleNabuCallback(w http.ResponseWriter, r *http.Request) {
 	}
 	// The console is a single-page app, so a failure comes back as a flag it can
 	// render rather than a JSON body the browser would show raw.
-	fail := func(reason string) {
+	fail := func(reason string, dest string) {
 		clearFlow()
-		http.Redirect(w, r, "/admin/?nabu_error="+url.QueryEscape(reason), http.StatusFound)
+		if dest == "" {
+			dest = "/panel/"
+		}
+		http.Redirect(w, r, dest+"?nabu_error="+url.QueryEscape(reason), http.StatusFound)
+	}
+
+	
+	cookie, err := r.Cookie(consoleNabuFlowCookie)
+	var flow consoleNabuFlow
+	var dest string
+	if err == nil {
+		var ok bool
+		flow, ok = cfg.unpackFlow(cookie.Value)
+		if ok {
+			dest = flow.ReturnTo
+		}
 	}
 
 	if e := r.URL.Query().Get("error"); e != "" {
-		fail(e)
+		fail(e, dest)
 		return
 	}
-	cookie, err := r.Cookie(consoleNabuFlowCookie)
+
 	if err != nil {
-		fail("expired")
+		fail("expired", dest)
 		return
 	}
-	flow, ok := cfg.unpackFlow(cookie.Value)
+	
 	// A callback whose state was not issued here did not start in this browser,
 	// so the code in it is not ours to redeem.
-	if !ok || !hmac.Equal([]byte(flow.State), []byte(r.URL.Query().Get("state"))) {
-		fail("expired")
+	if dest == "" || !hmac.Equal([]byte(flow.State), []byte(r.URL.Query().Get("state"))) {
+		fail("expired", dest)
 		return
 	}
 
 	profile, err := cfg.signIn(r.Context(), r.URL.Query().Get("code"), flow.Verifier, cfg.redirectURI(r))
 	if err != nil {
 		s.log.Warn("console nabuauth sign-in failed", "error", err)
-		fail("failed")
+		fail("failed", dest)
 		return
 	}
 	
@@ -266,7 +281,7 @@ func (s *Server) consoleNabuCallback(w http.ResponseWriter, r *http.Request) {
 	token, expiry, err := s.admin.NewSession(email, isAdmin)
 	if err != nil {
 		s.log.Error("could not issue console session", "error", err)
-		fail("failed")
+		fail("failed", dest)
 		return
 	}
 	clearFlow()
@@ -276,7 +291,7 @@ func (s *Server) consoleNabuCallback(w http.ResponseWriter, r *http.Request) {
 		Path:     "/",
 		HttpOnly: true,
 		Secure:   requestIsHTTPS(r),
-		SameSite: http.SameSiteStrictMode,
+		SameSite: http.SameSiteLaxMode,
 		Expires:  expiry,
 		MaxAge:   int(time.Until(expiry).Seconds()),
 	})

@@ -167,7 +167,7 @@ func (s *Server) startConsoleSession(w http.ResponseWriter, r *http.Request, use
 		// because the console has no cross-site use at all.
 		HttpOnly: true,
 		Secure:   r.TLS != nil || strings.EqualFold(r.Header.Get("X-Forwarded-Proto"), "https"),
-		SameSite: http.SameSiteStrictMode,
+		SameSite: http.SameSiteLaxMode,
 		Expires:  expiry,
 		MaxAge:   int(time.Until(expiry).Seconds()),
 	})
@@ -180,7 +180,7 @@ func (s *Server) consoleLogout(w http.ResponseWriter, r *http.Request) {
 	}
 	http.SetCookie(w, &http.Cookie{
 		Name: consoleCookie, Value: "", Path: "/",
-		HttpOnly: true, SameSite: http.SameSiteStrictMode, MaxAge: -1,
+		HttpOnly: true, SameSite: http.SameSiteLaxMode, MaxAge: -1,
 	})
 	w.WriteHeader(http.StatusNoContent)
 }

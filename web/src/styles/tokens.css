@@ -113,3 +113,24 @@
   --ng-success-bg: #d1fae5;
   --ng-success-text: #047857;
 }
+
+:root {
+  --ng-fg: #f8fafc;
+  --ng-muted-dark: #94a3b8;
+  --ng-bg-hover: #1e293b;
+  --ng-bg-active: #334155;
+  --ng-shadow: 0 4px 6px -1px rgba(0,0,0,0.5), 0 2px 4px -1px rgba(0,0,0,0.3);
+  --ng-shadow-soft: 0 1px 3px 0 rgba(0,0,0,0.5);
+
+  --ng-danger: #ef4444;
+  --ng-danger-bg: rgba(239, 68, 68, 0.1);
+  --ng-danger-text: #fca5a5;
+
+  --ng-warning: #f59e0b;
+  --ng-warning-bg: rgba(245, 158, 11, 0.1);
+  --ng-warning-text: #fcd34d;
+
+  --ng-success: #10b981;
+  --ng-success-bg: rgba(16, 185, 129, 0.1);
+  --ng-success-text: #6ee7b7;
+}

@@ -15,6 +15,14 @@ export default function SignIn({ needsSetup, onAuthenticated }) {
   const [nabu, setNabu] = useState(null);
 
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const errParam = params.get('nabu_error');
+    if (errParam) {
+      if (errParam === 'expired') setError('نشست شما منقضی شده است. لطفا دوباره تلاش کنید.');
+      else if (errParam === 'failed') setError('ورود با SSO ناموفق بود.');
+      else setError('خطای SSO: ' + errParam);
+    }
+
     if (!needsSetup) {
       api.statusNabu().then(setNabu).catch(console.error);
     }
