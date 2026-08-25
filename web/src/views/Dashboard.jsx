@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import Layout from '../components/Layout.jsx';
 import * as api from '../api.js';
-import { faInt, faDigits } from '../data/mock.js';
+import { faInt } from '../data/mock.js';
 
 export default function Dashboard() {
   const [data, setData] = useState(null);
@@ -43,7 +43,7 @@ export default function Dashboard() {
         </div>
         <div style={{ display: 'flex', gap: 12 }}>
           <button className="btn" style={{ background: 'transparent', border: '1px solid var(--ng-border)', color: 'var(--ng-heading)' }} onClick={() => window.location.hash = '#/plans'}>
-            + خرید پلن
+            + خرید پلن / شارژ
           </button>
           <button className="btn btn-primary" onClick={() => window.location.hash = '#/tokens'}>
             🔑 ساخت کلید
@@ -54,12 +54,13 @@ export default function Dashboard() {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 20, marginBottom: 24 }}>
         {/* Current Plan Card (Right in RTL) */}
         <div className="card" style={{ padding: 24, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', minHeight: 220, gridColumn: 'span 2' }}>
-          <h3 style={{ fontSize: 16, margin: '0 0 16px 0', alignSelf: 'flex-start', borderBottom: '1px solid var(--ng-border)', paddingBottom: 12, width: '100%', textAlign: 'right' }}>اشتراک فعلی</h3>
+          <h3 style={{ fontSize: 16, margin: '0 0 16px 0', alignSelf: 'flex-start', borderBottom: '1px solid var(--ng-border)', paddingBottom: 12, width: '100%', textAlign: 'right' }}>موجودی حساب</h3>
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-            <div style={{ fontSize: 32, marginBottom: 16, color: 'var(--ng-muted)' }}>✨</div>
-            <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 8 }}>اشتراک فعالی ندارید</div>
-            <p style={{ fontSize: 13, color: 'var(--ng-muted)', marginBottom: 20 }}>برای استفاده از درگاه، یک پلن تهیه کنید.</p>
-            <button onClick={() => window.location.hash = '#/plans'} className="btn btn-primary">مشاهده پلن‌ها</button>
+            <div style={{ fontSize: 40, fontWeight: 800, marginBottom: 8, color: 'var(--ng-fg)' }}>
+              {balance.toLocaleString()} <span style={{ fontSize: 16, fontWeight: 400, color: 'var(--ng-muted)' }}>تومان</span>
+            </div>
+            <p style={{ fontSize: 13, color: 'var(--ng-muted)', marginBottom: 20 }}>از طریق NabuPay می‌توانید حساب خود را شارژ کنید یا پلن تهیه کنید.</p>
+            <button onClick={() => window.location.hash = '#/plans'} className="btn btn-primary">شارژ موجودی (NabuPay)</button>
           </div>
         </div>
 
