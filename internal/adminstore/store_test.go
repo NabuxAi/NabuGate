@@ -146,7 +146,8 @@ func TestUsageSurvivesReopen(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	got := reopened.Usage()["nabuwrite"]
+	usage, _, _ := reopened.Usage()
+	got := usage["nabuwrite"]
 	if got.Requests != 2 || got.PromptTokens != 150 || got.CompletionTokens != 50 || got.Denied != 1 {
 		t.Errorf("counters after reopen = %+v", got)
 	}
