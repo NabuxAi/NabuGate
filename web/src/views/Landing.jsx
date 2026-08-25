@@ -64,16 +64,16 @@ export default function Landing({ lang = 'fa' }) {
           </a>
           <nav className="jv-nav hidden-mobile">
             <a href="/" className="active">{isFa ? 'صفحه اصلی' : 'Home'}</a>
-            <a href="#/plans">{isFa ? 'پلن‌ها' : 'Pricing'}</a>
-            <a href="#/models">{isFa ? 'مدل‌ها' : 'Models'}</a>
-            <a href="#/docs">{isFa ? 'مستندات' : 'Docs'}</a>
+            <a href="/plans">{isFa ? 'پلن‌ها' : 'Pricing'}</a>
+            <a href="/models">{isFa ? 'مدل‌ها' : 'Models'}</a>
+            <a href="/docs">{isFa ? 'مستندات' : 'Docs'}</a>
           </nav>
           <div className="jv-actions">
-            <a href="#/login" className="jv-btn jv-btn-ghost">
+            <a href="/panel/login" className="jv-btn jv-btn-ghost">
               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"></path><polyline points="10 17 15 12 10 7"></polyline><line x1="15" x2="3" y1="12" y2="12"></line></svg>
               {isFa ? 'ورود به کنسول' : 'Login'}
             </a>
-            <a href="#/login" className="jv-btn jv-btn-primary">
+            <a href="/panel/login" className="jv-btn jv-btn-primary">
               {isFa ? 'شروع استفاده' : 'Get Started'}
               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M7 17V7h10"></path><path d="M17 17 7 7"></path></svg>
             </a>
@@ -100,11 +100,11 @@ export default function Landing({ lang = 'fa' }) {
                   : 'NabuGate provides access to GPT, Claude, Gemini, Groq, and DeepSeek via a single OpenAI-compatible gateway. Manage your subscription, API keys, and usage from one console.'}
               </p>
               <div className="jv-hero-btns">
-                <a href="#/login" className="jv-btn jv-btn-primary">
+                <a href="/panel/login" className="jv-btn jv-btn-primary">
                   {isFa ? 'شروع استفاده' : 'Get Started'}
                   <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M7 17V7h10"></path><path d="M17 17 7 7"></path></svg>
                 </a>
-                <a href="#/plans" className="jv-btn jv-btn-outline">{isFa ? 'مشاهده پلن‌ها' : 'View Plans'}</a>
+                <a href="/plans" className="jv-btn jv-btn-outline">{isFa ? 'مشاهده پلن‌ها' : 'View Plans'}</a>
               </div>
               <div className="jv-tools">
                 <span>{isFa ? 'سازگار با ابزارهای محبوب توسعه‌دهندگان:' : 'Compatible with popular developer tools:'}</span>
@@ -229,7 +229,7 @@ export OPENAI_API_KEY="ng_xxxxxxxxxxxxxxxxxxxx"
             
             <div className="jv-tools-grid">
               {['Claude Code', 'Codex', 'VS Code', 'Cursor', 'Cline', 'Roo Code', 'OpenAI SDK'].map(t => (
-                <a href="#/docs" className="jv-tool-card" key={t}>
+                <a href="/docs" className="jv-tool-card" key={t}>
                   <div className="jv-tool-icon">
                     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="4 17 10 11 4 5"></polyline><line x1="12" x2="20" y1="19" y2="19"></line></svg>
                   </div>

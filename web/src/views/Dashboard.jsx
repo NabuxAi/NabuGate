@@ -1,3 +1,5 @@
+import { navigate } from "../nav.js";
+
 import { useEffect, useState } from 'react';
 import Layout from '../components/Layout.jsx';
 import * as api from '../api.js';
@@ -41,10 +43,10 @@ export default function Dashboard() {
           <p style={{ color: 'var(--ng-muted)', fontSize: 13, marginTop: 4 }}>نمای کلی حساب، اشتراک و مصرف شما.</p>
         </div>
         <div style={{ display: 'flex', gap: 12 }}>
-          <button className="btn" style={{ background: 'transparent', border: '1px solid var(--ng-border)', color: 'var(--ng-heading)' }} onClick={() => window.location.hash = '#/plans'}>
+          <button className="btn" style={{ background: 'transparent', border: '1px solid var(--ng-border)', color: 'var(--ng-heading)' }} onClick={() => navigate('plans')}>
             + خرید پلن / شارژ
           </button>
-          <button className="btn btn-primary" onClick={() => window.location.hash = '#/tokens'}>
+          <button className="btn btn-primary" onClick={() => navigate('tokens')}>
             🔑 ساخت کلید
           </button>
         </div>
@@ -58,7 +60,7 @@ export default function Dashboard() {
               {balance.toLocaleString('fa-IR')} <span style={{ fontSize: 16, fontWeight: 400, color: 'var(--ng-muted)' }}>تومان</span>
             </div>
             <p style={{ fontSize: 13, color: 'var(--ng-muted)', marginBottom: 20 }}>از طریق NabuPay می‌توانید حساب خود را شارژ کنید یا پلن تهیه کنید.</p>
-            <button onClick={() => window.location.hash = '#/plans'} className="btn btn-primary">شارژ موجودی (NabuPay)</button>
+            <button onClick={() => navigate('plans')} className="btn btn-primary">شارژ موجودی (NabuPay)</button>
           </div>
         </div>
 
@@ -70,7 +72,7 @@ export default function Dashboard() {
               <span style={{ fontSize: 13, fontWeight: 700 }} dir="ltr">{user?.email || "..."}</span>
             </div>
           </div>
-          <button style={{ marginTop: 20, background: 'transparent', border: '1px solid var(--ng-border)', color: 'var(--ng-heading)', padding: '10px', borderRadius: 8, fontSize: 13, cursor: 'pointer', width: '100%' }} onClick={() => window.location.hash = '#/profile'}>
+          <button style={{ marginTop: 20, background: 'transparent', border: '1px solid var(--ng-border)', color: 'var(--ng-heading)', padding: '10px', borderRadius: 8, fontSize: 13, cursor: 'pointer', width: '100%' }} onClick={() => navigate('profile')}>
             تنظیمات
           </button>
         </div>

@@ -8,6 +8,9 @@
   min-height: 100vh;
   display: flex;
   flex-direction: column;
+  flex: 1;
+  width: 100%;
+
 }
 
 .landing-body a {
@@ -46,6 +49,9 @@
 .jv-logo span {
   display: flex;
   flex-direction: column;
+  flex: 1;
+  width: 100%;
+
   line-height: 1;
 }
 
@@ -211,6 +217,9 @@
 .jv-tools {
   display: flex;
   flex-direction: column;
+  flex: 1;
+  width: 100%;
+
   gap: 0.5rem;
 }
 
@@ -338,6 +347,9 @@
 .jv-gateway-box .jv-gb-title {
   display: flex;
   flex-direction: column;
+  flex: 1;
+  width: 100%;
+
 }
 
 .jv-gateway-box .jv-gb-title strong {
@@ -386,6 +398,9 @@
 .jv-model-info {
   display: flex;
   flex-direction: column;
+  flex: 1;
+  width: 100%;
+
 }
 .jv-model-info strong {
   font-size: 0.75rem;
@@ -425,6 +440,9 @@
   margin-bottom: 3rem;
   display: flex;
   flex-direction: column;
+  flex: 1;
+  width: 100%;
+
   align-items: center;
   gap: 0.75rem;
 }
@@ -462,6 +480,9 @@
   border-radius: 1rem;
   display: flex;
   flex-direction: column;
+  flex: 1;
+  width: 100%;
+
   gap: 1rem;
 }
 
@@ -542,6 +563,9 @@
 .jv-tool-card {
   display: flex;
   flex-direction: column;
+  flex: 1;
+  width: 100%;
+
   gap: 12px;
   padding: 20px;
   border-radius: 12px;

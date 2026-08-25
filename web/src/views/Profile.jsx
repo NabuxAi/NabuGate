@@ -1,3 +1,5 @@
+import { navigate } from "../nav.js";
+
 import { useEffect, useState } from 'react';
 import Layout from '../components/Layout.jsx';
 import * as api from '../api.js';
@@ -33,7 +35,7 @@ export default function Profile() {
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
               <input type="text" className="input" value={balance.toLocaleString('fa-IR')} readOnly style={{ width: 150 }} />
               <span style={{ fontSize: 13, color: 'var(--ng-muted)' }}>تومان</span>
-              <button className="btn btn-primary" style={{ marginRight: 'auto' }} onClick={() => window.location.hash = '#/plans'}>شارژ</button>
+              <button className="btn btn-primary" style={{ marginRight: 'auto' }} onClick={() => navigate('plans')}>شارژ</button>
             </div>
           </div>
           

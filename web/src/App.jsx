@@ -55,15 +55,25 @@ const VIEWS = {
   ),
 };
 
-function viewFromHash() {
-  const id = (window.location.hash || '').replace(/^#\/?/, '');
-  return id ? (VIEWS[id] ? id : 'dashboard') : 'landing';
+function viewFromPath() {
+  let path = window.location.pathname;
+  if (path.startsWith('/admin/')) path = path.replace('/admin/', '');
+  else if (path.startsWith('/panel/')) path = path.replace('/panel/', '');
+  else if (path === '/admin') path = '';
+  else if (path === '/panel') path = '';
+  else if (path.startsWith('/')) path = path.replace('/', '');
+
+  if (path === '' && window.location.hash && window.location.hash.startsWith('#/')) {
+    path = window.location.hash.replace(/^#\/?/, '');
+  }
+
+  return path ? (VIEWS[path] ? path : 'dashboard') : 'landing';
 }
 
 export default function App() {
   useTheme();
 
-  const [view, setView] = useState(viewFromHash);
+  const [view, setView] = useState(viewFromPath);
   const [session, setSession] = useState(null);
 
   const isPanel = window.location.pathname.startsWith('/panel');
@@ -78,23 +88,22 @@ export default function App() {
   useEffect(refresh, []);
 
   useEffect(() => {
-    const onHash = () => setView(viewFromHash());
-    window.addEventListener('hashchange', onHash);
-    return () => window.removeEventListener('hashchange', onHash);
+    const onPopState = () => setView(viewFromPath());
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
   }, []);
 
   const navigate = (id) => {
-    window.location.hash = '#/' + id;
+    const basePath = isAdminPath ? '/admin' : (isPanel ? '/panel' : '');
+    const newUrl = `${basePath}/${id}`;
+    window.history.pushState(null, '', newUrl);
+    window.dispatchEvent(new PopStateEvent('popstate'));
   };
 
   if (session === null) return <div className="app-boot">…</div>;
   if (!session.authenticated && (view === 'landing' || view === 'docs') && !isPanel && !isAdminPath) {
     const View = VIEWS[view];
-    return (
-      <div className="app">
-        <View />
-      </div>
-    );
+    return <View />;
   }
   if (!session.authenticated) {
     return <SignIn needsSetup={session.needs_setup} onAuthenticated={refresh} />;

@@ -1,3 +1,5 @@
+import { navigate } from "../nav.js";
+
 import { useState } from 'react';
 import Layout from '../components/Layout.jsx';
 import * as api from '../api.js';
@@ -29,7 +31,7 @@ export default function Plans() {
       setSuccessMsg(`پرداخت با موفقیت انجام شد. موجودی شما ${selectedPlan.amount.toLocaleString()} تومان افزایش یافت.`);
       setGatewayOpen(false);
       // Refresh after a bit
-      setTimeout(() => window.location.hash = '#/dashboard', 2000);
+      setTimeout(() => navigate('dashboard'), 2000);
     } catch (e) {
       alert('خطا در پرداخت: ' + e.message);
     } finally {

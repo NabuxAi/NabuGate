@@ -34,12 +34,12 @@ export default function Docs({ lang = 'fa' }) {
           </a>
           <nav className="jv-nav hidden-mobile">
             <a href="/">{isFa ? 'صفحه اصلی' : 'Home'}</a>
-            <a href="/#/plans">{isFa ? 'پلن‌ها' : 'Pricing'}</a>
-            <a href="/#/models">{isFa ? 'مدل‌ها' : 'Models'}</a>
-            <a href="/#/docs" className="active">{isFa ? 'مستندات' : 'Docs'}</a>
+            <a href="/plans">{isFa ? 'پلن‌ها' : 'Pricing'}</a>
+            <a href="/models">{isFa ? 'مدل‌ها' : 'Models'}</a>
+            <a href="/docs" className="active">{isFa ? 'مستندات' : 'Docs'}</a>
           </nav>
           <div className="jv-actions">
-            <a href="/panel/#/login" className="jv-btn jv-btn-primary">
+            <a href="/panel/login" className="jv-btn jv-btn-primary">
               {isFa ? 'شروع استفاده' : 'Get Started'}
               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M7 17V7h10"></path><path d="M17 17 7 7"></path></svg>
             </a>
