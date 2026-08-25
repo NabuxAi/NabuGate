@@ -8,11 +8,19 @@ export default function Plans() {
   const [gatewayOpen, setGatewayOpen] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState(null);
   const [successMsg, setSuccessMsg] = useState('');
+  const [selectedBank, setSelectedBank] = useState('saman');
 
   const plans = [
     { id: 'starter', name: 'بسته پایه', amount: 100000, label: '۱۰۰,۰۰۰ تومان', tokens: 'پایه' },
     { id: 'pro', name: 'بسته حرفه‌ای', amount: 500000, label: '۵۰۰,۰۰۰ تومان', tokens: 'اقتصادی', popular: true },
     { id: 'ultra', name: 'بسته نامحدود', amount: 2000000, label: '۲,۰۰۰,۰۰۰ تومان', tokens: 'تجاری' },
+  ];
+
+  const banks = [
+    { id: 'saman', name: 'سامان' },
+    { id: 'mellat', name: 'ملت' },
+    { id: 'pasargad', name: 'پاسارگاد' },
+    { id: 'zarinpal', name: 'زرین‌پال' },
   ];
 
   const handleBuy = (plan) => {
@@ -27,10 +35,11 @@ export default function Plans() {
       // Simulate NabuPay gateway processing time
       await new Promise(r => setTimeout(r, 1500));
       await api.rechargeMe(selectedPlan.amount);
-      setSuccessMsg(`پرداخت از طریق درگاه یکپارچه NabuPay با موفقیت انجام شد. مبلغ ${selectedPlan.amount.toLocaleString('fa-IR')} تومان افزوده شد.`);
+      const bankName = banks.find(b => b.id === selectedBank)?.name;
+      setSuccessMsg(`پرداخت از طریق درگاه یکپارچه NabuPay (درگاه ${bankName}) با موفقیت انجام شد. مبلغ ${selectedPlan.amount.toLocaleString('fa-IR')} تومان افزوده شد.`);
       setGatewayOpen(false);
       // Refresh after a bit
-      setTimeout(() => navigate('dashboard'), 2500);
+      setTimeout(() => navigate('dashboard'), 3000);
     } catch (e) {
       alert('خطا در پرداخت: ' + e.message);
     } finally {
@@ -77,7 +86,7 @@ export default function Plans() {
       {/* Simulated NabuPay Gateway */}
       {gatewayOpen && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
-          <div className="card" style={{ width: 400, maxWidth: '95%', padding: 0, overflow: 'hidden', border: '1px solid var(--ng-border)' }}>
+          <div className="card" style={{ width: 450, maxWidth: '95%', padding: 0, overflow: 'hidden', border: '1px solid var(--ng-border)' }}>
             
             <div style={{ background: 'var(--ng-surface-soft)', padding: '24px 24px 16px 24px', textAlign: 'center', borderBottom: '1px solid var(--ng-border)' }}>
               <div style={{ fontSize: 36, marginBottom: 12 }}>💳</div>
@@ -96,26 +105,43 @@ export default function Plans() {
                 <span style={{ fontWeight: 700, fontSize: 14 }}>پلتفرم NabuGate</span>
               </div>
               
+              <div style={{ marginBottom: 24 }}>
+                <div style={{ fontSize: 13, color: 'var(--ng-muted)', marginBottom: 12 }}>انتخاب درگاه پرداخت:</div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                  {banks.map(b => (
+                    <button 
+                      key={b.id}
+                      onClick={() => setSelectedBank(b.id)}
+                      style={{ 
+                        padding: '12px', borderRadius: 8, cursor: 'pointer', fontSize: 14, fontWeight: 600,
+                        border: selectedBank === b.id ? '2px solid var(--ng-fg)' : '1px solid var(--ng-border)',
+                        background: selectedBank === b.id ? 'var(--ng-surface-soft)' : 'transparent',
+                        color: 'var(--ng-heading)'
+                      }}
+                    >
+                      {b.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              
               <button 
                 onClick={handlePay} 
-                className="btn btn-primary" 
-                style={{ width: '100%', padding: '14px', fontSize: 16, display: 'flex', justifyContent: 'center', alignItems: 'center' }}
                 disabled={loading}
+                className="btn btn-primary" 
+                style={{ width: '100%', padding: '14px', fontSize: 16, fontWeight: 700 }}
               >
-                {loading ? 'در حال ارتباط با بانک...' : 'انتقال به درگاه بانکی شاپرک'}
+                {loading ? 'در حال انتقال...' : 'پرداخت و انتقال به درگاه بانکی'}
               </button>
+              
               <button 
                 onClick={() => setGatewayOpen(false)} 
-                className="btn" 
-                style={{ width: '100%', padding: '12px', marginTop: 12, background: 'transparent', color: 'var(--ng-muted)', border: 'none' }}
                 disabled={loading}
+                className="btn" 
+                style={{ width: '100%', marginTop: 12, background: 'transparent', color: 'var(--ng-muted)', border: 'none' }}
               >
-                انصراف و بازگشت
+                انصراف
               </button>
-            </div>
-            
-            <div style={{ background: 'var(--ng-surface-soft)', padding: '12px', textAlign: 'center', borderTop: '1px solid var(--ng-border)', fontSize: 11, color: 'var(--ng-muted)' }}>
-              تمامی پرداخت‌ها در بستر امن NabuPay انجام می‌شود
             </div>
           </div>
         </div>
