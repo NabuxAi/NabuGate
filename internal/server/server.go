@@ -235,7 +235,7 @@ func (s *Server) record(r *http.Request, prov, model string, u provider.Usage) {
 	// Also accumulate into the persisted counters, so the console's numbers are
 	// real across restarts rather than resetting to zero on every redeploy.
 	if s.admin != nil {
-		s.admin.RecordUsage(project, int64(u.PromptTokens), int64(u.CompletionTokens), cost)
+		s.admin.RecordUsage(project, prov, model, int64(u.PromptTokens), int64(u.CompletionTokens), cost)
 	}
 	s.log.Info("billed", "project", project, "provider", prov, "model", model,
 		"total_tokens", u.TotalTokens, "cost_usd", cost)

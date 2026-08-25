@@ -33,14 +33,14 @@ func TestFirstAdminThenLogin(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Authenticate: %v", err)
 	}
-	if !s.ValidSession(token) {
+	if _, ok := s.ValidSession(token); !ok {
 		t.Error("the returned session was not valid")
 	}
 
 	if err := s.EndSession(token); err != nil {
 		t.Fatalf("EndSession: %v", err)
 	}
-	if s.ValidSession(token) {
+	if _, ok := s.ValidSession(token); ok {
 		t.Error("the session survived logout")
 	}
 }
@@ -74,7 +74,7 @@ func TestShortPasswordRefused(t *testing.T) {
 func TestTokenSecretIsShownOnceAndStoredHashed(t *testing.T) {
 	s := newStore(t)
 
-	tok, secret, err := s.NewToken("nabuwrite", []string{"write-*"}, 120, nil)
+	tok, secret, err := s.NewToken("nabuwrite", []string{"write-*"}, 120, nil, "admin@test.com", nil)
 	if err != nil {
 		t.Fatalf("NewToken: %v", err)
 	}
@@ -106,14 +106,14 @@ func TestTokenRequiresAnAllowList(t *testing.T) {
 	s := newStore(t)
 	// A key that reaches everything is an admin key, and minting one from a
 	// console form is how that happens by accident.
-	if _, _, err := s.NewToken("careless", nil, 0, nil); err == nil {
+	if _, _, err := s.NewToken("careless", nil, 0, nil, "admin@test.com", nil); err == nil {
 		t.Error("a token with no allow-list was created")
 	}
 }
 
 func TestDisabledTokenStopsResolving(t *testing.T) {
 	s := newStore(t)
-	_, secret, err := s.NewToken("nabuwrite", []string{"write-*"}, 0, nil)
+	_, secret, err := s.NewToken("nabuwrite", []string{"write-*"}, 0, nil, "admin@test.com", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -133,8 +133,8 @@ func TestUsageSurvivesReopen(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	s.RecordUsage("nabuwrite", 100, 40, 0.002)
-	s.RecordUsage("nabuwrite", 50, 10, 0.001)
+	s.RecordUsage("nabuwrite", "openai", "gpt-4", 100, 40, 0.002)
+	s.RecordUsage("nabuwrite", "openai", "gpt-4", 50, 10, 0.001)
 	s.RecordDenied("nabuwrite")
 	if err := s.Persist(); err != nil {
 		t.Fatalf("Persist: %v", err)
@@ -154,11 +154,11 @@ func TestUsageSurvivesReopen(t *testing.T) {
 
 func TestDuplicateProjectNameRefused(t *testing.T) {
 	s := newStore(t)
-	if _, _, err := s.NewToken("nabuwrite", []string{"write-*"}, 0, nil); err != nil {
+	if _, _, err := s.NewToken("nabuwrite", []string{"write-*"}, 0, nil, "admin@test.com", nil); err != nil {
 		t.Fatal(err)
 	}
 	// Two tokens under one name would split that project's usage in two.
-	if _, _, err := s.NewToken("NabuWrite", []string{"write-*"}, 0, nil); err == nil {
+	if _, _, err := s.NewToken("NabuWrite", []string{"write-*"}, 0, nil, "admin@test.com", nil); err == nil {
 		t.Error("a duplicate project name was accepted")
 	}
 }

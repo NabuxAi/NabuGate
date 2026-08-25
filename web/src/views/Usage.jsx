@@ -5,17 +5,26 @@ import { faInt, faDigits } from '../data/mock.js';
 
 export default function Usage() {
   const [byProject, setByProject] = useState({});
+  const [byModel, setByModel] = useState({});
+  const [byProvider, setByProvider] = useState({});
   const [error, setError] = useState(null);
 
   const load = () =>
     api
       .usage()
-      .then((r) => setByProject(r.by_project || {}))
+      .then((r) => {
+        setByProject(r.by_project || {});
+        setByModel(r.by_model || {});
+        setByProvider(r.by_provider || {});
+      })
       .catch((e) => setError(e.message));
 
   useEffect(load, []);
 
   const rows = Object.entries(byProject).sort((a, b) => (b[1].requests || 0) - (a[1].requests || 0));
+  const modelRows = Object.entries(byModel).sort((a, b) => (b[1].requests || 0) - (a[1].requests || 0));
+  const provRows = Object.entries(byProvider).sort((a, b) => (b[1].requests || 0) - (a[1].requests || 0));
+  
   const total = rows.reduce(
     (acc, [, v]) => ({
       requests: acc.requests + (v.requests || 0),
@@ -98,34 +107,56 @@ export default function Usage() {
 
       </div>
 
-      {/* Daily Usage Chart Placeholder */}
-      <div className="card" style={{ padding: 24, minHeight: 300, display: 'flex', flexDirection: 'column', marginBottom: 24 }}>
-        <h3 style={{ fontSize: 14, margin: '0 0 24px 0' }}>روند مصرف روزانه</h3>
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-          <div style={{ fontSize: 32, marginBottom: 12, color: 'var(--ng-border)' }}>📭</div>
-          <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 8 }}>موردی یافت نشد</div>
-          <p style={{ color: 'var(--ng-muted)', fontSize: 12 }}>در این بازه مصرفی ثبت نشده است.</p>
-        </div>
-      </div>
-
-      {/* Model & Provider Placeholders */}
+      {/* Model & Provider Stats */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 24, marginBottom: 24 }}>
-        <div className="card" style={{ padding: 24, minHeight: 250, display: 'flex', flexDirection: 'column' }}>
-          <h3 style={{ fontSize: 14, margin: '0 0 24px 0' }}>مصرف به تفکیک ارائه دهنده</h3>
-          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-            <div style={{ fontSize: 32, marginBottom: 12, color: 'var(--ng-border)' }}>📭</div>
-            <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 8 }}>موردی یافت نشد</div>
-            <p style={{ color: 'var(--ng-muted)', fontSize: 12 }}>مصرفی برای ارائه‌دهندگان ثبت نشده است.</p>
+        <div className="card" style={{ padding: 0, display: 'flex', flexDirection: 'column' }}>
+          <div style={{ padding: 24, borderBottom: '1px solid var(--ng-border)' }}>
+            <h3 style={{ fontSize: 14, margin: 0 }}>مصرف به تفکیک ارائه دهنده</h3>
           </div>
+          {provRows.length === 0 ? (
+            <div style={{ flex: 1, padding: 32, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+              <div style={{ fontSize: 32, marginBottom: 12, color: 'var(--ng-border)' }}>📭</div>
+              <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 8 }}>موردی یافت نشد</div>
+            </div>
+          ) : (
+            <table className="tbl" style={{ border: 'none', margin: 0 }}>
+              <thead><tr><th>پروایدر</th><th>توکن کل</th><th>هزینه</th></tr></thead>
+              <tbody>
+                {provRows.map(([name, v]) => (
+                  <tr key={name}>
+                    <td style={{ fontWeight: 700, color: 'var(--ng-heading)' }} dir="ltr">{name}</td>
+                    <td className="mono">{faInt((v.prompt_tokens || 0) + (v.completion_tokens || 0))}</td>
+                    <td className="mono ltr">{faDigits('$' + (v.cost_usd || 0).toFixed(4))}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
         </div>
 
-        <div className="card" style={{ padding: 24, minHeight: 250, display: 'flex', flexDirection: 'column' }}>
-          <h3 style={{ fontSize: 14, margin: '0 0 24px 0' }}>مصرف به تفکیک مدل</h3>
-          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-            <div style={{ fontSize: 32, marginBottom: 12, color: 'var(--ng-border)' }}>📭</div>
-            <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 8 }}>موردی یافت نشد</div>
-            <p style={{ color: 'var(--ng-muted)', fontSize: 12 }}>مصرفی برای مدل‌ها ثبت نشده است.</p>
+        <div className="card" style={{ padding: 0, display: 'flex', flexDirection: 'column' }}>
+          <div style={{ padding: 24, borderBottom: '1px solid var(--ng-border)' }}>
+            <h3 style={{ fontSize: 14, margin: 0 }}>مصرف به تفکیک مدل</h3>
           </div>
+          {modelRows.length === 0 ? (
+            <div style={{ flex: 1, padding: 32, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+              <div style={{ fontSize: 32, marginBottom: 12, color: 'var(--ng-border)' }}>📭</div>
+              <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 8 }}>موردی یافت نشد</div>
+            </div>
+          ) : (
+            <table className="tbl" style={{ border: 'none', margin: 0 }}>
+              <thead><tr><th>مدل</th><th>توکن کل</th><th>هزینه</th></tr></thead>
+              <tbody>
+                {modelRows.map(([name, v]) => (
+                  <tr key={name}>
+                    <td style={{ fontWeight: 700, color: 'var(--ng-heading)' }} dir="ltr">{name}</td>
+                    <td className="mono">{faInt((v.prompt_tokens || 0) + (v.completion_tokens || 0))}</td>
+                    <td className="mono ltr">{faDigits('$' + (v.cost_usd || 0).toFixed(4))}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
         </div>
       </div>
 
@@ -138,8 +169,8 @@ export default function Usage() {
           <thead>
             <tr>
               <th>کلید</th>
-              <th>پسوند</th>
-              <th>توکن</th>
+              <th>توکن خروجی</th>
+              <th>توکن ورودی</th>
               <th>درخواست‌ها</th>
               <th>هزینه ارائه‌دهنده</th>
             </tr>
@@ -157,10 +188,10 @@ export default function Usage() {
             {rows.map(([name, v]) => (
               <tr key={name}>
                 <td style={{ fontWeight: 700, color: 'var(--ng-heading)' }}>{name}</td>
-                <td style={{ color: 'var(--ng-muted)' }}>-</td>
-                <td className="mono">{faInt((v.prompt_tokens || 0) + (v.completion_tokens || 0))}</td>
+                <td className="mono">{faInt(v.completion_tokens || 0)}</td>
+                <td className="mono">{faInt(v.prompt_tokens || 0)}</td>
                 <td className="mono">{faInt(v.requests || 0)}</td>
-                <td className="mono ltr">{faDigits('$' + (v.cost_usd || 0).toFixed(3))}</td>
+                <td className="mono ltr">{faDigits('$' + (v.cost_usd || 0).toFixed(4))}</td>
               </tr>
             ))}
           </tbody>

@@ -145,6 +145,8 @@ type state struct {
 	Agents   []AgentRecord        `json:"agents"`
 	Flows    []FlowRecord         `json:"flows"`
 	Usage    map[string]Counters  `json:"usage"`
+	UsageByModel map[string]Counters `json:"usage_by_model,omitempty"`
+	UsageByProv map[string]Counters `json:"usage_by_prov,omitempty"`
 	Sessions map[string]time.Time `json:"sessions"`
 	UserSessions map[string]SessionInfo `json:"user_sessions"`
 	Users map[string]*User `json:"users,omitempty"` // token hash -> expiry
@@ -162,8 +164,12 @@ type Store struct {
 // Open loads the state file, creating an empty one if it does not exist.
 func Open(path string) (*Store, error) {
 	s := &Store{path: path, st: state{
-		Usage:    map[string]Counters{},
-		Sessions: map[string]time.Time{},
+		Usage:        map[string]Counters{},
+		UsageByModel: map[string]Counters{},
+		UsageByProv:  map[string]Counters{},
+		Sessions:     map[string]time.Time{},
+		UserSessions: map[string]SessionInfo{},
+		Users:        map[string]*User{},
 	}}
 
 	raw, err := os.ReadFile(path)
@@ -183,8 +189,20 @@ func Open(path string) (*Store, error) {
 	if s.st.Usage == nil {
 		s.st.Usage = map[string]Counters{}
 	}
+	if s.st.UsageByModel == nil {
+		s.st.UsageByModel = map[string]Counters{}
+	}
+	if s.st.UsageByProv == nil {
+		s.st.UsageByProv = map[string]Counters{}
+	}
 	if s.st.Sessions == nil {
 		s.st.Sessions = map[string]time.Time{}
+	}
+	if s.st.UserSessions == nil {
+		s.st.UserSessions = map[string]SessionInfo{}
+	}
+	if s.st.Users == nil {
+		s.st.Users = map[string]*User{}
 	}
 	s.purgeExpiredLocked()
 	return s, nil
@@ -615,7 +633,7 @@ func (s *Store) SetOrigins(name string, origins []string) error {
 // RecordUsage accumulates one call against a project. Kept in memory and
 // flushed by Persist, because a disk write per request would dominate the cost
 // of a cheap completion.
-func (s *Store) RecordUsage(project string, prompt, completion int64, cost float64) {
+func (s *Store) RecordUsage(project, prov, model string, prompt, completion int64, cost float64) {
 	if project == "" {
 		project = "(admin)"
 	}
@@ -628,6 +646,20 @@ func (s *Store) RecordUsage(project string, prompt, completion int64, cost float
 	c.CompletionTokens += completion
 	c.CostUSD += cost
 	s.st.Usage[project] = c
+
+	cm := s.st.UsageByModel[model]
+	cm.Requests++
+	cm.PromptTokens += prompt
+	cm.CompletionTokens += completion
+	cm.CostUSD += cost
+	s.st.UsageByModel[model] = cm
+
+	cp := s.st.UsageByProv[prov]
+	cp.Requests++
+	cp.PromptTokens += prompt
+	cp.CompletionTokens += completion
+	cp.CostUSD += cost
+	s.st.UsageByProv[prov] = cp
 
 	for i := range s.st.Tokens {
 		if strings.EqualFold(s.st.Tokens[i].Name, project) {
@@ -653,14 +685,22 @@ func (s *Store) RecordDenied(project string) {
 }
 
 // Usage returns the persisted counters per project.
-func (s *Store) Usage() map[string]Counters {
+func (s *Store) Usage() (map[string]Counters, map[string]Counters, map[string]Counters) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	out := make(map[string]Counters, len(s.st.Usage))
 	for k, v := range s.st.Usage {
 		out[k] = v
 	}
-	return out
+	outM := make(map[string]Counters, len(s.st.UsageByModel))
+	for k, v := range s.st.UsageByModel {
+		outM[k] = v
+	}
+	outP := make(map[string]Counters, len(s.st.UsageByProv))
+	for k, v := range s.st.UsageByProv {
+		outP[k] = v
+	}
+	return out, outM, outP
 }
 
 // ResetUsage clears the counters for one project, or all of them when name is
@@ -670,6 +710,8 @@ func (s *Store) ResetUsage(name string) error {
 	defer s.mu.Unlock()
 	if name == "" {
 		s.st.Usage = map[string]Counters{}
+		s.st.UsageByModel = map[string]Counters{}
+		s.st.UsageByProv = map[string]Counters{}
 	} else {
 		delete(s.st.Usage, name)
 	}

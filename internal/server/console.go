@@ -454,7 +454,12 @@ func (s *Server) patchToken(w http.ResponseWriter, r *http.Request) {
 // tracker behind /v1/usage resets to zero on every redeploy, which made the
 // console look like nothing had ever run.
 func (s *Server) consoleUsage(w http.ResponseWriter, _ *http.Request) {
-	writeJSON(w, http.StatusOK, map[string]any{"by_project": s.admin.Usage()})
+	byProj, byModel, byProv := s.admin.Usage()
+	writeJSON(w, http.StatusOK, map[string]any{
+		"by_project": byProj,
+		"by_model": byModel,
+		"by_provider": byProv,
+	})
 }
 
 func (s *Server) resetUsage(w http.ResponseWriter, r *http.Request) {
@@ -600,12 +605,13 @@ func (s *Server) consoleOverview(w http.ResponseWriter, r *http.Request) {
 	// in the deployment's environment and the gateway never sees them in a form
 	// worth showing — and a console that displayed keys would be a console worth
 	// stealing.
+	byProj, _, _ := s.admin.Usage()
 	writeJSON(w, http.StatusOK, map[string]any{
 		"providers":   providers,
 		"aliases":     aliases,
 		"agents":      s.agents.Names(),
 		"config_keys": s.policy.Projects(),
-		"usage":       s.admin.Usage(),
+		"usage":       byProj,
 	})
 }
 

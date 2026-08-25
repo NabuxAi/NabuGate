@@ -1,0 +1,78 @@
+--- internal/adminstore/store.go
++++ internal/adminstore/store.go
+@@ -194,6 +194,12 @@
+ 	if s.st.Usage == nil {
+ 		s.st.Usage = make(map[string]Counters)
+ 	}
++	if s.st.UsageByModel == nil {
++		s.st.UsageByModel = make(map[string]Counters)
++	}
++	if s.st.UsageByProv == nil {
++		s.st.UsageByProv = make(map[string]Counters)
++	}
+ 	if s.st.Users == nil {
+ 		s.st.Users = make(map[string]*User)
+ 	}
+@@ -617,7 +623,7 @@
+ 
+ // RecordUsage accumulates one call against a project. Kept in memory and
+ // flushed periodically.
+-func (s *Store) RecordUsage(project string, prompt, completion int64, cost float64) {
++func (s *Store) RecordUsage(project, prov, model string, prompt, completion int64, cost float64) {
+ 	if project == "" {
+ 		project = "(admin)"
+ 	}
+@@ -632,6 +638,20 @@
+ 	c.CostUSD += cost
+ 	s.st.Usage[project] = c
+ 
++	cm := s.st.UsageByModel[model]
++	cm.Requests++
++	cm.PromptTokens += prompt
++	cm.CompletionTokens += completion
++	cm.CostUSD += cost
++	s.st.UsageByModel[model] = cm
++
++	cp := s.st.UsageByProv[prov]
++	cp.Requests++
++	cp.PromptTokens += prompt
++	cp.CompletionTokens += completion
++	cp.CostUSD += cost
++	s.st.UsageByProv[prov] = cp
++
+ 	for i := range s.st.Tokens {
+ 		if strings.EqualFold(s.st.Tokens[i].Name, project) {
+ 			s.st.Tokens[i].LastUsed = time.Now().UTC()
+@@ -677,15 +697,23 @@
+ 
+ // Usage returns a snapshot of the usage counters per project.
+-func (s *Store) Usage() map[string]Counters {
++func (s *Store) Usage() (map[string]Counters, map[string]Counters, map[string]Counters) {
+ 	s.mu.RLock()
+ 	defer s.mu.RUnlock()
+ 	out := make(map[string]Counters, len(s.st.Usage))
+ 	for k, v := range s.st.Usage {
+ 		out[k] = v
+ 	}
+-	return out
++	outM := make(map[string]Counters, len(s.st.UsageByModel))
++	for k, v := range s.st.UsageByModel {
++		outM[k] = v
++	}
++	outP := make(map[string]Counters, len(s.st.UsageByProv))
++	for k, v := range s.st.UsageByProv {
++		outP[k] = v
++	}
++	return out, outM, outP
+ }
+ 
+ // ResetUsage clears the counters for one project, or all of them when name is
+@@ -695,6 +723,8 @@
+ 	defer s.mu.Unlock()
+ 	if name == "" {
+ 		s.st.Usage = map[string]Counters{}
++		s.st.UsageByModel = map[string]Counters{}
++		s.st.UsageByProv = map[string]Counters{}
+ 	} else {
+ 		delete(s.st.Usage, name)
+ 	}
