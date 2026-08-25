@@ -35,6 +35,8 @@ async function req(path, options = {}) {
 // ---- session ----------------------------------------------------------------
 
 export const status = () => req('/status');
+export const statusNabu = () => req("/nabu/status");
+
 
 export const setup = (username, password) =>
   req('/setup', { method: 'POST', body: JSON.stringify({ username, password }) });
