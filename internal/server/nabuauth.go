@@ -104,6 +104,7 @@ type consoleNabuFlow struct {
 	State    string `json:"s"`
 	Verifier string `json:"v"`
 	Expires  int64  `json:"e"`
+	ReturnTo string `json:"r"`
 }
 
 // signFlow authenticates the flow cookie. Without a signature a visitor could
@@ -174,8 +175,13 @@ func (s *Server) consoleNabuStart(w http.ResponseWriter, r *http.Request) {
 	state, verifier := b64u(buf[:32]), b64u(buf[32:])
 	sum := sha256.Sum256([]byte(verifier))
 
+	returnTo := "/panel/"
+	if strings.Contains(r.Referer(), "/admin") {
+		returnTo = "/admin/"
+	}
+
 	cookieValue, err := cfg.packFlow(consoleNabuFlow{
-		State: state, Verifier: verifier, Expires: time.Now().Add(consoleNabuFlowTTL).Unix(),
+		State: state, Verifier: verifier, Expires: time.Now().Add(consoleNabuFlowTTL).Unix(), ReturnTo: returnTo,
 	})
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "could not start sign-in")
@@ -202,6 +208,9 @@ func (s *Server) consoleNabuStart(w http.ResponseWriter, r *http.Request) {
 		"state":                 {state},
 		"code_challenge":        {b64u(sum[:])},
 		"code_challenge_method": {"S256"},
+	}
+	if p := r.URL.Query().Get("provider"); p != "" {
+		q.Set("provider", p)
 	}
 	http.Redirect(w, r, cfg.URL+"/oauth/authorize?"+q.Encode(), http.StatusFound)
 }
@@ -271,7 +280,12 @@ func (s *Server) consoleNabuCallback(w http.ResponseWriter, r *http.Request) {
 		Expires:  expiry,
 		MaxAge:   int(time.Until(expiry).Seconds()),
 	})
-	http.Redirect(w, r, "/admin/", http.StatusFound)
+
+	dest := flow.ReturnTo
+	if dest == "" {
+		dest = "/panel/"
+	}
+	http.Redirect(w, r, dest, http.StatusFound)
 }
 
 func requestIsHTTPS(r *http.Request) bool {
