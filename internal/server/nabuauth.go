@@ -209,10 +209,11 @@ func (s *Server) consoleNabuStart(w http.ResponseWriter, r *http.Request) {
 		"code_challenge":        {b64u(sum[:])},
 		"code_challenge_method": {"S256"},
 	}
+	targetURL := cfg.URL + "/oauth/authorize?" + q.Encode()
 	if p := r.URL.Query().Get("provider"); p != "" {
-		q.Set("provider", p)
+		targetURL = cfg.URL + "/login/" + url.PathEscape(p) + "?next=" + url.QueryEscape("/oauth/authorize?"+q.Encode())
 	}
-	http.Redirect(w, r, cfg.URL+"/oauth/authorize?"+q.Encode(), http.StatusFound)
+	http.Redirect(w, r, targetURL, http.StatusFound)
 }
 
 // consoleNabuCallback handles the redirect back from NabuAuth.
