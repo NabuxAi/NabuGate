@@ -10,7 +10,7 @@ export default function Sidebar({ current, onNavigate, effectivelyAdmin, isPanel
         <div className="brand-mark" aria-hidden="true">✨</div>
         <div style={{ minWidth: 0, display: 'flex', flexDirection: 'column', gap: 4 }}>
           <div className="brand-name">NabuGate</div>
-          <span style={{ fontSize: 10, background: effectivelyAdmin ? 'var(--ng-danger)' : 'var(--ng-success)', color: effectivelyAdmin ? 'var(--ng-bg)' : 'var(--ng-bg)', padding: '2px 6px', borderRadius: 10, width: 'fit-content' }}>
+          <span style={{ fontSize: 10, background: effectivelyAdmin ? 'var(--ng-danger-bg)' : 'var(--ng-success-bg)', color: effectivelyAdmin ? 'var(--ng-danger-text)' : 'var(--ng-success-text)', padding: '2px 6px', borderRadius: 10, width: 'fit-content' }}>
             {effectivelyAdmin ? 'مدیریت کل' : 'پنل کاربری'}
           </span>
         </div>
