@@ -165,7 +165,7 @@ export default function Agents() {
       }
     >
       {error && <div className="banner-error" style={{ marginBottom: '16px' }}>{error}</div>}
-      {success && <div className="banner-success" style={{ marginBottom: '16px', background: '#052e16', border: '1px solid #16a34a', color: '#86efac', padding: '12px 16px', borderRadius: '8px' }}>{success}</div>}
+      {success && <div className="banner-success" style={{ marginBottom: '16px', background: 'var(--ng-success-bg)', border: '1px solid var(--ng-success)', color: 'var(--ng-success-text)', padding: '12px 16px', borderRadius: '8px' }}>{success}</div>}
 
       <div className="tabs-container">
         <div
@@ -252,7 +252,7 @@ export default function Agents() {
                   </button>
                   <button
                     className="btn btn-ghost"
-                    style={{ color: '#ef4444', borderColor: 'transparent' }}
+                    style={{ color: 'var(--ng-danger)', borderColor: 'transparent' }}
                     onClick={() => handleDeleteAgent(a.name)}
                     title="حذف"
                   >
@@ -281,7 +281,7 @@ export default function Agents() {
                   <strong style={{ fontSize: '11.5px', color: 'var(--ng-slate-700)' }}>مراحل (Steps):</strong>
                   {f.steps?.map((st, i) => (
                     <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12.5px' }}>
-                      <span style={{ width: '20px', height: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--ng-accent)', color: '#fff', borderRadius: '50%', fontSize: '11px', fontWeight: 'bold' }}>{i + 1}</span>
+                      <span style={{ width: '20px', height: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--ng-accent)', color: 'white', borderRadius: '50%', fontSize: '11px', fontWeight: 'bold' }}>{i + 1}</span>
                       <span className="mono" style={{ color: 'var(--ng-heading)', fontWeight: '600' }}>{st.agent}</span>
                       {st.label && <span style={{ color: 'var(--ng-muted)', fontSize: '11px' }}>({st.label})</span>}
                     </div>
@@ -309,7 +309,7 @@ export default function Agents() {
                 </button>
                 <button
                   className="btn btn-ghost"
-                  style={{ color: '#ef4444', borderColor: 'transparent' }}
+                  style={{ color: 'var(--ng-danger)', borderColor: 'transparent' }}
                   onClick={() => handleDeleteFlow(f.name)}
                 >
                   🗑️
@@ -384,7 +384,7 @@ export default function Agents() {
             <div style={{ marginTop: '32px', borderTop: '1px solid var(--ng-border-faint)', paddingTop: '24px', animation: 'fadeIn 0.4s ease-out' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
                 <h4 style={{ margin: 0, color: 'var(--ng-heading)', fontSize: '15px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span style={{ color: 'var(--ng-ok-text)' }}>●</span> پاسخ دریافتی:
+                  <span style={{ color: 'var(--ng-success-text)' }}>●</span> پاسخ دریافتی:
                 </h4>
                 <button
                   className="btn btn-ghost"
@@ -542,7 +542,7 @@ export default function Agents() {
                       <button
                         type="button"
                         className="btn btn-ghost"
-                        style={{ padding: '8px', color: '#ef4444' }}
+                        style={{ padding: '8px', color: 'var(--ng-danger)' }}
                         onClick={() => {
                           const newSteps = editingFlow.steps.filter((_, idx) => idx !== i);
                           setEditingFlow({ ...editingFlow, steps: newSteps });

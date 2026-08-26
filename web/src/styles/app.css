@@ -61,7 +61,7 @@ button { font-family: inherit; }
   border-radius: var(--ng-radius);
   display: grid;
   place-items: center;
-  color: #fff;
+  color: var(--ng-bg, #fff);
   background: var(--ng-brand-grad);
   box-shadow: var(--ng-shadow-brand);
   font-size: 18px;
@@ -144,18 +144,18 @@ button { font-family: inherit; }
   transition: transform var(--ng-dur) var(--ng-ease), background var(--ng-dur) var(--ng-ease);
 }
 .btn:active { transform: translateY(0); }
-.btn-primary { color: #fff; background: var(--ng-accent); box-shadow: var(--ng-shadow-btn); }
+.btn-primary { color: var(--ng-bg, #fff); background: var(--ng-accent); box-shadow: var(--ng-shadow-btn); }
 .btn-primary:hover { background: var(--ng-accent-strong); transform: translateY(-2px); }
 .btn-ghost {
   min-height: 32px;
   padding: 6px 10px;
   font-size: 11.5px;
-  color: #1f2937;
+  color: var(--ng-heading);
   background: var(--ng-surface-soft);
   border: 1px solid var(--ng-info-border);
   box-shadow: none;
 }
-.btn-ghost:hover { background: #eef3fb; }
+.btn-ghost:hover { background: var(--ng-faint); }
 
 /* ---- Badges / pills ---- */
 .pill {
@@ -191,9 +191,9 @@ button { font-family: inherit; }
   border-radius: var(--ng-radius-sm);
   padding: 2px 7px;
   font-size: 10.5px;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--ng-border);
   background: var(--ng-surface);
-  color: #64748b;
+  color: var(--ng-muted);
   white-space: nowrap;
 }
 .tag-primary { border-color: var(--ng-info-border); background: var(--ng-info-surface); color: var(--ng-info-text); font-weight: 700; }
@@ -297,7 +297,7 @@ button { font-family: inherit; }
   color: var(--ng-muted);
   border-bottom: 1px solid var(--ng-border-faint);
 }
-.tbl tbody td { padding: 9px 8px; border-bottom: 1px solid #f6f8fc; vertical-align: middle; }
+.tbl tbody td { padding: 9px 8px; border-bottom: 1px solid var(--ng-border-faint); vertical-align: middle; }
 .tbl tbody tr:last-child td { border-bottom: none; }
 .tbl .alias { color: var(--ng-heading); font-size: 12.5px; font-weight: 700; }
 .chain { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; }
@@ -309,7 +309,7 @@ button { font-family: inherit; }
   border: 1px solid var(--ng-pass-border);
   background: var(--ng-pass-surface);
   padding: 13px 15px;
-  color: #5b21b6;
+  color: var(--ng-accent);
   font-size: 12px;
   line-height: 1.7;
 }
@@ -392,11 +392,11 @@ button { font-family: inherit; }
 .signin-field input {
   display: block; width: 100%; margin-top: 0.35rem; padding: 0.55rem 0.7rem;
   font: inherit; font-size: 0.9rem;
-  color: var(--ng-heading); background: var(--ng-bg, #fff);
+  color: var(--ng-heading); background: var(--ng-bg, var(--ng-bg, #fff));
   border: 1px solid var(--ng-border, #e3e3e3); border-radius: 8px;
 }
 .signin-hint { display: block; margin-top: 0.3rem; font-size: 0.7rem; line-height: 1.8; color: var(--ng-muted); }
-.signin-error { margin: 0 0 0.9rem; font-size: 0.8rem; color: #c53030; }
+.signin-error { margin: 0 0 0.9rem; font-size: 0.8rem; color: var(--ng-danger-text, #c53030); }
 .signin-submit { width: 100%; }
 
 /* ── modals ───────────────────────────────────────────────────────────────── */
@@ -415,10 +415,10 @@ button { font-family: inherit; }
 .token-secret {
   margin: 0.75rem 0 0; padding: 0.85rem;
   font-size: 0.85rem; word-break: break-all; white-space: pre-wrap;
-  background: var(--ng-faint, #f4f4f5); border-radius: 8px;
+  background: var(--ng-faint, var(--ng-faint)); border-radius: 8px;
 }
 
-.banner-error { margin-bottom: 14px; padding: 12px 14px; color: #c53030; }
+.banner-error { margin-bottom: 14px; padding: 12px 14px; color: var(--ng-danger-text, #c53030); }
 
 /* ---- Form Controls ---- */
 .label {
@@ -882,7 +882,7 @@ select.input {
 }
 
 .text-gradient {
-  background: linear-gradient(135deg, #fff, #9ca3af);
+  background: linear-gradient(135deg, var(--ng-bg, #fff), #9ca3af);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }
