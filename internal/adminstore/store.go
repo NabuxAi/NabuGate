@@ -873,7 +873,7 @@ func (s *Store) AddPayment(email string, amount float64, status string, id strin
 func (s *Store) SignupUser(email, password string) error {
 	email = strings.TrimSpace(strings.ToLower(email))
 	if email == "" || password == "" {
-		return errors.New("ایمیل یا رمز عبور نامعتبر است")
+		return errors.New("email or password is invalid")
 	}
 
 	s.mu.Lock()
@@ -883,7 +883,7 @@ func (s *Store) SignupUser(email, password string) error {
 		s.st.Users = make(map[string]*User)
 	}
 	if _, exists := s.st.Users[email]; exists {
-		return errors.New("کاربری با این ایمیل قبلاً ثبت نام کرده است")
+		return errors.New("an account with this email already exists")
 	}
 
 	salt := make([]byte, saltLen)
@@ -903,6 +903,56 @@ func (s *Store) SignupUser(email, password string) error {
 	}
 	s.save()
 	return nil
+}
+
+// ChangeUserPassword replaces a user's password, proving the current one first.
+//
+// Every session and every stored credential survives except the password
+// itself: an account holder changing their password on their own machine is a
+// routine act, not a compromise, and signing them out of their other tabs would
+// train them not to do it. An operator who needs the other behaviour revokes
+// sessions explicitly.
+func (s *Store) ChangeUserPassword(email, current, next string) error {
+	email = strings.TrimSpace(strings.ToLower(email))
+	if len(next) < 8 {
+		return errors.New("the new password must be at least 8 characters")
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	found := s.st.Users[email]
+	if found == nil || found.Salt == "" || found.Hash == "" {
+		// An account signed in through single sign-on has no stored password to
+		// replace, and saying so is more useful than "wrong password" — the
+		// caller would otherwise keep trying passwords that cannot exist.
+		return errors.New("this account has no password to change")
+	}
+
+	salt, _ := base64.RawStdEncoding.DecodeString(found.Salt)
+	storedHash, _ := base64.RawStdEncoding.DecodeString(found.Hash)
+	key, err := pbkdf2.Key(sha256.New, current, salt, pbkdfIterations, pbkdfKeyLen)
+	if err != nil {
+		return err
+	}
+	if subtle.ConstantTimeCompare(key, storedHash) != 1 {
+		return ErrBadCredentials
+	}
+
+	// A fresh salt, not the old one: reusing it would leave the two hashes
+	// comparable, so anyone holding a copy of the old record could tell whether
+	// the password had actually changed.
+	newSalt := make([]byte, saltLen)
+	if _, err := rand.Read(newSalt); err != nil {
+		return err
+	}
+	newHash, err := pbkdf2.Key(sha256.New, next, newSalt, pbkdfIterations, pbkdfKeyLen)
+	if err != nil {
+		return err
+	}
+	found.Salt = base64.RawStdEncoding.EncodeToString(newSalt)
+	found.Hash = base64.RawStdEncoding.EncodeToString(newHash)
+	return s.save()
 }
 
 func (s *Store) AuthenticateUser(email, password string) (string, time.Time, error) {
@@ -938,7 +988,13 @@ func (s *Store) AuthenticateUser(email, password string) (string, time.Time, err
 	if s.st.UserSessions == nil {
 		s.st.UserSessions = make(map[string]SessionInfo)
 	}
-	s.st.UserSessions[token] = SessionInfo{
+	// Keyed by the hash, as Authenticate and NewSession already were, and as
+	// ValidSession has always read. Stored raw, this did two things at once: no
+	// account that signed in through this path could stay signed in, because
+	// the lookup hashed a token the write had not; and the live session token
+	// itself was written to the state file, so a copy of that file was a set of
+	// working sessions rather than a set of useless hashes.
+	s.st.UserSessions[hashString(token)] = SessionInfo{
 		Expiry:  expiry,
 		Email:   email,
 		IsAdmin: false,

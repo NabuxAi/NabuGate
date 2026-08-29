@@ -47,6 +47,7 @@ func (s *Server) mountConsoleAPI(mux *http.ServeMux) {
 	mux.Handle("GET /api/me", s.consoleAuth(s.getMe))
 	mux.Handle("POST /api/me/recharge", s.consoleAuth(s.rechargeMe))
 	mux.Handle("GET /api/me/usage", s.consoleAuth(s.accountUsage))
+	mux.Handle("POST /api/me/password", s.consoleAuth(s.changeMyPassword))
 	mux.Handle("POST /api/tokens", s.consoleAuth(s.createToken))
 	mux.Handle("DELETE /api/tokens/{name}", s.consoleAuth(s.deleteToken))
 	mux.Handle("PATCH /api/tokens/{name}", s.consoleAuth(s.patchToken))
@@ -556,13 +557,55 @@ func cleanList(in []string) []string {
 // gateway that did not exist — providers that were never keyed, aliases that had
 // been renamed. Everything here is read from the live router.
 
+// accountView is what /api/me answers with. It exists so the handler cannot
+// answer with adminstore.User, whose Salt and Hash fields carry json tags and
+// were therefore being serialised straight to the browser — a password hash and
+// its salt handed to every signed-in page, and to anything that could read one
+// response. Listing the fields here means a field added to the stored user is
+// not published by default; it has to be named.
+type accountView struct {
+	Email    string               `json:"email"`
+	Name     string               `json:"name"`
+	Balance  float64              `json:"balance"`
+	Payments []adminstore.Payment `json:"payments,omitempty"`
+}
+
 func (s *Server) getMe(w http.ResponseWriter, r *http.Request) {
 	email, _ := r.Context().Value(consoleEmailCtxKey{}).(string)
 	user := s.admin.GetUser(email)
 	if user == nil {
-		user = &adminstore.User{Email: email, Balance: 0}
+		user = &adminstore.User{Email: email}
 	}
-	writeJSON(w, http.StatusOK, user)
+	writeJSON(w, http.StatusOK, accountView{
+		Email:    user.Email,
+		Name:     user.Name,
+		Balance:  user.Balance,
+		Payments: user.Payments,
+	})
+}
+
+// changeMyPassword changes the caller's own password. The current one is
+// required: a stolen session cookie should not be enough to lock the owner out
+// of their own account, which is exactly what a change that only needed the
+// cookie would allow.
+func (s *Server) changeMyPassword(w http.ResponseWriter, r *http.Request) {
+	email, _ := r.Context().Value(consoleEmailCtxKey{}).(string)
+	var req struct {
+		Current string `json:"current"`
+		New     string `json:"new"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	if err := s.admin.ChangeUserPassword(email, req.Current, req.New); err != nil {
+		// One sentence for a wrong current password and for a new one that is
+		// too short would be unhelpful, but neither reveals anything the caller
+		// does not already know: they are signed in as this account.
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (s *Server) rechargeMe(w http.ResponseWriter, r *http.Request) {
@@ -678,8 +721,21 @@ func (s *Server) listUsers(w http.ResponseWriter, _ *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]any{"users": []any{}})
 		return
 	}
+	// Projected through accountView for the same reason /api/me is: ListUsers
+	// hands back the stored records, whose Salt and Hash are tagged for JSON.
+	// Being an administrator is a reason to see who holds an account and what
+	// they have spent, not a reason to be handed everyone's password hash.
 	users := s.admin.ListUsers()
-	writeJSON(w, http.StatusOK, map[string]any{"users": users})
+	view := make([]accountView, 0, len(users))
+	for _, u := range users {
+		view = append(view, accountView{
+			Email:    u.Email,
+			Name:     u.Name,
+			Balance:  u.Balance,
+			Payments: u.Payments,
+		})
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"users": view})
 }
 
 func (s *Server) adminRechargeUser(w http.ResponseWriter, r *http.Request) {

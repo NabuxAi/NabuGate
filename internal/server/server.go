@@ -142,7 +142,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /v1/embeddings", s.auth(s.handleEmbeddings))
 	mux.HandleFunc("GET /v1/usage", s.auth(s.handleUsage))
 	mux.HandleFunc("GET /v1/photos/search", s.auth(s.handlePhotoSearch))
-	
+
 	if assets, ok := web.Assets(); ok {
 		fileServer := http.FileServer(http.FS(assets))
 		mux.Handle("GET /", spaFileServer(assets, fileServer))
@@ -151,7 +151,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/public/models", func(w http.ResponseWriter, r *http.Request) {
 		infos := s.router.AliasInfos()
 		infos = append(infos, s.router.CatalogModels(r.Context())...)
-		
+
 		names := make([]string, 0, len(infos))
 		for _, info := range infos {
 			names = append(names, info.ID)

@@ -240,7 +240,6 @@ func (s *Server) consoleNabuCallback(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, dest+"?nabu_error="+url.QueryEscape(reason), http.StatusFound)
 	}
 
-	
 	cookie, err := r.Cookie(consoleNabuFlowCookie)
 	var flow consoleNabuFlow
 	var dest string
@@ -261,7 +260,7 @@ func (s *Server) consoleNabuCallback(w http.ResponseWriter, r *http.Request) {
 		fail("expired", dest)
 		return
 	}
-	
+
 	// A callback whose state was not issued here did not start in this browser,
 	// so the code in it is not ours to redeem.
 	if dest == "" || !hmac.Equal([]byte(flow.State), []byte(r.URL.Query().Get("state"))) {
@@ -275,7 +274,7 @@ func (s *Server) consoleNabuCallback(w http.ResponseWriter, r *http.Request) {
 		fail("failed", dest)
 		return
 	}
-	
+
 	email := strings.ToLower(profile.Email)
 	isAdmin := cfg.Admins[email]
 

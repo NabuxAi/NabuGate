@@ -15,13 +15,12 @@ import Agents from './views/Agents.jsx';
 import Users from './views/Users.jsx';
 import Profile from "./views/Profile.jsx";
 import Payments from "./views/Payments.jsx";
-import Placeholder from './views/Placeholder.jsx';
 import Integration from './views/Integration.jsx';
 import Account from './views/Account.jsx';
 import Plans from './views/Plans.jsx';
-import Teams from './views/Teams.jsx';
 import Landing from './views/Landing.jsx';
 import Docs from './views/Docs.jsx';
+import Security from './views/Security.jsx';
 
 const VIEWS = {
   landing: () => <Landing lang={window.location.pathname.startsWith('/fa') ? 'fa' : 'en'} />,
@@ -38,24 +37,9 @@ const VIEWS = {
   integration: () => <Integration />,
   account: () => <Account />,
   plans: () => <Plans />,
-  teams: () => <Teams />,
-  subscriptions: () => <Placeholder title="اشتراک‌ها" subtitle="مدیریت اشتراک‌های فعال شما" icon="💼" />,
-  requests: () => <Placeholder title="درخواست‌ها" subtitle="گزارش درخواست‌های ارسالی به API" icon="📄" />,
-  invitations: () => <Placeholder title="دعوت‌نامه‌ها" subtitle="دعوت‌نامه‌های ارسالی و دریافتی" icon="✉️" />,
   payments: () => <Payments />,
-  referrals: () => <Placeholder title="دعوت دوستان" subtitle="لینک دعوت و پاداش‌ها" icon="🎁" />,
   profile: () => <Profile />,
-  security: () => <Placeholder title="امنیت" subtitle="تنظیمات امنیتی و رمز عبور" icon="🛡️" />,
-  support: () => <Placeholder title="پشتیبانی" subtitle="تیکت‌ها و ارتباط با پشتیبانی" icon="⚙️" />,
-  help: () => <Placeholder title="راهنما" subtitle="مستندات و آموزش‌ها" icon="❓" />,
-  logs: () => (
-    <Placeholder
-      title="لاگ‌ها"
-      subtitle="لاگ‌های ساخت‌یافتهٔ JSON: تأخیر، توکن، هزینه، وضعیت"
-      icon="➤"
-      body="نمایش لاگ‌های زندهٔ دروازه به‌زودی در این نما اضافه می‌شود."
-    />
-  ),
+  security: () => <Security />,
 };
 
 function viewFromPath() {
@@ -113,9 +97,14 @@ export default function App() {
   }
 
   // Determine allowed views based on whether they are in /panel/ or /admin/
+  // Every id here has a sidebar entry in navGroups, and every navGroups entry
+  // is here. The two lists drifted apart before: eleven views were routable
+  // with nothing linking to them, and the views that had no data behind them
+  // rendered an apology.
   let allowed = [
-    'dashboard', 'integration', 'tokens', 'account', 'plans', 'teams',
-    'subscriptions', 'requests', 'invitations', 'payments', 'referrals', 'profile', 'security', 'support', 'help'
+    'dashboard', 'account', 'plans', 'payments',
+    'tokens', 'models', 'integration', 'docs',
+    'profile', 'security',
   ];
 
   const effectivelyAdmin = isAdminPath && session.is_admin;

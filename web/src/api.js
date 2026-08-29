@@ -151,5 +151,23 @@ export const patchToken = (name, allowedOrigins, providers) =>
 export const getMe = () => req('/me');
 export const rechargeMe = (amount) => req('/me/recharge', { method: 'POST', body: JSON.stringify({ amount: Number(amount) }) });
 
-export const listUsers = () => get('/api/users');
-export const adminRechargeUser = (email, amount) => post('/api/users/recharge', { email, amount: Number(amount) });
+// Both of these called get()/post(), which this module has never defined, and
+// doubled the /api prefix that req() already adds. Every admin user screen
+// threw a ReferenceError before it could render a row.
+export const listUsers = () => req('/users');
+
+export const adminRechargeUser = (email, amount) =>
+  req('/users/recharge', {
+    method: 'POST',
+    body: JSON.stringify({ email, amount: Number(amount) }),
+  });
+
+// ---- the signed-in account -------------------------------------------------
+
+export const myUsage = () => req('/me/usage');
+
+export const changeMyPassword = (current, next) =>
+  req('/me/password', {
+    method: 'POST',
+    body: JSON.stringify({ current, new: next }),
+  });

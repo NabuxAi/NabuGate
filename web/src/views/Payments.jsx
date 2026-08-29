@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import Layout from '../components/Layout.jsx';
 import * as api from '../api.js';
+import { usd } from '../data/mock.js';
 
 export default function Payments() {
   const [user, setUser] = useState(null);
@@ -18,7 +19,7 @@ export default function Payments() {
   const sorted = [...payments].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 
   return (
-    <Layout title="تاریخچه پرداخت‌ها" subtitle="لیست شارژهای انجام شده با NabuPay">
+    <Layout title="تاریخچه پرداخت‌ها" subtitle="شارژهای انجام‌شدهٔ حساب">
       {error && <div className="card banner-error">{error}</div>}
 
       <div className="card">
@@ -32,7 +33,7 @@ export default function Payments() {
             <thead>
               <tr>
                 <th style={{ padding: '12px', borderBottom: '1px solid var(--ng-border)' }}>شناسه تراکنش</th>
-                <th style={{ padding: '12px', borderBottom: '1px solid var(--ng-border)' }}>مبلغ (تومان)</th>
+                <th style={{ padding: '12px', borderBottom: '1px solid var(--ng-border)' }}>مبلغ</th>
                 <th style={{ padding: '12px', borderBottom: '1px solid var(--ng-border)' }}>وضعیت</th>
                 <th style={{ padding: '12px', borderBottom: '1px solid var(--ng-border)' }}>تاریخ</th>
               </tr>
@@ -42,14 +43,16 @@ export default function Payments() {
                 <tr key={p.id}>
                   <td style={{ padding: '12px', borderBottom: '1px solid var(--ng-border)', fontFamily: 'monospace' }}>{p.id}</td>
                   <td style={{ padding: '12px', borderBottom: '1px solid var(--ng-border)', fontWeight: 700 }}>
-                    {p.amount.toLocaleString('fa-IR')}
+                    {usd(p.amount)}
                   </td>
                   <td style={{ padding: '12px', borderBottom: '1px solid var(--ng-border)' }}>
-                    {p.status === 'success' ? (
-                      <span style={{ fontSize: 11, background: 'var(--ng-ok-soft)', color: 'var(--ng-ok-text)', padding: '2px 8px', borderRadius: 12 }}>موفق</span>
-                    ) : (
-                      <span style={{ fontSize: 11, background: 'var(--ng-error-soft)', color: 'var(--ng-error-text)', padding: '2px 8px', borderRadius: 12 }}>ناموفق</span>
-                    )}
+                    {/* --ng-ok-soft and --ng-error-soft are not tokens this
+                        theme defines, so both badges used to render with no
+                        background — a failed payment looked like a successful
+                        one in everything but the word. */}
+                    <span className={'badge ' + (p.status === 'success' ? 'badge-pass' : 'badge-fail')} style={{ fontSize: 11 }}>
+                      {p.status === 'success' ? 'موفق' : 'ناموفق'}
+                    </span>
                   </td>
                   <td style={{ padding: '12px', borderBottom: '1px solid var(--ng-border)' }} dir="ltr">
                     {new Date(p.created_at).toLocaleString('fa-IR')}

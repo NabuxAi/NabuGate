@@ -3,6 +3,7 @@ import { navigate } from "../nav.js";
 import { useEffect, useState } from 'react';
 import Layout from '../components/Layout.jsx';
 import * as api from '../api.js';
+import { usd } from '../data/mock.js';
 
 export default function Profile() {
   const [user, setUser] = useState(null);
@@ -37,8 +38,7 @@ export default function Profile() {
             <div>
               <label style={{ display: 'block', fontSize: 13, color: 'var(--ng-muted)', marginBottom: 6 }}>موجودی حساب</label>
               <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <input type="text" className="input" value={balance.toLocaleString('fa-IR')} readOnly style={{ width: 150, fontWeight: 700 }} />
-                <span style={{ fontSize: 13, color: 'var(--ng-muted)' }}>تومان</span>
+                <input type="text" className="input" value={usd(balance)} readOnly style={{ width: 150, fontWeight: 700 }} dir="ltr" />
                 <button className="btn btn-primary" style={{ marginRight: 'auto' }} onClick={() => navigate('plans')}>
                   شارژ حساب
                 </button>
@@ -47,8 +47,14 @@ export default function Profile() {
             
             <div>
               <label style={{ display: 'block', fontSize: 13, color: 'var(--ng-muted)', marginBottom: 6 }}>رمز عبور و امنیت</label>
+              {/* This used to state flatly that the visitor had signed in
+                  through NabuAuth and had to leave the panel to change a
+                  password. Accounts created with the local sign-up form have a
+                  password stored right here, and were being sent away to change
+                  something this panel owns. */}
               <div style={{ fontSize: 13, padding: '12px 16px', background: 'var(--ng-surface-soft)', borderRadius: 8, border: '1px solid var(--ng-border)', lineHeight: 1.6 }}>
-                شما از طریق <strong>SSO (NabuAuth)</strong> وارد شده‌اید. برای تغییر رمز عبور یا مدیریت امنیت حساب خود، لطفاً از حساب کاربری خارج شده و از طریق پنل اصلی NabuAuth اقدام کنید.
+                رمز عبور حساب را در بخش <button type="button" className="linklike" onClick={() => navigate('security')}>امنیت</button> تغییر دهید.
+                اگر با حساب نابو (SSO) وارد شده‌اید، رمزتان در NabuAuth مدیریت می‌شود و اینجا رمزی برای تغییر وجود ندارد.
               </div>
             </div>
           </div>
@@ -56,7 +62,7 @@ export default function Profile() {
 
         {/* Transaction History */}
         <div className="card" style={{ display: 'flex', flexDirection: 'column' }}>
-          <h3 style={{ fontSize: 16, marginBottom: 20, paddingBottom: 12, borderBottom: '1px solid var(--ng-border)' }}>تاریخچه پرداخت‌ها (NabuPay)</h3>
+          <h3 style={{ fontSize: 16, marginBottom: 20, paddingBottom: 12, borderBottom: '1px solid var(--ng-border)' }}>تاریخچه پرداخت‌ها</h3>
           
           <div style={{ flex: 1 }}>
             {payments.length === 0 ? (
@@ -70,7 +76,7 @@ export default function Profile() {
                 <thead>
                   <tr>
                     <th>تاریخ</th>
-                    <th>مبلغ (تومان)</th>
+                    <th>مبلغ</th>
                     <th>کد پیگیری</th>
                     <th>وضعیت</th>
                   </tr>
@@ -81,15 +87,18 @@ export default function Profile() {
                       <td style={{ fontSize: 13, color: 'var(--ng-muted)' }} dir="ltr">
                         {new Date(p.created_at).toLocaleDateString('fa-IR')}
                       </td>
-                      <td style={{ fontWeight: 700 }}>
-                        {p.amount.toLocaleString('fa-IR')}
+                      <td style={{ fontWeight: 700 }} dir="ltr">
+                        {usd(p.amount)}
                       </td>
                       <td className="mono" style={{ fontSize: 12 }}>
                         {p.id.split('_')[1] || p.id}
                       </td>
                       <td>
-                        <span className="badge badge-pass" style={{ fontSize: 11 }}>
-                          موفق
+                        {/* Read from the record. This was hard-coded to
+                            "موفق", so a failed payment was reported as a
+                            successful one. */}
+                        <span className={'badge ' + (p.status === 'success' ? 'badge-pass' : 'badge-fail')} style={{ fontSize: 11 }}>
+                          {p.status === 'success' ? 'موفق' : 'ناموفق'}
                         </span>
                       </td>
                     </tr>

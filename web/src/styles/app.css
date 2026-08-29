@@ -1111,3 +1111,21 @@ select.input {
 .rtl .hero-actions svg {
   transform: scaleX(-1);
 }
+
+/* The success counterpart to .banner-error, which existed alone — so every
+   screen that had something to confirm either said nothing or invented its own
+   colours inline. */
+.banner-ok { margin-bottom: 14px; padding: 12px 14px; color: var(--ng-ok-text); }
+
+/* .badge-pass had no opposite. Views wanting to mark a failure reached for
+   --ng-error-soft and --ng-error-text, neither of which is a token this theme
+   defines, so the badge rendered with no background at all. */
+.badge-fail { border: 1px solid var(--ng-danger); background: var(--ng-danger-bg); color: var(--ng-danger-text); }
+
+/* A button that reads as a link, for navigation inside a sentence. <a href>
+   would reload the page out of the SPA; a bare <button> in running text looks
+   like a control the sentence is telling you to press. */
+.linklike {
+  background: none; border: 0; padding: 0; font: inherit;
+  color: var(--ng-accent, var(--ng-ok-text)); cursor: pointer; text-decoration: underline;
+}
