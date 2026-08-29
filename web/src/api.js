@@ -23,6 +23,11 @@ async function req(path, options = {}) {
   if (res.status === 401) {
     const err = new Error('unauthenticated');
     err.unauthenticated = true;
+    // Nothing read this flag, so an expired session left every card on the
+    // page showing the word "unauthenticated" and no way back to the sign-in
+    // form short of reloading by hand. The app listens for this and re-checks
+    // the session, which renders the sign-in screen.
+    window.dispatchEvent(new CustomEvent('nabu:unauthenticated'));
     throw err;
   }
   if (!res.ok) {

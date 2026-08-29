@@ -82,6 +82,15 @@ export default function App() {
     return () => window.removeEventListener('popstate', onPopState);
   }, []);
 
+  // Any request answered 401 means the session ended while the page was open.
+  // Re-checking is enough: /api/status answers 200 with authenticated false,
+  // so this cannot loop, and the render below then shows the sign-in form.
+  useEffect(() => {
+    const onExpired = () => refresh();
+    window.addEventListener('nabu:unauthenticated', onExpired);
+    return () => window.removeEventListener('nabu:unauthenticated', onExpired);
+  }, []);
+
   const navigate = (id) => {
     const basePath = isAdminPath ? '/admin' : (isPanel ? '/panel' : '');
     const newUrl = `${basePath}/${id}`;
