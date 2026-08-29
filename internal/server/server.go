@@ -51,6 +51,10 @@ type Server struct {
 	// as it did before.
 	admin *adminstore.Store
 
+	// requests is the recent-calls ring the console reads. In memory and
+	// bounded — see adminstore.RequestLog for why it is not persisted.
+	requests *adminstore.RequestLog
+
 	// memory is the conversation store. nil disables the feature entirely and
 	// every request behaves exactly as it did before.
 	memory *memory.Store
@@ -98,7 +102,7 @@ func (s *Server) loadManagedAgents() {
 // (dev mode) and a warning is logged by the caller. agents may be nil or empty
 // when no sub-agents are configured.
 func New(r *router.Router, enforcer *policy.Enforcer, tracker *usage.Tracker, agents *agent.Registry, log *slog.Logger) *Server {
-	return &Server{router: r, policy: enforcer, usage: tracker, agents: agents, log: log, logins: newThrottle(), toolExec: agent.NewToolExecutor()}
+	return &Server{router: r, policy: enforcer, usage: tracker, agents: agents, log: log, logins: newThrottle(), toolExec: agent.NewToolExecutor(), requests: adminstore.NewRequestLog(500)}
 }
 
 // WithToolExecutor overrides the agent-tool executor — tests use it to permit
@@ -237,6 +241,13 @@ func (s *Server) record(r *http.Request, prov, model string, u provider.Usage) {
 	if s.admin != nil {
 		s.admin.RecordUsage(project, prov, model, int64(u.PromptTokens), int64(u.CompletionTokens), cost)
 	}
+	s.requests.Add(adminstore.RequestEntry{
+		Project:  project,
+		Provider: prov,
+		Model:    model,
+		Tokens:   int64(u.TotalTokens),
+		CostUSD:  cost,
+	})
 	s.log.Info("billed", "project", project, "provider", prov, "model", model,
 		"total_tokens", u.TotalTokens, "cost_usd", cost)
 }
@@ -1031,6 +1042,10 @@ func (s *Server) auth(next http.HandlerFunc) http.HandlerFunc {
 			if t, found := s.lookupConsoleToken(token); found {
 				if !originAllowed(t.AllowedOrigins, r) {
 					s.admin.RecordDenied(t.Name)
+					s.requests.Add(adminstore.RequestEntry{
+						Project: t.Name, Denied: true,
+						Reason: "origin not permitted for this key",
+					})
 					s.log.Warn("origin refused", "project", t.Name,
 						"origin", requestOriginHost(r), "allowed", t.AllowedOrigins)
 					writeError(w, http.StatusForbidden, "this key is not permitted from this origin")
@@ -1048,6 +1063,10 @@ func (s *Server) auth(next http.HandlerFunc) http.HandlerFunc {
 			return
 		}
 		if !s.policy.RateOK(token) {
+			s.requests.Add(adminstore.RequestEntry{
+				Project: pol.Project, Denied: true,
+				Reason: "rate limit exceeded",
+			})
 			w.Header().Set("Retry-After", "1")
 			writeError(w, http.StatusTooManyRequests, "rate limit exceeded")
 			return
@@ -1068,6 +1087,13 @@ func (s *Server) aliasAllowed(w http.ResponseWriter, r *http.Request, alias stri
 	if ok && pol.Allows(alias) {
 		return true
 	}
+	// The alias is named in the entry because that is the whole content of the
+	// answer: "your key was refused" is not actionable, "your key was refused
+	// nabu-smart" is a one-line fix to the allow-list.
+	s.requests.Add(adminstore.RequestEntry{
+		Project: pol.Project, Model: alias, Denied: true,
+		Reason: "alias not permitted for this key",
+	})
 	writeError(w, http.StatusForbidden, fmt.Sprintf("alias %q is not permitted for this key", alias))
 	return false
 }

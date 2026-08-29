@@ -21,6 +21,7 @@ import Plans from './views/Plans.jsx';
 import Landing from './views/Landing.jsx';
 import Docs from './views/Docs.jsx';
 import Security from './views/Security.jsx';
+import Requests from './views/Requests.jsx';
 
 const VIEWS = {
   landing: () => <Landing lang={window.location.pathname.startsWith('/fa') ? 'fa' : 'en'} />,
@@ -40,6 +41,7 @@ const VIEWS = {
   payments: () => <Payments />,
   profile: () => <Profile />,
   security: () => <Security />,
+  requests: () => <Requests />,
 };
 
 function viewFromPath() {
@@ -103,7 +105,7 @@ export default function App() {
   // rendered an apology.
   let allowed = [
     'dashboard', 'account', 'plans', 'payments',
-    'tokens', 'models', 'integration', 'docs',
+    'tokens', 'models', 'requests', 'integration', 'docs',
     'profile', 'security',
   ];
 

@@ -1,6 +1,11 @@
 package server
 
-import "net/http"
+import (
+	"net/http"
+	"strings"
+
+	"nabugate/internal/adminstore"
+)
 
 // Per-user usage, for the panel at /panel/.
 //
@@ -34,5 +39,36 @@ func (s *Server) accountUsage(w http.ResponseWriter, r *http.Request) {
 		// see, and the one thing an aggregate token count hides completely.
 		"denied":   denied,
 		"cost_usd": cost,
+	})
+}
+
+// recentRequests answers the question the aggregate counters cannot: what did
+// my key just do, and if it was refused, why.
+//
+// An administrator sees the whole deployment. Anyone else sees only calls
+// attributed to a project one of their own keys owns — and the set of owned
+// projects is built before the log is read, so a caller with no keys gets an
+// empty set rather than a nil one, which is what the log treats as "everything".
+func (s *Server) recentRequests(w http.ResponseWriter, r *http.Request) {
+	isAdmin, _ := r.Context().Value(consoleAdminCtxKey{}).(bool)
+	email, _ := r.Context().Value(consoleEmailCtxKey{}).(string)
+
+	var mine map[string]bool
+	if !isAdmin {
+		mine = make(map[string]bool)
+		for _, t := range s.admin.TokensForOwner(email) {
+			mine[strings.ToLower(t.Name)] = true
+		}
+	}
+
+	entries := s.requests.Recent(mine, 200)
+	if entries == nil {
+		entries = []adminstore.RequestEntry{}
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"requests": entries,
+		// Said out loud because an empty log after a restart is not the same
+		// fact as no traffic, and the console cannot tell the two apart.
+		"volatile": true,
 	})
 }

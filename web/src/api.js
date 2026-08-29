@@ -171,3 +171,5 @@ export const changeMyPassword = (current, next) =>
     method: 'POST',
     body: JSON.stringify({ current, new: next }),
   });
+
+export const recentRequests = () => req('/requests');

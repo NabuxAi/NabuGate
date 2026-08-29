@@ -13,6 +13,7 @@ export const navGroups = [
     items: [
       { id: 'tokens', label: 'کلیدهای API', icon: '🔑' },
       { id: 'models', label: 'مدل‌ها', icon: '🧠' },
+      { id: 'requests', label: 'درخواست‌ها', icon: '➤' },
       { id: 'integration', label: 'اتصال به دروازه', icon: '🔗' },
       { id: 'docs', label: 'مستندات', icon: '📘' },
     ]

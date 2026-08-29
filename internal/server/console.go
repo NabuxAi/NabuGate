@@ -48,6 +48,7 @@ func (s *Server) mountConsoleAPI(mux *http.ServeMux) {
 	mux.Handle("POST /api/me/recharge", s.consoleAuth(s.rechargeMe))
 	mux.Handle("GET /api/me/usage", s.consoleAuth(s.accountUsage))
 	mux.Handle("POST /api/me/password", s.consoleAuth(s.changeMyPassword))
+	mux.Handle("GET /api/requests", s.consoleAuth(s.recentRequests))
 	mux.Handle("POST /api/tokens", s.consoleAuth(s.createToken))
 	mux.Handle("DELETE /api/tokens/{name}", s.consoleAuth(s.deleteToken))
 	mux.Handle("PATCH /api/tokens/{name}", s.consoleAuth(s.patchToken))
