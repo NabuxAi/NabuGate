@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import Layout from '../components/Layout.jsx';
 import * as api from '../api.js';
-import { faInt, faDigits } from '../data/mock.js';
+import { faInt, faDigits, usd } from '../data/mock.js';
 
 export default function Usage() {
   const [byProject, setByProject] = useState({});
@@ -36,7 +36,6 @@ export default function Usage() {
   );
 
   const totalTokens = total.prompt_tokens + total.completion_tokens;
-  const estimatedCostToman = Math.round(total.cost * 65000); // Dummy exchange rate for UI
 
   return (
     <Layout
@@ -92,7 +91,10 @@ export default function Usage() {
         <div className="card" style={{ padding: '20px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
             <div style={{ color: 'var(--ng-muted)', fontSize: 13, marginBottom: 8 }}>هزینه تخمینی</div>
-            <div style={{ fontSize: 18, fontWeight: 700 }}>{faInt(estimatedCostToman)} <span style={{ fontSize: 12, fontWeight: 400 }}>تومان</span></div>
+            {/* This multiplied the dollar figure by a rate written into the
+                source as "dummy exchange rate for UI". A made-up number
+                rendered in تومان beside real ones reads as a real one. */}
+            <div style={{ fontSize: 18, fontWeight: 700 }} dir="ltr">{usd(total.cost)}</div>
           </div>
           <div style={{ background: 'rgba(245, 158, 11, 0.1)', color: '#f59e0b', padding: 12, borderRadius: 8, fontSize: 20 }}>💳</div>
         </div>

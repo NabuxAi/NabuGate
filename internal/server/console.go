@@ -55,7 +55,7 @@ func (s *Server) mountConsoleAPI(mux *http.ServeMux) {
 
 	mux.Handle("GET /api/overview", s.consoleAuth(s.consoleOverview))
 	mux.Handle("GET /api/usage", s.consoleAuth(s.consoleUsage))
-	mux.Handle("POST /api/usage/reset", s.consoleAuth(s.resetUsage))
+	mux.Handle("POST /api/usage/reset", s.consoleAuth(requireAdmin(s.resetUsage)))
 
 	mux.Handle("GET /api/admins", s.consoleAuth(requireAdmin(s.listAdmins)))
 	mux.Handle("GET /api/users", s.consoleAuth(requireAdmin(s.listUsers)))
@@ -469,7 +469,28 @@ func (s *Server) patchToken(w http.ResponseWriter, r *http.Request) {
 // These are the real numbers, and they survive a restart — the in-memory
 // tracker behind /v1/usage resets to zero on every redeploy, which made the
 // console look like nothing had ever run.
-func (s *Server) consoleUsage(w http.ResponseWriter, _ *http.Request) {
+// consoleUsage reports accumulated usage. An administrator sees the whole
+// deployment; anyone else sees only the projects their own keys own.
+//
+// It used to answer with everything to every signed-in caller, so anyone who
+// signed up through the public form could read every other customer's project
+// names, request counts and spend. The per-model and per-provider breakdowns
+// are deployment-wide totals that cannot be attributed to one owner, so they
+// are simply not offered to a non-admin rather than being filtered into
+// something that looks like their own.
+func (s *Server) consoleUsage(w http.ResponseWriter, r *http.Request) {
+	isAdmin, _ := r.Context().Value(consoleAdminCtxKey{}).(bool)
+	if !isAdmin {
+		email, _ := r.Context().Value(consoleEmailCtxKey{}).(string)
+		writeJSON(w, http.StatusOK, map[string]any{
+			"by_project":  s.admin.UsageForOwner(email),
+			"by_model":    map[string]adminstore.Counters{},
+			"by_provider": map[string]adminstore.Counters{},
+			"scoped":      true,
+		})
+		return
+	}
+
 	byProj, byModel, byProv := s.admin.Usage()
 	writeJSON(w, http.StatusOK, map[string]any{
 		"by_project":  byProj,

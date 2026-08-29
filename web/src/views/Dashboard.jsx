@@ -2,6 +2,7 @@ import { navigate } from "../nav.js";
 import { useEffect, useState } from 'react';
 import Layout from '../components/Layout.jsx';
 import * as api from '../api.js';
+import { usd } from '../data/mock.js';
 
 export default function Dashboard() {
   const [data, setData] = useState(null);
@@ -67,10 +68,10 @@ export default function Dashboard() {
           <h3 style={{ fontSize: 16, margin: '0 0 16px 0', alignSelf: 'flex-start', borderBottom: '1px solid var(--ng-border)', paddingBottom: 12, width: '100%', textAlign: 'right' }}>موجودی حساب</h3>
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
             <div style={{ fontSize: 40, fontWeight: 800, marginBottom: 8, color: 'var(--ng-fg)' }}>
-              {balance.toLocaleString('fa-IR')} <span style={{ fontSize: 16, fontWeight: 400, color: 'var(--ng-muted)' }}>تومان</span>
+              {usd(balance)}
             </div>
-            <p style={{ fontSize: 13, color: 'var(--ng-muted)', marginBottom: 20 }}>از طریق NabuPay می‌توانید حساب خود را شارژ کنید یا پلن تهیه کنید.</p>
-            <button onClick={() => navigate('plans')} className="btn btn-primary">شارژ موجودی (NabuPay)</button>
+            <p style={{ fontSize: 13, color: 'var(--ng-muted)', marginBottom: 20 }}>موجودی حساب برای مصرف مدل‌ها استفاده می‌شود. درگاه پرداخت هنوز وصل نیست.</p>
+            <button onClick={() => navigate('plans')} className="btn btn-primary">شارژ موجودی</button>
           </div>
         </div>
 
@@ -132,9 +133,9 @@ export default function Dashboard() {
               {onboardingStep === 3 && (
                 <div className="fade-in">
                   <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 24, fontSize: 48 }}>💳</div>
-                  <h2 style={{ fontSize: 24, fontWeight: 800, textAlign: 'center', marginBottom: 12 }}>شارژ حساب با NabuPay</h2>
+                  <h2 style={{ fontSize: 24, fontWeight: 800, textAlign: 'center', marginBottom: 12 }}>شارژ حساب</h2>
                   <p style={{ color: 'var(--ng-muted)', lineHeight: 1.8, textAlign: 'center' }}>
-                    سیستم پرداخت به صورت Pay-as-you-go (پرداخت به ازای مصرف) کار می‌کنه. با استفاده از <strong>NabuPay</strong> می‌تونی حسابتو شارژ کنی و فقط به اندازه توکن‌هایی که مصرف می‌کنی هزینه بدی.
+                    هزینه به‌ازای مصرف حساب می‌شود: فقط به اندازهٔ توکن‌هایی که خرج می‌کنید. درگاه پرداخت هنوز وصل نشده و شارژ فعلاً شبیه‌سازی‌شده است.
                   </p>
                 </div>
               )}

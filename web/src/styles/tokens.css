@@ -33,6 +33,11 @@
   --ng-ok: #10b981;
   --ng-ok-text: #10b981;
   --ng-ok-surface: rgba(16, 185, 129, 0.1);
+  /* Four views reach for --ng-ok-soft, which was never defined, so their
+     badges rendered with no background at all. Defined as an alias rather
+     than edited out of the call sites: the name reads correctly and the two
+     are meant to be the same colour. */
+  --ng-ok-soft: var(--ng-ok-surface);
   --ng-ok-border: rgba(16, 185, 129, 0.2);
   /* Status — warn (amber) */
   --ng-warn-text: #f59e0b;

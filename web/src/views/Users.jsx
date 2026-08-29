@@ -58,7 +58,7 @@ export default function Users() {
             <thead>
               <tr>
                 <th>ایمیل</th>
-                <th>موجودی (تومان)</th>
+                <th>موجودی</th>
                 <th>تراکنش‌ها</th>
               </tr>
             </thead>
@@ -94,7 +94,7 @@ export default function Users() {
               />
             </label>
             <label style={{ fontSize: 13 }}>
-              مبلغ (تومان):
+              مبلغ (دلار):
               <input
                 className="signin-field"
                 type="number"

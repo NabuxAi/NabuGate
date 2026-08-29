@@ -117,3 +117,55 @@ func TestTheUserListDoesNotPublishPasswordHashes(t *testing.T) {
 		t.Fatalf("got %d users, want 2", len(got.Users))
 	}
 }
+
+// consoleUsage answered with the whole deployment to every signed-in caller,
+// so anyone who signed up through the public form could read every other
+// customer's project names, request counts and spend.
+func TestUsageIsScopedToTheCallerUnlessTheyAreAnAdmin(t *testing.T) {
+	store, err := adminstore.Open(filepath.Join(t.TempDir(), "admin.json"))
+	if err != nil {
+		t.Fatalf("open store: %v", err)
+	}
+	if _, _, err := store.NewToken("mine", []string{"*"}, 0, nil, "me@example.com", nil); err != nil {
+		t.Fatalf("mint key: %v", err)
+	}
+	if _, _, err := store.NewToken("theirs", []string{"*"}, 0, nil, "them@example.com", nil); err != nil {
+		t.Fatalf("mint key: %v", err)
+	}
+	store.RecordUsage("mine", "openai", "gpt", 10, 10, 0.01)
+	store.RecordUsage("theirs", "openai", "gpt", 99, 99, 9.99)
+
+	s := &Server{admin: store}
+
+	ask := func(email string, admin bool) map[string]any {
+		t.Helper()
+		r := httptest.NewRequest(http.MethodGet, "/api/usage", nil)
+		ctx := context.WithValue(r.Context(), consoleEmailCtxKey{}, email)
+		ctx = context.WithValue(ctx, consoleAdminCtxKey{}, admin)
+		w := httptest.NewRecorder()
+		s.consoleUsage(w, r.WithContext(ctx))
+		if w.Code != http.StatusOK {
+			t.Fatalf("status %d", w.Code)
+		}
+		var got map[string]any
+		if err := json.Unmarshal(w.Body.Bytes(), &got); err != nil {
+			t.Fatalf("decode: %v", err)
+		}
+		return got
+	}
+
+	mine, _ := ask("me@example.com", false)["by_project"].(map[string]any)
+	if _, leaked := mine["theirs"]; leaked {
+		t.Error("a non-admin was shown another owner's project")
+	}
+	if _, ok := mine["mine"]; !ok {
+		t.Error("a non-admin was not shown their own project")
+	}
+
+	// The administrator must still see both, or the check above would pass by
+	// showing nobody anything.
+	all, _ := ask("admin@example.com", true)["by_project"].(map[string]any)
+	if len(all) != 2 {
+		t.Errorf("an administrator saw %d projects, want 2", len(all))
+	}
+}
