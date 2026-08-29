@@ -3,8 +3,8 @@ package server
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/url"
 	"strings"
@@ -43,9 +43,10 @@ func (s *Server) mountConsoleAPI(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/nabu/callback", s.consoleNabuCallback)
 	mux.HandleFunc("GET /admin/api/nabu/callback", s.consoleNabuCallback)
 
-		mux.Handle("GET /api/tokens", s.consoleAuth(s.listTokens))
+	mux.Handle("GET /api/tokens", s.consoleAuth(s.listTokens))
 	mux.Handle("GET /api/me", s.consoleAuth(s.getMe))
 	mux.Handle("POST /api/me/recharge", s.consoleAuth(s.rechargeMe))
+	mux.Handle("GET /api/me/usage", s.consoleAuth(s.accountUsage))
 	mux.Handle("POST /api/tokens", s.consoleAuth(s.createToken))
 	mux.Handle("DELETE /api/tokens/{name}", s.consoleAuth(s.deleteToken))
 	mux.Handle("PATCH /api/tokens/{name}", s.consoleAuth(s.patchToken))
@@ -343,13 +344,13 @@ func (s *Server) testAgent(w http.ResponseWriter, r *http.Request) {
 func (s *Server) listTokens(w http.ResponseWriter, r *http.Request) {
 	isAdmin, _ := r.Context().Value(consoleAdminCtxKey{}).(bool)
 	email, _ := r.Context().Value(consoleEmailCtxKey{}).(string)
-	
+
 	allTokens := s.admin.Tokens()
 	if isAdmin {
 		writeJSON(w, http.StatusOK, map[string]any{"tokens": allTokens})
 		return
 	}
-	
+
 	var userTokens []adminstore.Token
 	for _, t := range allTokens {
 		if strings.EqualFold(t.Owner, email) {
@@ -408,7 +409,18 @@ func (s *Server) deleteToken(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusForbidden, "not authorized to edit this token")
 		return
 	}
-	if err := s.admin.DeleteToken(name); err != nil {
+	// An admin may remove any key; anyone else gets a delete that carries the
+	// ownership check inside it, so nothing can change between deciding and
+	// doing.
+	isAdmin, _ := r.Context().Value(consoleAdminCtxKey{}).(bool)
+	email, _ := r.Context().Value(consoleEmailCtxKey{}).(string)
+	var err error
+	if isAdmin {
+		err = s.admin.DeleteToken(name)
+	} else {
+		err = s.admin.DeleteTokenForOwner(email, name)
+	}
+	if err != nil {
 		writeError(w, http.StatusNotFound, err.Error())
 		return
 	}
@@ -458,8 +470,8 @@ func (s *Server) patchToken(w http.ResponseWriter, r *http.Request) {
 func (s *Server) consoleUsage(w http.ResponseWriter, _ *http.Request) {
 	byProj, byModel, byProv := s.admin.Usage()
 	writeJSON(w, http.StatusOK, map[string]any{
-		"by_project": byProj,
-		"by_model": byModel,
+		"by_project":  byProj,
+		"by_model":    byModel,
 		"by_provider": byProv,
 	})
 }
@@ -581,7 +593,7 @@ func (s *Server) consoleOverview(w http.ResponseWriter, r *http.Request) {
 
 	isAdmin, _ := r.Context().Value(consoleAdminCtxKey{}).(bool)
 	email, _ := r.Context().Value(consoleEmailCtxKey{}).(string)
-	
+
 	allowedProviders := make(map[string]bool)
 	if !isAdmin {
 		for _, t := range s.admin.Tokens() {

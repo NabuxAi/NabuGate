@@ -68,9 +68,9 @@ type Payment struct {
 }
 
 type User struct {
-	Email    string    `json:"email"`
-	Salt     string    `json:"salt"`
-	Hash     string    `json:"hash"`
+	Email string `json:"email"`
+	Salt  string `json:"salt"`
+	Hash  string `json:"hash"`
 
 	Balance  float64   `json:"balance"`
 	Name     string    `json:"name"`
@@ -140,16 +140,16 @@ type FlowStepRecord struct {
 }
 
 type state struct {
-	Admins   []Admin              `json:"admins"`
-	Tokens   []Token              `json:"tokens"`
-	Agents   []AgentRecord        `json:"agents"`
-	Flows    []FlowRecord         `json:"flows"`
-	Usage    map[string]Counters  `json:"usage"`
-	UsageByModel map[string]Counters `json:"usage_by_model,omitempty"`
-	UsageByProv map[string]Counters `json:"usage_by_prov,omitempty"`
-	Sessions map[string]time.Time `json:"sessions"`
+	Admins       []Admin                `json:"admins"`
+	Tokens       []Token                `json:"tokens"`
+	Agents       []AgentRecord          `json:"agents"`
+	Flows        []FlowRecord           `json:"flows"`
+	Usage        map[string]Counters    `json:"usage"`
+	UsageByModel map[string]Counters    `json:"usage_by_model,omitempty"`
+	UsageByProv  map[string]Counters    `json:"usage_by_prov,omitempty"`
+	Sessions     map[string]time.Time   `json:"sessions"`
 	UserSessions map[string]SessionInfo `json:"user_sessions"`
-	Users map[string]*User `json:"users,omitempty"` // token hash -> expiry
+	Users        map[string]*User       `json:"users,omitempty"` // token hash -> expiry
 }
 
 // Store is the persisted gateway state.
@@ -558,6 +558,86 @@ func (s *Store) NewToken(name string, allow []string, rateLimit int, origins []s
 // Tokens returns the stored tokens, newest first. Hashes are cleared: nothing
 // outside this package needs them, and shipping them to a browser would be a
 // needless way to leak an offline-crackable value.
+// TokensForOwner returns only the keys belonging to one person.
+//
+// Owner-scoped rather than filtered by the caller, for the same reason the CRM
+// puts the tenant in the query: a list that is fetched whole and narrowed
+// afterwards is one forgotten branch away from showing somebody else's keys.
+// The hash is cleared here as it is in Tokens() — a key is shown once, at
+// creation, and never again.
+func (s *Store) TokensForOwner(owner string) []Token {
+	owner = strings.ToLower(strings.TrimSpace(owner))
+	if owner == "" {
+		// No owner means no keys, never "all keys". An empty string is what an
+		// unauthenticated caller looks like.
+		return []Token{}
+	}
+
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	out := []Token{}
+	for _, t := range s.st.Tokens {
+		if strings.ToLower(t.Owner) != owner {
+			continue
+		}
+		t.Hash = ""
+		out = append(out, t)
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].CreatedAt.After(out[j].CreatedAt) })
+	return out
+}
+
+// UsageForOwner sums what this person's keys have spent, per project.
+//
+// Usage is recorded against a project name, and a key's Name is that project,
+// so the owner's projects are the join. A key that was deleted keeps its usage
+// row, which stays out of this total — the figure answers "what are my current
+// keys costing", which is the question the panel asks.
+func (s *Store) UsageForOwner(owner string) map[string]Counters {
+	out := map[string]Counters{}
+	for _, t := range s.TokensForOwner(owner) {
+		s.mu.RLock()
+		c, ok := s.st.Usage[t.Name]
+		s.mu.RUnlock()
+		if ok {
+			out[t.Name] = c
+		}
+	}
+	return out
+}
+
+// DeleteTokenForOwner removes a key only when it belongs to this person.
+//
+// Ownership is part of the delete rather than checked before it, so a race
+// between the check and the delete cannot remove somebody else's key.
+func (s *Store) DeleteTokenForOwner(owner, name string) error {
+	owner = strings.ToLower(strings.TrimSpace(owner))
+	if owner == "" {
+		return ErrTokenNotFound
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	for i, t := range s.st.Tokens {
+		// Matched case-insensitively, as DeleteToken does — the two must agree
+		// on what counts as the same key or one can delete what the other cannot
+		// find.
+		if !strings.EqualFold(t.Name, name) {
+			continue
+		}
+		if strings.ToLower(t.Owner) != owner {
+			// Same answer as a key that does not exist. Telling them apart says
+			// "this key is somebody else's", which is a fact worth not giving.
+			return ErrTokenNotFound
+		}
+		s.st.Tokens = append(s.st.Tokens[:i], s.st.Tokens[i+1:]...)
+		return s.save()
+	}
+	return ErrTokenNotFound
+}
+
 func (s *Store) Tokens() []Token {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -798,7 +878,7 @@ func (s *Store) SignupUser(email, password string) error {
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	
+
 	if s.st.Users == nil {
 		s.st.Users = make(map[string]*User)
 	}
@@ -854,7 +934,7 @@ func (s *Store) AuthenticateUser(email, password string) (string, time.Time, err
 	rand.Read(tok)
 	token := hex.EncodeToString(tok)
 	expiry := time.Now().Add(SessionTTL)
-	
+
 	if s.st.UserSessions == nil {
 		s.st.UserSessions = make(map[string]SessionInfo)
 	}
