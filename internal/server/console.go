@@ -684,13 +684,27 @@ func (s *Server) consoleOverview(w http.ResponseWriter, r *http.Request) {
 	// in the deployment's environment and the gateway never sees them in a form
 	// worth showing — and a console that displayed keys would be a console worth
 	// stealing.
-	byProj, _, _ := s.admin.Usage()
+	// Scoped exactly as /api/usage is. Closing the leak there and leaving it
+	// open here would have moved the door rather than shut it: this is the same
+	// per-project spend, and the panel's own dashboard reads it from here.
+	//
+	// config_keys names the projects declared in the deployment's config, which
+	// is the operator's inventory rather than any one customer's, so a
+	// non-admin gets an empty list instead of a filtered one.
+	usageByProject := map[string]adminstore.Counters{}
+	configKeys := []string{}
+	if isAdmin {
+		usageByProject, _, _ = s.admin.Usage()
+		configKeys = s.policy.Projects()
+	} else {
+		usageByProject = s.admin.UsageForOwner(email)
+	}
 	writeJSON(w, http.StatusOK, map[string]any{
 		"providers":   providers,
 		"aliases":     aliases,
 		"agents":      s.agents.Names(),
-		"config_keys": s.policy.Projects(),
-		"usage":       byProj,
+		"config_keys": configKeys,
+		"usage":       usageByProject,
 	})
 }
 

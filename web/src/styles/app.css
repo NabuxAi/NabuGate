@@ -415,7 +415,7 @@ button { font-family: inherit; }
 .token-secret {
   margin: 0.75rem 0 0; padding: 0.85rem;
   font-size: 0.85rem; word-break: break-all; white-space: pre-wrap;
-  background: var(--ng-faint, var(--ng-faint)); border-radius: 8px;
+  background: var(--ng-faint); border-radius: 8px;
 }
 
 .banner-error { margin-bottom: 14px; padding: 12px 14px; color: var(--ng-danger-text, #c53030); }

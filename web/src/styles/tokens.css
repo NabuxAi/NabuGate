@@ -75,6 +75,15 @@
   --ng-dur: 200ms;
 
   --ng-sidebar-w: 250px;
+
+  /* Four variables were used without ever being defined, so the rules that
+     referenced them fell back to nothing: .btn-ghost had no hover state, and
+     the code blocks on the integration page relied on hard-coded navy hex
+     values that were unreadable against a light background. */
+  --ng-faint: rgba(148, 163, 184, 0.12);
+  --ng-slate-500: #64748b;
+  --ng-code-bg: #0b1020;
+  --ng-code-text: #e6ecff;
   --ng-topbar-h: 64px;
 }
 
@@ -117,6 +126,11 @@
   --ng-success: #10b981;
   --ng-success-bg: #d1fae5;
   --ng-success-text: #047857;
+
+  --ng-faint: rgba(100, 116, 139, 0.08);
+  --ng-slate-500: #64748b;
+  --ng-code-bg: #f8fafc;
+  --ng-code-text: #0f172a;
 }
 
 :root {
