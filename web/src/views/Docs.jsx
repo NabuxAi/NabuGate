@@ -80,29 +80,28 @@ export default function Docs() {
               <h1 style={{ fontSize: 32, marginBottom: 24, fontWeight: 900, letterSpacing: '-1px' }}>مرجع API</h1>
               <p style={{ color: 'var(--ng-muted)', marginBottom: 24 }}>اندپوینت‌های زیر به صورت ۱۰۰٪ با استاندارد OpenAI سازگار هستند و ترافیک شما را مستقیماً به پروایدرهای مختلف (Anthropic, Google, Groq و...) ترجمه می‌کنند.</p>
               
-              <div style={{ background: 'var(--ng-surface-soft)', border: '1px solid var(--ng-border)', borderRadius: 12, padding: 20, marginBottom: 16 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
-                  <span style={{ background: 'var(--ng-ok-soft)', color: 'var(--ng-ok-text)', padding: '4px 8px', borderRadius: 6, fontWeight: 700, fontSize: 12, fontFamily: 'monospace' }}>POST</span>
-                  <code style={{ fontSize: 16, fontWeight: 600 }}>/v1/chat/completions</code>
+              {[
+                { method: 'POST', path: '/v1/chat/completions', desc: 'اصلی‌ترین اندپوینت چت و بینایی. استریم و tool calling کامل پشتیبانی می‌شود.' },
+                { method: 'POST', path: '/v1/responses', desc: 'واسطِ Responses، برای کلاینت‌هایی که این شکل را می‌خواهند.' },
+                { method: 'POST', path: '/v1/embeddings', desc: 'تولید بردار برای RAG. پارامتر dimensions تا خودِ پروایدر می‌رود.' },
+                { method: 'POST', path: '/v1/images/generations', desc: 'تولید تصویر — و با aliasِ عکس، جست‌وجوی تصویرِ استوک.' },
+                { method: 'POST', path: '/v1/audio/speech', desc: 'تبدیل متن به گفتار.' },
+                { method: 'POST', path: '/v1/audio/transcriptions', desc: 'تبدیل گفتار به متن.' },
+                { method: 'POST', path: '/v1/photos/search', desc: 'جست‌وجوی عکسِ استوک بدون تولیدِ تصویر.' },
+                { method: 'GET', path: '/v1/models', desc: 'فهرستِ زندهٔ همهٔ aliasها، ایجنت‌ها و فلوهای این دروازه.' },
+                { method: 'GET', path: '/v1/agents', desc: 'فهرستِ ساب‌ایجنت‌ها. هرکدام مثل یک model صدا زده می‌شوند.' },
+                { method: 'GET', path: '/v1/usage', desc: 'مصرفِ همین کلید: توکن و هزینه به تفکیکِ مدل.' },
+                { method: 'GET', path: '/v1/conversations', desc: 'گفت‌وگوهای ذخیره‌شده، وقتی حافظه روشن باشد.' },
+                { method: 'GET', path: '/v1/health', desc: 'سلامتِ دروازه.' },
+              ].map((e) => (
+                <div key={e.path} style={{ background: 'var(--ng-surface-soft)', border: '1px solid var(--ng-border)', borderRadius: 12, padding: 20, marginBottom: 16 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+                    <span style={{ background: 'var(--ng-ok-soft)', color: 'var(--ng-ok-text)', padding: '4px 8px', borderRadius: 6, fontWeight: 700, fontSize: 12, fontFamily: 'monospace' }}>{e.method}</span>
+                    <code style={{ fontSize: 16, fontWeight: 600 }} dir="ltr">{e.path}</code>
+                  </div>
+                  <p style={{ margin: 0, color: 'var(--ng-muted)' }}>{e.desc}</p>
                 </div>
-                <p style={{ margin: 0, color: 'var(--ng-muted)' }}>اصلی‌ترین اندپوینت برای چت و تعامل با مدل‌های متنی و بینایی (Vision). پشتیبانی کامل از Streaming و Tool Calling.</p>
-              </div>
-
-              <div style={{ background: 'var(--ng-surface-soft)', border: '1px solid var(--ng-border)', borderRadius: 12, padding: 20, marginBottom: 16 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
-                  <span style={{ background: 'var(--ng-ok-soft)', color: 'var(--ng-ok-text)', padding: '4px 8px', borderRadius: 6, fontWeight: 700, fontSize: 12, fontFamily: 'monospace' }}>POST</span>
-                  <code style={{ fontSize: 16, fontWeight: 600 }}>/v1/embeddings</code>
-                </div>
-                <p style={{ margin: 0, color: 'var(--ng-muted)' }}>برای تولید Embedding و استفاده در سیستم‌های RAG.</p>
-              </div>
-
-              <div style={{ background: 'var(--ng-surface-soft)', border: '1px solid var(--ng-border)', borderRadius: 12, padding: 20, marginBottom: 16 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
-                  <span style={{ background: 'var(--ng-ok-soft)', color: 'var(--ng-ok-text)', padding: '4px 8px', borderRadius: 6, fontWeight: 700, fontSize: 12, fontFamily: 'monospace' }}>GET</span>
-                  <code style={{ fontSize: 16, fontWeight: 600 }}>/v1/models</code>
-                </div>
-                <p style={{ margin: 0, color: 'var(--ng-muted)' }}>دریافت لیست تمامی مدل‌های فعال و در دسترس در دروازه شما.</p>
-              </div>
+              ))}
             </div>
           )}
 
