@@ -2,12 +2,12 @@ import { useEffect, useState } from 'react';
 import Layout from '../components/Layout.jsx';
 import * as api from '../api.js';
 import { faInt, faDigits, usd } from '../data/mock.js';
+import { usePayment } from '../components/usePayment.js';
 
 export default function Account() {
   const [user, setUser] = useState(null);
   const [usage, setUsage] = useState(null);
   const [amount, setAmount] = useState(10);
-  const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
 
   // The balance and the spend come from two endpoints, and the recharge form
@@ -15,24 +15,14 @@ export default function Account() {
   // usage report that cannot have moved.
   const loadUser = () => api.getMe().then(setUser).catch((e) => setError(e.message));
 
+  // Handles both halves: sending the payer to the gateway, and crediting the
+  // wallet when they come back. loadUser refreshes the balance on the way in.
+  const payment = usePayment(loadUser);
+
   useEffect(() => {
     loadUser();
     api.myUsage().then(setUsage).catch((e) => setError(e.message));
   }, []);
-
-  async function recharge(e) {
-    e.preventDefault();
-    setBusy(true);
-    setError(null);
-    try {
-      await api.rechargeMe(amount);
-      await loadUser();
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setBusy(false);
-    }
-  }
 
   if (!user) {
     return (
@@ -48,7 +38,16 @@ export default function Account() {
 
   return (
     <Layout title="حساب کاربری" subtitle="موجودی، مصرف کلیدهای شما و شارژ حساب.">
-      {error && <div className="card banner-error">{error}</div>}
+      {(error || payment.error) && <div className="card banner-error">{error || payment.error}</div>}
+      {payment.settled?.credited && (
+        <div className="card banner-ok">پرداخت تأیید شد و موجودی اضافه شد.</div>
+      )}
+      {payment.settled && !payment.settled.credited && payment.settled.payments?.length > 0 && (
+        <div className="card banner-error">
+          پرداخت هنوز تأیید نشده است. اگر مبلغ از حسابتان کم شده، چند دقیقه بعد
+          همین صفحه را باز کنید — تأیید از خودِ درگاه گرفته می‌شود.
+        </div>
+      )}
 
       <div className="stats">
         <div className="stat">
@@ -121,10 +120,11 @@ export default function Account() {
 
       <div className="card" style={{ marginTop: 16 }}>
         <h3 style={{ marginBottom: 4 }}>افزایش موجودی</h3>
-        <p className="muted" style={{ marginBottom: 16, fontSize: 13 }}>
-          درگاه پرداخت هنوز وصل نیست؛ این شارژ شبیه‌سازی‌شده است و موجودی را بدون تراکنش واقعی بالا می‌برد.
+        <p className="muted" style={{ marginBottom: 16, fontSize: 13, lineHeight: 1.7 }}>
+          به درگاه بانکی منتقل می‌شوید. اطلاعات کارت را همان‌جا وارد می‌کنید و
+          هرگز در این پنل ذخیره نمی‌شود؛ موجودی بعد از تأیید خودِ درگاه اضافه می‌شود.
         </p>
-        <form onSubmit={recharge} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+        <form onSubmit={(e) => { e.preventDefault(); payment.pay(amount); }} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           <input
             type="number"
             className="input"
@@ -136,8 +136,8 @@ export default function Account() {
             dir="ltr"
           />
           <span>دلار</span>
-          <button className="btn btn-primary" disabled={busy}>
-            {busy ? 'در حال پرداخت…' : 'شارژ حساب'}
+          <button className="btn btn-primary" disabled={payment.busy}>
+            {payment.busy ? 'در حال انتقال به درگاه…' : 'پرداخت'}
           </button>
         </form>
       </div>

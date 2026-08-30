@@ -1,14 +1,12 @@
 import { navigate } from '../nav.js';
 import { useState } from 'react';
 import Layout from '../components/Layout.jsx';
-import * as api from '../api.js';
 import { usd } from '../data/mock.js';
+import { usePayment } from '../components/usePayment.js';
 
 export default function Plans() {
-  const [loading, setLoading] = useState(false);
   const [selected, setSelected] = useState(null);
-  const [successMsg, setSuccessMsg] = useState('');
-  const [error, setError] = useState(null);
+  const payment = usePayment(() => navigate('account'));
 
   // Amounts are dollars, because /api/me/recharge adds this number straight to
   // a balance the gateway spends in USD. These were 100000, 500000 and 2000000
@@ -19,42 +17,22 @@ export default function Plans() {
     { id: 'ultra', name: 'بستهٔ تجاری', amount: 200 },
   ];
 
-  const buy = async (plan) => {
+  const buy = (plan) => {
     setSelected(plan);
-    setLoading(true);
-    setError(null);
-    setSuccessMsg('');
-    try {
-      await api.rechargeMe(plan.amount);
-      setSuccessMsg(`موجودی ${usd(plan.amount)} افزایش یافت.`);
-      setTimeout(() => navigate('account'), 2000);
-    } catch (e) {
-      setError(e.message);
-    } finally {
-      setLoading(false);
-      setSelected(null);
-    }
+    payment.pay(plan.amount);
   };
 
   return (
     <Layout title="خرید و شارژ حساب" subtitle="افزایش موجودی برای استفاده از مدل‌ها.">
-      {error && <div className="card banner-error">{error}</div>}
-      {successMsg && <div className="card banner-ok">{successMsg}</div>}
+      {payment.error && <div className="card banner-error">{payment.error}</div>}
+      {payment.settled?.credited && <div className="card banner-ok">پرداخت تأیید شد و موجودی اضافه شد.</div>}
 
-      {/* This screen used to open a modal branded "NabuPay — درگاه امن یکپارچه
-          نبوکس", ask you to pick between سامان, ملت, پاسارگاد and زرین‌پال,
-          wait 1.5 seconds, and then report that payment through the chosen
-          bank had succeeded. No gateway is connected and no bank was involved;
-          the balance was simply incremented. A convincing receipt for a
-          payment that did not happen is worse than no screen at all. */}
-      <div className="card" style={{ marginBottom: 24, padding: 16 }}>
-        <strong>درگاه پرداخت هنوز وصل نیست.</strong>
-        <p className="muted" style={{ margin: '8px 0 0', fontSize: 13, lineHeight: 1.7 }}>
-          این دکمه‌ها موجودی را بدون هیچ تراکنشِ بانکی بالا می‌برند و فقط برای
-          راه‌اندازی و آزمایش‌اند.
-        </p>
-      </div>
-
+      {/* This screen used to fake the whole thing: a modal branded "NabuPay",
+          a choice of four real banks, a 1.5-second wait and then a report that
+          payment had succeeded — with no gateway involved and the balance
+          simply incremented. It now hands off to the real gateway through the
+          NabuPay bridge, and the money is credited only once that gateway
+          confirms it. */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 24, padding: '16px 0' }}>
         {plans.map((plan) => (
           <div
@@ -85,9 +63,11 @@ export default function Plans() {
               className={`btn ${plan.popular ? 'btn-primary' : ''}`}
               style={!plan.popular ? { border: '1px solid var(--ng-border)', background: 'transparent', color: 'var(--ng-fg)' } : {}}
               onClick={() => buy(plan)}
-              disabled={loading}
+              disabled={payment.busy}
             >
-              {loading && selected?.id === plan.id ? 'در حال شارژ…' : `شارژ ${usd(plan.amount)}`}
+              {payment.busy && selected?.id === plan.id
+                ? 'در حال انتقال به درگاه…'
+                : `پرداخت ${usd(plan.amount)}`}
             </button>
           </div>
         ))}

@@ -112,6 +112,34 @@ that holds provider secrets and mints tokens, so the allow-list is a separate
 decision from the sign-in. With no list the button stays hidden and the
 endpoints refuse — an empty list reads as "nobody", never "everyone".
 
+## Paying for credit
+
+Wallet top-ups go through **NabuPay**, the payment bridge NabuDesk exposes. The
+gateways themselves — Zarinpal, Aqayepardakht, Larapay, Stripe, PayPal, Polar,
+NowPayments — are configured there, so no merchant credential lives in this
+repo and no card detail passes through this app: the payer is handed to the
+bank and comes back.
+
+| Variable | Meaning |
+|---|---|
+| `NABUPAY_URL` | The bridge's base URL, e.g. `https://desk.nabuxai.com` |
+| `NABUPAY_SECRET` | Shared secret; requests are signed `sha256("<app>:<ts>:<body>")` |
+| `NABUPAY_APP_ID` | Identifies this caller to the bridge, default `gate` |
+| `NABUPAY_GATEWAY` | Default gateway slug, default `zarinpal` |
+| `NABU_PUBLIC_URL` | Where the gateway returns the payer; derived from the request when unset |
+
+With `NABUPAY_URL` or `NABUPAY_SECRET` unset there is no gateway, and the panel
+says top-ups are unavailable. That is the honest answer, and it is the one that
+was missing while the button added to the balance without any money moving.
+
+The balance moves only when the bridge says the gateway confirmed the payment.
+Starting a top-up records the invoice as pending against the account and
+credits nothing; the panel finishes it when the payer returns, by asking the
+server to settle **its own** pending invoices. Nothing the payer's browser
+carries is read — not the query the gateway appends, not an invoice number —
+because a return URL is something anyone can type. Settling is safe to repeat,
+so refreshing that page credits once.
+
 ## Running it
 
 ```bash

@@ -858,7 +858,11 @@ func (s *Store) AddPayment(email string, amount float64, status string, id strin
 		u = &User{Email: email}
 		s.st.Users[email] = u
 	}
-	if status == "success" {
+	// Anything not explicitly a failure moves the balance. This read
+	// `status == "success"` and nothing else, so the admin screen's manual
+	// top-up — which passes "admin-recharge" — recorded a payment row and
+	// credited nothing: the operator saw "ok", the customer saw no money.
+	if status != "failed" && status != "pending" {
 		u.Balance += amount
 	}
 	u.Payments = append(u.Payments, Payment{

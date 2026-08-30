@@ -7,10 +7,12 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 	"time"
 
 	"nabugate/internal/adminstore"
+	"nabugate/internal/nabupay"
 	"nabugate/internal/provider"
 )
 
@@ -46,6 +48,7 @@ func (s *Server) mountConsoleAPI(mux *http.ServeMux) {
 	mux.Handle("GET /api/tokens", s.consoleAuth(s.listTokens))
 	mux.Handle("GET /api/me", s.consoleAuth(s.getMe))
 	mux.Handle("POST /api/me/recharge", s.consoleAuth(s.rechargeMe))
+	mux.Handle("POST /api/me/payments/settle", s.consoleAuth(s.settleMyPayments))
 	mux.Handle("GET /api/me/usage", s.consoleAuth(s.accountUsage))
 	mux.Handle("POST /api/me/password", s.consoleAuth(s.changeMyPassword))
 	mux.Handle("GET /api/requests", s.consoleAuth(s.recentRequests))
@@ -630,19 +633,141 @@ func (s *Server) changeMyPassword(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+// rechargeMe starts a real payment and hands back where to send the payer.
+//
+// It used to add the requested number to the balance and answer "paid" without
+// any money moving, which made the panel's top-up button a way to give yourself
+// credit. Now it raises an invoice on the NabuPay bridge, records it as pending
+// against this account, and returns the gateway's checkout URL. The balance
+// does not move until the gateway says it did — see settleMyPayment.
 func (s *Server) rechargeMe(w http.ResponseWriter, r *http.Request) {
 	email, _ := r.Context().Value(consoleEmailCtxKey{}).(string)
+
 	var req struct {
-		Amount float64 `json:"amount"`
+		Amount  float64 `json:"amount"`
+		Gateway string  `json:"gateway"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid amount")
 		return
 	}
-	// generate a fake transaction ID for simulation
-	txID := fmt.Sprintf("tr_%d", time.Now().UnixNano())
-	newBalance := s.admin.AddPayment(email, req.Amount, "success", txID)
-	writeJSON(w, http.StatusOK, map[string]any{"balance": newBalance})
+	if req.Amount <= 0 {
+		writeError(w, http.StatusBadRequest, "a payment must be for more than nothing")
+		return
+	}
+	if !s.pay.Configured() {
+		// 501 rather than 500: nothing is broken, the deployment simply has no
+		// gateway, and the panel renders that as a sentence instead of an error.
+		writeError(w, http.StatusNotImplemented, nabupay.ErrNotConfigured.Error())
+		return
+	}
+	if req.Gateway == "" {
+		req.Gateway = s.payGateway
+	}
+
+	checkout, err := s.pay.Start(r.Context(), nabupay.StartOptions{
+		AmountUSD:   req.Amount,
+		Gateway:     req.Gateway,
+		Description: fmt.Sprintf("NabuGate wallet top-up for %s", email),
+		// The payer returns to the panel, which then asks us to settle. The
+		// query the gateway appends is not read: only the invoice number is,
+		// and only to ask the bridge what really happened.
+		CallbackURL: s.publicURL(r) + "/panel/account",
+	})
+	if err != nil {
+		writeError(w, http.StatusBadGateway, err.Error())
+		return
+	}
+
+	// Recorded before the payer leaves, which is what binds this invoice to
+	// this account. Settling later cannot then take the payer's word for whose
+	// invoice it is.
+	if err := s.admin.StartPayment(email, req.Amount, checkout.Invoice); err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"invoice":      checkout.Invoice,
+		"checkout_url": checkout.URL,
+	})
+}
+
+// settleMyPayments finishes whatever this account left pending at the gateway.
+//
+// Called by the panel when a payer returns. Nothing that arrives with them is
+// read: not the query string the gateway appended, not an invoice number. The
+// invoices to ask about are the ones this account started before it left,
+// which is the only version of the question that cannot be pointed at somebody
+// else's payment.
+//
+// Safe to call repeatedly — the return page is one a payer can refresh — and
+// each invoice is credited once.
+func (s *Server) settleMyPayments(w http.ResponseWriter, r *http.Request) {
+	email, _ := r.Context().Value(consoleEmailCtxKey{}).(string)
+
+	if !s.pay.Configured() {
+		writeError(w, http.StatusNotImplemented, nabupay.ErrNotConfigured.Error())
+		return
+	}
+
+	// Bounded: somebody who started several checkouts and abandoned them should
+	// not turn one page load into an unbounded run of calls to the bridge.
+	pending := s.admin.PendingPayments(email, 10)
+
+	type result struct {
+		Invoice string  `json:"invoice"`
+		Paid    bool    `json:"paid"`
+		Amount  float64 `json:"amount"`
+	}
+	out := make([]result, 0, len(pending))
+	var balance float64
+	credited := false
+
+	for _, p := range pending {
+		paid, err := s.pay.Confirm(r.Context(), p.ID)
+		if err != nil {
+			// One unreachable invoice must not hide the others, and it is not
+			// a failed payment — the bridge simply did not answer.
+			s.log.Warn("could not confirm a payment", "invoice", p.ID, "error", err)
+			continue
+		}
+		if !paid {
+			out = append(out, result{Invoice: p.ID, Paid: false, Amount: p.Amount})
+			continue
+		}
+		b, err := s.admin.SettlePayment(email, p.ID)
+		if err != nil && !errors.Is(err, adminstore.ErrPaymentAlreadySettled) {
+			s.log.Error("confirmed payment could not be credited", "invoice", p.ID, "error", err)
+			continue
+		}
+		balance, credited = b, true
+		s.log.Info("wallet credited", "account", email, "invoice", p.ID, "balance", b)
+		out = append(out, result{Invoice: p.ID, Paid: true, Amount: p.Amount})
+	}
+
+	res := map[string]any{"payments": out, "credited": credited}
+	if credited {
+		res["balance"] = balance
+	}
+	writeJSON(w, http.StatusOK, res)
+}
+
+// publicURL is the base the payer's browser reached us on, so the gateway sends
+// them back to the same host they started from.
+func (s *Server) publicURL(r *http.Request) string {
+	if v := strings.TrimRight(os.Getenv("NABU_PUBLIC_URL"), "/"); v != "" {
+		return v
+	}
+	scheme := "https"
+	if r.TLS == nil && !strings.EqualFold(r.Header.Get("X-Forwarded-Proto"), "https") {
+		scheme = "http"
+	}
+	host := r.Header.Get("X-Forwarded-Host")
+	if host == "" {
+		host = r.Host
+	}
+	return scheme + "://" + host
 }
 
 func (s *Server) consoleOverview(w http.ResponseWriter, r *http.Request) {

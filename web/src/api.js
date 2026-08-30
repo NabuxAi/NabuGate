@@ -154,7 +154,19 @@ export const patchToken = (name, allowedOrigins, providers) =>
   });
 
 export const getMe = () => req('/me');
-export const rechargeMe = (amount) => req('/me/recharge', { method: 'POST', body: JSON.stringify({ amount: Number(amount) }) });
+// Starts a real payment: answers with an invoice number and the gateway's
+// checkout URL, not with a new balance. Nothing is credited until the payer
+// comes back and settleMyPayment confirms with the gateway.
+export const rechargeMe = (amount, gateway) =>
+  req('/me/recharge', {
+    method: 'POST',
+    body: JSON.stringify({ amount: Number(amount), gateway }),
+  });
+
+// Finishes whatever this account left pending at the gateway. Takes no
+// invoice number: the server knows which invoices this caller started, and
+// nothing the gateway put in the return URL is worth reading.
+export const settleMyPayments = () => req('/me/payments/settle', { method: 'POST' });
 
 // Both of these called get()/post(), which this module has never defined, and
 // doubled the /api prefix that req() already adds. Every admin user screen

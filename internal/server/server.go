@@ -19,6 +19,7 @@ import (
 	"nabugate/internal/agent"
 	"nabugate/internal/flow"
 	"nabugate/internal/memory"
+	"nabugate/internal/nabupay"
 	"nabugate/internal/photos"
 	"nabugate/internal/policy"
 	"nabugate/internal/provider"
@@ -54,6 +55,15 @@ type Server struct {
 	// requests is the recent-calls ring the console reads. In memory and
 	// bounded — see adminstore.RequestLog for why it is not persisted.
 	requests *adminstore.RequestLog
+
+	// pay starts and confirms real payments through NabuPay. nil when the
+	// deployment has no gateway configured, in which case the panel says
+	// recharging is unavailable rather than pretending to take money.
+	pay *nabupay.Client
+
+	// payGateway is the bridge gateway slug used when the panel does not name
+	// one — the deployment's default way to take money.
+	payGateway string
 
 	// memory is the conversation store. nil disables the feature entirely and
 	// every request behaves exactly as it did before.
@@ -110,6 +120,15 @@ func New(r *router.Router, enforcer *policy.Enforcer, tracker *usage.Tracker, ag
 // for the same reason as the other attachments.
 func (s *Server) WithToolExecutor(e *agent.ToolExecutor) *Server {
 	s.toolExec = e
+	return s
+}
+
+// WithPayments attaches the NabuPay bridge client. Separate from New for the
+// same reason the others are: a deployment with no payment gateway configured
+// keeps working exactly as it did, and its panel says so.
+func (s *Server) WithPayments(c *nabupay.Client, defaultGateway string) *Server {
+	s.pay = c
+	s.payGateway = defaultGateway
 	return s
 }
 

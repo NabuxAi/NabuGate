@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"nabugate/internal/config"
+	"nabugate/internal/nabupay"
 	"nabugate/internal/photos"
 	"nabugate/internal/policy"
 	"nabugate/internal/router"
@@ -72,6 +73,26 @@ func main() {
 		log.Warn(w)
 	}
 	srv := server.New(r, enforcer, tracker, agents, log).WithFlows(flows)
+
+	// Real payments, through the NabuPay bridge NabuDesk exposes. The gateways
+	// themselves are configured there; NabuGate owns the wallet and so decides
+	// when a balance moves, but never handles merchant credentials.
+	//
+	// Unset means no gateway: the panel says top-ups are unavailable, which is
+	// the honest answer and the one that was missing while the button simply
+	// added to the balance.
+	payClient := nabupay.New(
+		os.Getenv("NABUPAY_URL"),
+		envOr("NABUPAY_APP_ID", "gate"),
+		os.Getenv("NABUPAY_SECRET"),
+	)
+	srv = srv.WithPayments(payClient, envOr("NABUPAY_GATEWAY", "zarinpal"))
+	if payClient.Configured() {
+		log.Info("payments enabled", "bridge", os.Getenv("NABUPAY_URL"),
+			"default_gateway", envOr("NABUPAY_GATEWAY", "zarinpal"))
+	} else {
+		log.Info("payments disabled (NABUPAY_URL or NABUPAY_SECRET not set): the panel will say top-ups are unavailable")
+	}
 
 	// Console state: accounts, console-minted project tokens, and usage that
 	// survives a restart. Mount a volume at NABU_STATE_DIR to keep it — without
