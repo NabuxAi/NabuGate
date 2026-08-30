@@ -3,10 +3,10 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "description": "NabuGate admin console — web UI for the central AI gateway (dashboard, providers, model aliases/routing, project keys, usage & pricing).",
+  "description": "NabuGate admin console \u2014 web UI for the central AI gateway (dashboard, providers, model aliases/routing, project keys, usage & pricing).",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "vite build && node stamp-src-hash.mjs",
     "preview": "vite preview"
   },
   "dependencies": {
