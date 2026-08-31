@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -193,13 +194,37 @@ func (c *Client) do(req *http.Request, out any) error {
 	defer res.Body.Close()
 
 	// The bridge answers 422 with a usable sentence when a gateway refuses, so
-	// the body is decoded before the status is judged.
-	dec := json.NewDecoder(res.Body)
-	if err := dec.Decode(out); err != nil && res.StatusCode < 300 {
-		return fmt.Errorf("payment bridge returned an unreadable response: %w", err)
+	// the body is read before the status is judged.
+	body, readErr := io.ReadAll(io.LimitReader(res.Body, 1<<20))
+	if readErr != nil {
+		return fmt.Errorf("payment bridge response could not be read: %w", readErr)
 	}
-	if res.StatusCode >= 500 {
-		return fmt.Errorf("payment bridge is unavailable (%d)", res.StatusCode)
+
+	// Anything but 2xx is an ERROR, never a verdict.
+	//
+	// This used to decode 4xx into the zero value and return nil, so a rotated
+	// secret, a refused signature or a moved route came back from Confirm as
+	// (false, nil) — indistinguishable from "the gateway says this is unpaid".
+	// Every payer was told their payment had not been confirmed and nothing was
+	// logged, because the caller only logs on a non-nil error.
+	if res.StatusCode < 200 || res.StatusCode >= 300 {
+		var problem struct {
+			Message string `json:"message"`
+			Error   string `json:"error"`
+		}
+		_ = json.Unmarshal(body, &problem)
+		switch {
+		case problem.Message != "":
+			return fmt.Errorf("payment bridge refused the request (%d): %s", res.StatusCode, problem.Message)
+		case problem.Error != "":
+			return fmt.Errorf("payment bridge refused the request (%d): %s", res.StatusCode, problem.Error)
+		default:
+			return fmt.Errorf("payment bridge refused the request (%d)", res.StatusCode)
+		}
+	}
+
+	if err := json.Unmarshal(body, out); err != nil {
+		return fmt.Errorf("payment bridge returned an unreadable response: %w", err)
 	}
 	return nil
 }

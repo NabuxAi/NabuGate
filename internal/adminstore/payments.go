@@ -148,8 +148,12 @@ func (s *Store) PendingPayments(email string, limit int) []Payment {
 		return nil
 	}
 
+	// OLDEST first. Walking newest-first meant a genuinely paid invoice could be
+	// pushed out of the caller's limit by later abandoned attempts and never
+	// settled again — the one invoice with money behind it is the one that gets
+	// dropped, because every new top-up click raises a fresh pending row.
 	out := make([]Payment, 0, limit)
-	for i := len(u.Payments) - 1; i >= 0 && len(out) < limit; i-- {
+	for i := 0; i < len(u.Payments) && len(out) < limit; i++ {
 		if u.Payments[i].Status == "pending" {
 			out = append(out, u.Payments[i])
 		}

@@ -211,3 +211,29 @@ func TestAddPaymentDoesNotCreditFailedOrPendingRows(t *testing.T) {
 		}
 	}
 }
+
+// A payer who clicks top-up several times leaves abandoned pending invoices.
+// If the settle sweep looks at the newest ones, the single invoice they
+// actually paid can be pushed out of the window and never credited.
+func TestTheOldestPendingPaymentsAreOfferedFirst(t *testing.T) {
+	st := newPaymentStore(t)
+
+	// The one that will be paid, raised first.
+	if err := st.StartPayment("buyer@example.com", 50, "INV-PAID"); err != nil {
+		t.Fatalf("start: %v", err)
+	}
+	// Then a dozen abandoned attempts.
+	for i := 0; i < 12; i++ {
+		if err := st.StartPayment("buyer@example.com", 5, "INV-ABANDONED-"+string(rune('a'+i))); err != nil {
+			t.Fatalf("start %d: %v", i, err)
+		}
+	}
+
+	pending := st.PendingPayments("buyer@example.com", 10)
+	if len(pending) != 10 {
+		t.Fatalf("got %d pending, want the limit of 10", len(pending))
+	}
+	if pending[0].ID != "INV-PAID" {
+		t.Fatalf("first offered invoice is %q; the paid one is no longer reachable", pending[0].ID)
+	}
+}

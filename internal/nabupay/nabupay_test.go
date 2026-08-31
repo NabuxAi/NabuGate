@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 )
@@ -152,5 +153,62 @@ func TestABridgeThatIsDownIsReportedAsSuch(t *testing.T) {
 	c := New(srv.URL, "gate", "s")
 	if _, err := c.Confirm(context.Background(), "INV-1"); err == nil {
 		t.Error("a 502 from the bridge was reported as an answer")
+	}
+}
+
+// A refused request is an ERROR, not a verdict of "unpaid".
+//
+// Confirm used to decode any 4xx into the zero value and return (false, nil),
+// which is exactly what an unpaid invoice looks like. So a rotated secret or a
+// moved route told every payer their payment had not been confirmed, while the
+// caller — which only logs on a non-nil error — recorded nothing at all.
+func TestARefusedConfirmIsAnErrorRatherThanAnUnpaidVerdict(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		code int
+		body string
+		want string
+	}{
+		{"bad signature", 403, `{"success":false,"error":"Invalid NabuGate signature or expired request timestamp."}`, "Invalid NabuGate signature"},
+		{"route moved", 404, `{"message":"Not Found"}`, "Not Found"},
+		{"validation", 422, `{"message":"gateway not configured"}`, "gateway not configured"},
+		{"no body", 401, ``, "401"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(tc.code)
+				io.WriteString(w, tc.body)
+			}))
+			defer srv.Close()
+
+			c := New(srv.URL, "gate", "s")
+			paid, err := c.Confirm(context.Background(), "INV-1")
+			if err == nil {
+				t.Fatalf("a %d was reported as a verdict (paid=%v) instead of an error", tc.code, paid)
+			}
+			if paid {
+				t.Error("a refused request reported the invoice as paid")
+			}
+			if !strings.Contains(err.Error(), tc.want) {
+				t.Errorf("error %q does not mention %q, so an operator cannot tell what went wrong", err, tc.want)
+			}
+		})
+	}
+}
+
+// The same applies to starting a payment: a refusal must not look like a
+// checkout that merely lacked a URL.
+func TestARefusedStartSurfacesTheBridgesReason(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusForbidden)
+		io.WriteString(w, `{"error":"Invalid NabuGate signature or expired request timestamp."}`)
+	}))
+	defer srv.Close()
+
+	c := New(srv.URL, "gate", "s")
+	if _, err := c.Start(context.Background(), StartOptions{AmountUSD: 10}); err == nil {
+		t.Fatal("a 403 was accepted")
+	} else if !strings.Contains(err.Error(), "signature") {
+		t.Errorf("error %q hides the bridge's reason", err)
 	}
 }

@@ -17,27 +17,39 @@ export function usePayment(onSettled) {
   const [settled, setSettled] = useState(null);
 
   useEffect(() => {
-    // Only worth asking when the payer has plausibly just come back from a
-    // gateway. The bridge appends its own query to the return URL, so its
-    // presence is the signal — its contents are not read, because they come
-    // from the payer's browser and prove nothing.
+    // Settle on EVERY load of a screen that offers payment, not only when the
+    // gateway's query is present.
+    //
+    // This used to require ?status= or ?gateway= and then strip the query
+    // immediately, which gave each payment exactly one settlement attempt: the
+    // single page load on return from the bank. A gateway that confirms later —
+    // NowPayments waits for chain confirmations — or one blip in the bridge left
+    // the invoice pending forever, and the banner telling the payer to reopen
+    // the page could not work, because reopening it carries no query.
+    //
+    // Asking is cheap: the server returns immediately when nothing is pending.
     const params = new URLSearchParams(window.location.search);
-    if (!params.has('status') && !params.has('gateway')) return;
+    if (params.has('status') || params.has('gateway')) {
+      // Cosmetic only: keep the gateway's query out of a URL somebody might copy.
+      const clean = new URL(window.location.href);
+      clean.search = '';
+      window.history.replaceState(null, '', clean.toString());
+    }
 
-    // Cleared before anything else, so a refresh does not re-enter this and a
-    // copied URL carries no payment query.
-    const clean = new URL(window.location.href);
-    clean.search = '';
-    window.history.replaceState(null, '', clean.toString());
-
+    let cancelled = false;
     api
       .settleMyPayments()
       .then((res) => {
+        if (cancelled) return;
         setSettled(res);
         if (res?.credited && onSettled) onSettled();
       })
-      .catch((e) => setError(e.message));
-    // Once, on mount: the query is gone by the time anything could re-run it.
+      .catch((e) => {
+        if (!cancelled) setError(e.message);
+      });
+    return () => {
+      cancelled = true;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
