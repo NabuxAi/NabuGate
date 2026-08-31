@@ -26,6 +26,10 @@ import (
 	"nabugate/web"
 )
 
+// defaultPayGateway is the gateway used when NABUPAY_GATEWAY is unset. It must
+// be one the bridge can actually start a hosted checkout with.
+const defaultPayGateway = "aqayepardakht"
+
 func main() {
 	configPath := flag.String("config", envOr("NABU_CONFIG", "config.yaml"),
 		"path to the YAML config file (ignored when the NABU_CONFIG_YAML env var holds the config inline)")
@@ -86,10 +90,15 @@ func main() {
 		envOr("NABUPAY_APP_ID", "gate"),
 		os.Getenv("NABUPAY_SECRET"),
 	)
-	srv = srv.WithPayments(payClient, envOr("NABUPAY_GATEWAY", "zarinpal"))
+	// Not zarinpal. ZarinpalGateway extends LarapayGateway, which implements
+	// PaymentGateway but NOT HostedCheckout — and the bridge refuses anything
+	// that is not a HostedCheckout with "cannot start a payment for an invoice".
+	// So this default produced a 422 on the first top-up of any deployment that
+	// did not override it.
+	srv = srv.WithPayments(payClient, envOr("NABUPAY_GATEWAY", defaultPayGateway))
 	if payClient.Configured() {
 		log.Info("payments enabled", "bridge", os.Getenv("NABUPAY_URL"),
-			"default_gateway", envOr("NABUPAY_GATEWAY", "zarinpal"))
+			"default_gateway", envOr("NABUPAY_GATEWAY", defaultPayGateway))
 	} else {
 		log.Info("payments disabled (NABUPAY_URL or NABUPAY_SECRET not set): the panel will say top-ups are unavailable")
 	}
