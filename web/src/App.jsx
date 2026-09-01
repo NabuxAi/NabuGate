@@ -13,6 +13,7 @@ import Keys from './views/Keys.jsx';
 import Usage from './views/Usage.jsx';
 import Agents from './views/Agents.jsx';
 import Users from './views/Users.jsx';
+import Opsless from './views/Opsless.jsx';
 import Profile from "./views/Profile.jsx";
 import Payments from "./views/Payments.jsx";
 import Integration from './views/Integration.jsx';
@@ -29,6 +30,7 @@ const VIEWS = {
 
   dashboard: () => <Dashboard />,
   providers: () => <Providers />,
+  opsless: () => <Opsless />,
   models: () => <Models />,
   keys: () => <Keys />,
   tokens: () => <Tokens />,

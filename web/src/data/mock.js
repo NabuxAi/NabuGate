@@ -34,6 +34,7 @@ export const navGroups = [
       { id: 'providers', label: 'پروایدرها', icon: '🔌' },
       { id: 'agents', label: 'عامل‌ها', icon: '🤖' },
       { id: 'keys', label: 'کلیدهای سیستم', icon: '🔐' },
+      { id: 'opsless', label: 'اپس‌لس (Zero-UI)', icon: '⚡' },
     ]
   }
 ];
