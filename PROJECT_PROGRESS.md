@@ -86,6 +86,21 @@ breaks a vector store.
 3. **Origin allow-lists are opt-in per token.** A token minted without one is unrestricted,
    which is correct for server-side callers and wrong for a browser app — worth a warning in
    the console when a token is created without origins and is likely to be embedded.
+4. **Config-file project keys are unmetered.** The balance gate and the debit in
+   `RecordUsage` apply only to console-minted tokens with an owner. The eleven keys in
+   `config.default.yaml` (`nabudesk`, `nabuwrite`, `rasad-gcc`, …) have no owner and no
+   spend cap — usage is counted, nothing bounds it. Right for the org's own apps as long
+   as they are the org's; wrong the day one of those keys is handed to a customer. A
+   per-key `max_usd_per_day` in the policy is the smallest fix.
+5. **An unpriced model is served free.** `usage.Cost` returns 0 for any `provider/model`
+   missing from the price table, and nothing warns. Pinned by `TestUnpricedModelCostsZero`
+   so the next person changes it on purpose: a boot-time check that every routable model
+   has a price would close it.
+6. **Overdraft is bounded by one request, per concurrent request.** The gate is a
+   pre-flight `Balance <= 0`; a single expensive call, or several in flight at once, can
+   take a balance below zero by their full cost. Every metered response now carries
+   `X-Nabu-Balance-USD`, and `X-Nabu-Balance-Warning: low` under one dollar, so a caller
+   can see it coming; a reservation per request is what would actually bound it.
 
 ## Validation
 

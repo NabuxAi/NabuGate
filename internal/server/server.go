@@ -1040,6 +1040,11 @@ func aliasErrStatus(err error, unknownPrefix string) int {
 	return http.StatusBadGateway
 }
 
+// lowBalanceUSD is the remaining balance under which metered responses start
+// carrying X-Nabu-Balance-Warning. One dollar is a few hundred nabu-smart
+// calls: enough notice to top up, not so much that the header is always on.
+const lowBalanceUSD = 1.0
+
 // auth validates the bearer token, enforces the per-key rate limit, and stores
 // the resolved policy in the request context for later alias checks. When no
 // keys are configured, requests pass through (dev mode).
@@ -1071,15 +1076,25 @@ func (s *Server) auth(next http.HandlerFunc) http.HandlerFunc {
 					return
 				}
 				if t.Owner != "" {
-					if u := s.admin.GetUser(t.Owner); u != nil && u.Balance <= 0 {
-						s.admin.RecordDenied(t.Name)
-						s.requests.Add(adminstore.RequestEntry{
-							Project: t.Name, Denied: true,
-							Reason: "insufficient balance",
-						})
-						s.log.Warn("insufficient balance", "project", t.Name, "owner", t.Owner, "balance", u.Balance)
-						writeError(w, http.StatusPaymentRequired, "insufficient balance")
-						return
+					if u := s.admin.GetUser(t.Owner); u != nil {
+						if u.Balance <= 0 {
+							s.admin.RecordDenied(t.Name)
+							s.requests.Add(adminstore.RequestEntry{
+								Project: t.Name, Denied: true,
+								Reason: "insufficient balance",
+							})
+							s.log.Warn("insufficient balance", "project", t.Name, "owner", t.Owner, "balance", u.Balance)
+							writeError(w, http.StatusPaymentRequired, "insufficient balance: top up your NabuGate account to keep this key working")
+							return
+						}
+						// A hard 402 should never be the first thing a customer hears
+						// about their balance. Every metered response carries what is
+						// left, and a warning header once it drops under the threshold,
+						// so a caller can alert or top up before requests start failing.
+						w.Header().Set("X-Nabu-Balance-USD", strconv.FormatFloat(u.Balance, 'f', 4, 64))
+						if u.Balance < lowBalanceUSD {
+							w.Header().Set("X-Nabu-Balance-Warning", "low")
+						}
 					}
 				}
 				pol = policy.Policy{Project: t.Name, Allow: t.Allow, RateLimit: t.RateLimit, Providers: t.Providers}

@@ -22,6 +22,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"sort"
@@ -741,24 +742,36 @@ func (s *Store) RecordUsage(project, prov, model string, prompt, completion int6
 	cp.CostUSD += cost
 	s.st.UsageByProv[prov] = cp
 
-	// Deduct from the owner's balance if the project corresponds to a token
-	for _, t := range s.st.Tokens {
-		if t.Name == project && t.Owner != "" {
-			ownerEmail := strings.ToLower(t.Owner)
-			if u, ok := s.st.Users[ownerEmail]; ok {
-				u.Balance -= cost
-			}
-			break
-		}
-	}
-
+	// Deduct from the owner's balance if the project corresponds to a token.
+	// Matched the same way the token is looked up everywhere else (case-
+	// insensitively); an exact compare here would let a key named with a
+	// different case than its usage record run unmetered.
+	exhausted := false
 	for i := range s.st.Tokens {
-		if strings.EqualFold(s.st.Tokens[i].Name, project) {
-			s.st.Tokens[i].LastUsed = time.Now().UTC()
-			break
+		t := &s.st.Tokens[i]
+		if !strings.EqualFold(t.Name, project) {
+			continue
 		}
+		t.LastUsed = time.Now().UTC()
+		if t.Owner != "" {
+			if u, ok := s.st.Users[strings.ToLower(t.Owner)]; ok {
+				before := u.Balance
+				u.Balance -= cost
+				exhausted = before > 0 && u.Balance <= 0
+			}
+		}
+		break
 	}
 	s.dirty = true
+	// Debits normally ride the periodic flush; a disk write per request would
+	// dominate a cheap completion. The one debit worth paying for is the one
+	// that empties the account: lose it to a crash and the next boot serves the
+	// customer again on money already spent.
+	if exhausted {
+		if err := s.save(); err != nil {
+			log.Printf("adminstore: persist exhausted balance for %s: %v", project, err)
+		}
+	}
 }
 
 // RecordDenied counts a request refused by policy or origin, which is what
