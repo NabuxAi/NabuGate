@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"nabugate/internal/config"
+	"nabugate/internal/opsless"
 	"nabugate/internal/provider"
 )
 
@@ -431,7 +432,6 @@ func (r *Router) Image(ctx context.Context, alias string, req provider.ImageRequ
 			continue
 		}
 
-
 		if !providerAllowed(ctx, t.Provider) {
 			failures.add(t.Provider, t.Model, fmt.Errorf("provider not allowed by token policy"))
 			continue
@@ -481,7 +481,6 @@ func (r *Router) Speech(ctx context.Context, alias string, req provider.SpeechRe
 			r.log.Warn("skip audio target", "alias", alias, "provider", t.Provider, "reason", "no speech support")
 			continue
 		}
-
 
 		if !providerAllowed(ctx, t.Provider) {
 			failures.add(t.Provider, t.Model, fmt.Errorf("provider not allowed by token policy"))
@@ -556,7 +555,6 @@ func (r *Router) Embed(ctx context.Context, alias string, req provider.Embedding
 			r.log.Warn("skip embedding target", "alias", alias, "provider", t.Provider, "reason", "no embedding support")
 			continue
 		}
-
 
 		if !providerAllowed(ctx, t.Provider) {
 			failures.add(t.Provider, t.Model, fmt.Errorf("provider not allowed by token policy"))
@@ -712,7 +710,9 @@ func (r *Router) Responses(ctx context.Context, model string, body map[string]js
 		return nil, "", "", fmt.Errorf("unknown model alias %q", model)
 	}
 	var failures targetErrors
-	for _, t := range targets {
+	var failedProvider, failedModel, errReason string
+
+	for i, t := range targets {
 		adapter, ok := r.adapters[t.Provider]
 		if !ok {
 			failures.add(t.Provider, t.Model, fmt.Errorf("provider not available (is its API key set?)"))
@@ -724,7 +724,6 @@ func (r *Router) Responses(ctx context.Context, model string, body map[string]js
 			r.log.Warn("skip responses target", "model", model, "provider", t.Provider, "reason", "no responses support")
 			continue
 		}
-
 
 		if !providerAllowed(ctx, t.Provider) {
 			failures.add(t.Provider, t.Model, fmt.Errorf("provider not allowed by token policy"))
@@ -741,8 +740,23 @@ func (r *Router) Responses(ctx context.Context, model string, body map[string]js
 		if err != nil {
 			failures.add(t.Provider, t.Model, err)
 			r.log.Warn("upstream failed", append(attrs, "error", err.Error())...)
+			failedProvider = t.Provider
+			failedModel = t.Model
+			errReason = err.Error()
 			continue
 		}
+
+		// If this was a successful fallback (not the first attempt), trigger Opsless Zero-UI Alert
+		if i > 0 && failedProvider != "" {
+			project := "unknown"
+			if p, ok := ctx.Value("project").(string); ok {
+				project = p
+			}
+			go func(proj, fp, fm, tp, tm, reason string) {
+				opsless.NotifySelfHealing(r.log, proj, fp, fm, tp, tm, reason)
+			}(project, failedProvider, failedModel, t.Provider, t.Model, errReason)
+		}
+
 		r.log.Info("upstream ok", append(attrs, "status", resp.StatusCode)...)
 		return resp, t.Provider, t.Model, nil
 	}
@@ -804,7 +818,6 @@ func (r *Router) Transcribe(ctx context.Context, alias string, req provider.Tran
 			r.log.Warn("skip transcription target", "alias", alias, "provider", t.Provider, "reason", "no transcription support")
 			continue
 		}
-
 
 		if !providerAllowed(ctx, t.Provider) {
 			failures.add(t.Provider, t.Model, fmt.Errorf("provider not allowed by token policy"))
