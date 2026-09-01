@@ -698,26 +698,16 @@ models:
 
 
   nabu-smart:
-    # kimi-k2.6 is deliberately NOT here. On Parspack it returns its reasoning
-    # inline as `content` — no separate reasoning field and no delimiter to strip
-    # — so a caller gets "The user says ... the persona is ..." instead of an
-    # answer. It stays reachable as nabu-kimi for anyone who wants it knowingly.
     primary:
-      model: gpt-5.5
+      provider: 9router
+      model: "gemini-2.5-pro"
     fallback:
+      - provider: 9router
+        model: "gemini-2.5-flash"
+      - model: gpt-5.5
       - model: gpt-4o
       - model: deepseek-v4-pro
-      - model: gpt-4.1-mini
-      # Same all-Parspack chain as nabu-fast, same 402, same outage — and this
-      # is the alias NabuChat sends every message to, so the product went silent
-      # with it. The last two rungs cross vendors on purpose: one Google key,
-      # one OpenRouter free model that was verified answering rather than
-      # assumed to.
-      - provider: gemini
-        model: "gemini-2.5-flash"
       - model: claude-sonnet-5
-      - model: gpt-5.6-terra
-      - model: nemotron-3-ultra
       # Ultimate local self-hosted fallback
       - provider: llamacpp
         model: "qwen-local"
