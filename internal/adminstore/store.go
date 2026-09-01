@@ -741,6 +741,17 @@ func (s *Store) RecordUsage(project, prov, model string, prompt, completion int6
 	cp.CostUSD += cost
 	s.st.UsageByProv[prov] = cp
 
+	// Deduct from the owner's balance if the project corresponds to a token
+	for _, t := range s.st.Tokens {
+		if t.Name == project && t.Owner != "" {
+			ownerEmail := strings.ToLower(t.Owner)
+			if u, ok := s.st.Users[ownerEmail]; ok {
+				u.Balance -= cost
+			}
+			break
+		}
+	}
+
 	for i := range s.st.Tokens {
 		if strings.EqualFold(s.st.Tokens[i].Name, project) {
 			s.st.Tokens[i].LastUsed = time.Now().UTC()

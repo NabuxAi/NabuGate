@@ -1070,6 +1070,18 @@ func (s *Server) auth(next http.HandlerFunc) http.HandlerFunc {
 					writeError(w, http.StatusForbidden, "this key is not permitted from this origin")
 					return
 				}
+				if t.Owner != "" {
+					if u := s.admin.GetUser(t.Owner); u != nil && u.Balance <= 0 {
+						s.admin.RecordDenied(t.Name)
+						s.requests.Add(adminstore.RequestEntry{
+							Project: t.Name, Denied: true,
+							Reason: "insufficient balance",
+						})
+						s.log.Warn("insufficient balance", "project", t.Name, "owner", t.Owner, "balance", u.Balance)
+						writeError(w, http.StatusPaymentRequired, "insufficient balance")
+						return
+					}
+				}
 				pol = policy.Policy{Project: t.Name, Allow: t.Allow, RateLimit: t.RateLimit, Providers: t.Providers}
 				ok = true
 			}
