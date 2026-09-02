@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 
 import Layout from '../components/Layout.jsx';
 import * as api from '../api.js';
+import { Skeleton } from '../components/Skeleton.jsx';
 
 /*
  * Keys declared in config.yaml.
@@ -35,7 +36,7 @@ export default function Keys() {
           و از همین کنسول قابل مدیریت‌اند؛ این‌ها با دیپلوی می‌آیند.
         </p>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-          {projects === null && <span style={{ color: 'var(--ng-muted)' }}>…</span>}
+          {projects === null && <><Skeleton w={90} h={22} round /><Skeleton w={120} h={22} round /><Skeleton w={70} h={22} round /></>}
           {projects?.length === 0 && (
             <span style={{ color: 'var(--ng-muted)' }}>هیچ کلید پروژه‌ای در کانفیگ تعریف نشده.</span>
           )}

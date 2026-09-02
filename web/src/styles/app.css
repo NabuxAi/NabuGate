@@ -652,7 +652,7 @@ select.input {
   gap: 1rem;
 }
 
-.btn-primary {
+.landing-page .btn-primary {
   background-color: var(--ng-fg);
   color: var(--ng-bg);
   padding: 0.75rem 1.5rem;
@@ -662,7 +662,7 @@ select.input {
   transition: opacity 0.2s;
 }
 
-.btn-primary:hover {
+.landing-page .btn-primary:hover {
   opacity: 0.9;
 }
 

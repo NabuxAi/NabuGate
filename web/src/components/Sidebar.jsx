@@ -29,7 +29,12 @@ export default function Sidebar({ current, onNavigate, effectivelyAdmin, isPanel
                     type="button"
                     className={'nav-item' + (current === item.id ? ' active' : '')}
                     aria-current={current === item.id ? 'page' : undefined}
-                    onClick={() => onNavigate(item.id)}
+                    onClick={() => {
+                      // On a phone the sidebar is a drawer; a tap on an item
+                      // should take you to the page, not leave the drawer open.
+                      document.querySelector('.app')?.classList.remove('nav-open');
+                      onNavigate(item.id);
+                    }}
                   >
                     <span className="ic" aria-hidden="true">
                       {item.icon}

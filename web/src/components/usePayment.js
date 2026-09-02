@@ -45,7 +45,10 @@ export function usePayment(onSettled) {
         if (res?.credited && onSettled) onSettled();
       })
       .catch((e) => {
-        if (!cancelled) setError(e.message);
+        // 501 is "this deployment has no gateway", which the screens already
+        // say in their own words; repeating it as a red banner on every visit
+        // made an ordinary deployment look broken.
+        if (!cancelled && e.status !== 501) setError(e.message);
       });
     return () => {
       cancelled = true;

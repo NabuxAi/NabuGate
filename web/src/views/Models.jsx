@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import Layout from '../components/Layout.jsx';
 import * as api from '../api.js';
+import { SkeletonCards } from '../components/Skeleton.jsx';
 
 export default function Models() {
   const [data, setData] = useState(null);
@@ -44,7 +45,8 @@ export default function Models() {
         </p>
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 16 }}>
-          {aliases.length === 0 && <div className="card" style={{ padding: 24, textAlign: 'center', color: 'var(--ng-muted)' }}>در حال بارگذاری...</div>}
+          {data === null && <div style={{ gridColumn: '1 / -1' }}><SkeletonCards n={6} h={110} /></div>}
+          {data !== null && aliases.length === 0 && <div className="card" style={{ padding: 24, textAlign: 'center', color: 'var(--ng-muted)', gridColumn: '1 / -1' }}>هیچ aliasی تعریف نشده است.</div>}
           {aliases.map((a) => {
             const style = getModelColor(a.id);
             return (

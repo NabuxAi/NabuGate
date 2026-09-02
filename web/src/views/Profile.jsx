@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import Layout from '../components/Layout.jsx';
 import * as api from '../api.js';
 import { usd } from '../data/mock.js';
+import { SkeletonTable, Skeleton } from '../components/Skeleton.jsx';
 
 export default function Profile() {
   const [user, setUser] = useState(null);
@@ -65,7 +66,9 @@ export default function Profile() {
           <h3 style={{ fontSize: 16, marginBottom: 20, paddingBottom: 12, borderBottom: '1px solid var(--ng-border)' }}>تاریخچه پرداخت‌ها</h3>
           
           <div style={{ flex: 1 }}>
-            {payments.length === 0 ? (
+            {user === null ? (
+              <SkeletonTable rows={4} cols={4} />
+            ) : payments.length === 0 ? (
               <div style={{ padding: '40px 20px', textAlign: 'center', color: 'var(--ng-muted)' }}>
                 <div style={{ fontSize: 32, marginBottom: 12, opacity: 0.5 }}>🧾</div>
                 <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 8, color: 'var(--ng-heading)' }}>تراکنشی یافت نشد</div>
@@ -97,8 +100,8 @@ export default function Profile() {
                         {/* Read from the record. This was hard-coded to
                             "موفق", so a failed payment was reported as a
                             successful one. */}
-                        <span className={'badge ' + (p.status === 'success' ? 'badge-pass' : 'badge-fail')} style={{ fontSize: 11 }}>
-                          {p.status === 'success' ? 'موفق' : 'ناموفق'}
+                        <span className={'badge ' + (p.status === 'success' ? 'badge-ok' : p.status === 'pending' ? 'badge-warn' : 'badge-fail')} style={{ fontSize: 11 }}>
+                          {p.status === 'success' ? 'موفق' : p.status === 'pending' ? 'در انتظار' : 'ناموفق'}
                         </span>
                       </td>
                     </tr>

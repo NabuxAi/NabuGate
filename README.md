@@ -140,6 +140,11 @@ carries is read — not the query the gateway appends, not an invoice number —
 because a return URL is something anyone can type. Settling is safe to repeat,
 so refreshing that page credits once.
 
+Operator guide, including every log line and what to tell a customer:
+[`docs/payments.md`](docs/payments.md). Customer-facing walkthrough:
+[`docs/getting-started.md`](docs/getting-started.md), and the public page at
+`/docs`.
+
 ## Running it
 
 ```bash

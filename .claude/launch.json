@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "gateway",
+      "runtimeExecutable": "env",
+      "runtimeArgs": ["NABU_STATE_DIR=/private/tmp/claude-501/-Users-mrchatgpt-Sites-NabuGate/f1605a83-0ede-4e90-b0f7-eb5be9cc3d61/scratchpad/state", "NABU_ALLOW_NO_AUTH=1", "go", "run", "./cmd/gateway", "-config", "config.yaml"],
+      "port": 8080
+    }
+  ]
+}

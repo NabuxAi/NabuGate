@@ -1,0 +1,323 @@
+/*
+ * Console polish: motion, skeletons, mobile drawer, softer surfaces.
+ *
+ * Loaded after app.css so it only refines. Every animation here is opacity or
+ * transform (compositor-only) and every one is switched off under
+ * prefers-reduced-motion, which app.css already honours for transitions.
+ */
+
+:root {
+  --ng-accent-grad: linear-gradient(135deg, #2563eb 0%, #7c3aed 100%);
+  /* Critically damped spring (no overshoot) sampled into a linear() curve, so
+     CSS transitions settle the way a damping-1.0 spring does: fast start,
+     long soft tail. Older engines fall back to the bezier on the next line. */
+  --ng-spring: cubic-bezier(0.2, 0.9, 0.3, 1);
+  --ng-spring: linear(0, 0.213 6.3%, 0.41 12.9%, 0.567 19.8%, 0.692 27.1%, 0.788 34.9%, 0.859 43.1%, 0.91 51.8%, 0.945 61%, 0.97 71.5%, 0.985 82.5%, 0.995 93.6%, 1);
+  /* Under-damped (~0.8) for things that arrive with momentum: drawer, sheet. */
+  --ng-spring-soft: cubic-bezier(0.3, 1.3, 0.4, 1);
+  --ng-spring-soft: linear(0, 0.35 6.5%, 0.66 13.5%, 0.89 20.8%, 1.03 28.4%, 1.08 36.4%, 1.06 45%, 1.02 54%, 0.995 64%, 0.992 75%, 1 100%);
+  --ng-ease-out: var(--ng-spring);
+  --ng-response: 320ms;   /* "response": time to reach target, not a fixed duration */
+  --ng-response-fast: 160ms;
+  --ng-dur-slow: var(--ng-response);
+}
+
+/* ---- Typography: tracking and leading follow size ---- */
+.topbar h2, .card h3, .kpi .kpi-value, .plan .price, .plan h3 { letter-spacing: -0.015em; }
+.kpi .kpi-value, .plan .price { letter-spacing: -0.02em; line-height: 1.05; }
+.kpi .kpi-sub, .card .card-sub, .badge, .tag, .svc-meta { letter-spacing: 0.01em; }
+
+
+/* ---- Buttons: gradient primary, real outline variant, focus ring ---- */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px; line-height: 1;
+  transition: transform var(--ng-response) var(--ng-spring), filter var(--ng-response) var(--ng-spring), background var(--ng-dur) var(--ng-ease), border-color var(--ng-dur) var(--ng-ease);
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation; /* removes the 300ms tap delay */
+}
+/* The press is acknowledged on pointer-down, not on release, and settles
+   back with the spring. 80ms in, so the finger never waits for it. */
+.btn:active:not(:disabled), .chip:active, .nav-item:active, .check-item:active { transform: scale(0.97) !important; transition-duration: 80ms; }
+.btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none !important; }
+.btn:focus-visible, .input:focus-visible, .nav-item:focus-visible {
+  outline: 2px solid var(--ng-accent-strong);
+  outline-offset: 2px;
+}
+.btn-primary {
+  background: var(--ng-accent-grad);
+  color: #fff;
+  box-shadow: 0 8px 20px rgba(37, 99, 235, 0.25);
+}
+.btn-primary:hover { background: var(--ng-accent-grad); filter: brightness(1.08); }
+.btn-outline {
+  background: transparent;
+  color: var(--ng-heading);
+  border: 1px solid var(--ng-border-card);
+}
+.btn-outline:hover { background: var(--ng-surface-soft); border-color: var(--ng-accent-border); }
+.btn-sm { min-height: 32px; padding: 6px 12px; font-size: 12px; }
+.btn-lg { min-height: 46px; padding: 12px 22px; font-size: 14px; }
+
+/* ---- Cards: soft lift on hover, only for cards that opt in ---- */
+.card { transition: transform var(--ng-response) var(--ng-spring), border-color var(--ng-dur) var(--ng-ease); }
+.card-hover { position: relative; }
+.card-hover::after {
+  content: ''; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
+  box-shadow: 0 16px 40px rgba(2, 6, 23, 0.35); opacity: 0;
+  transition: opacity var(--ng-response) var(--ng-spring);
+}
+[data-theme="light"] .card-hover::after { box-shadow: 0 16px 40px rgba(15, 23, 42, 0.12); }
+.card-hover:hover { transform: translateY(-2px); border-color: var(--ng-accent-border); }
+.card-hover:hover::after { opacity: 1; }
+.card-flat { box-shadow: none; }
+
+/* ---- View transitions ---- */
+@keyframes ng-view-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: none; }
+}
+.view-enter { animation: ng-view-in var(--ng-response) var(--ng-spring) both; will-change: transform, opacity; }
+.fade-in { animation: ng-view-in 240ms var(--ng-spring) both; }
+
+/* Children of a grid arrive one after another. The delay is capped so a long
+   list does not keep the last row invisible for a second. */
+.stagger > * { animation: ng-view-in 380ms var(--ng-ease-out) both; }
+.stagger > *:nth-child(1) { animation-delay: 0ms; }
+.stagger > *:nth-child(2) { animation-delay: 45ms; }
+.stagger > *:nth-child(3) { animation-delay: 90ms; }
+.stagger > *:nth-child(4) { animation-delay: 135ms; }
+.stagger > *:nth-child(5) { animation-delay: 180ms; }
+.stagger > *:nth-child(6) { animation-delay: 225ms; }
+.stagger > *:nth-child(n+7) { animation-delay: 260ms; }
+
+/* ---- Skeletons ---- */
+.sk {
+  position: relative;
+  overflow: hidden;
+  background: var(--ng-surface-soft);
+  border-radius: var(--ng-radius-sm);
+  min-height: 12px;
+}
+.sk::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, var(--ng-sk-shine, rgba(255, 255, 255, 0.07)), transparent);
+  animation: ng-shimmer 1.5s var(--ng-ease-out) infinite;
+}
+[data-theme="light"] .sk::after { --ng-sk-shine: rgba(15, 23, 42, 0.06); }
+@keyframes ng-shimmer { to { transform: translateX(100%); } }
+.sk-text { height: 12px; }
+.sk-title { height: 18px; width: 40%; }
+.sk-round { border-radius: var(--ng-radius-pill); }
+.sk-stack { display: flex; flex-direction: column; gap: 10px; }
+.sk-stat { padding: 18px; }
+
+/* ---- Empty state ---- */
+.empty {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center;
+  padding: 40px 16px; color: var(--ng-muted); gap: 8px;
+}
+.empty .empty-icon {
+  width: 52px; height: 52px; border-radius: 16px; display: grid; place-items: center;
+  background: var(--ng-surface-soft); border: 1px solid var(--ng-border); font-size: 22px; margin-bottom: 6px;
+}
+.empty h4 { margin: 0; color: var(--ng-heading); font-size: 14px; font-weight: 800; }
+.empty p { margin: 0; font-size: 12.5px; line-height: 1.8; max-width: 380px; }
+
+/* ---- Progress bars (usage breakdown) ---- */
+.bar { height: 8px; border-radius: 999px; background: var(--ng-surface-softer); overflow: hidden; }
+.bar > i { display: block; height: 100%; border-radius: inherit; background: var(--ng-accent-grad); transform-origin: right; animation: ng-grow 600ms var(--ng-ease-out) both; }
+[dir="ltr"] .bar > i { transform-origin: left; }
+@keyframes ng-grow { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+
+/* ---- Checklist (getting-started card) ---- */
+.checklist { display: flex; flex-direction: column; gap: 10px; }
+.check-item {
+  display: flex; align-items: center; gap: 12px; padding: 12px 14px;
+  border: 1px solid var(--ng-border); border-radius: var(--ng-radius); background: var(--ng-surface-soft);
+  transition: border-color var(--ng-dur) var(--ng-ease), background var(--ng-dur) var(--ng-ease);
+}
+.check-item.done { border-color: var(--ng-ok-border); background: var(--ng-ok-surface); }
+.check-item .mark {
+  width: 26px; height: 26px; border-radius: 999px; display: grid; place-items: center; flex: 0 0 auto;
+  font-size: 12px; font-weight: 800; background: var(--ng-surface); border: 1px solid var(--ng-border-card); color: var(--ng-muted);
+}
+.check-item.done .mark { background: var(--ng-ok); border-color: var(--ng-ok); color: #fff; }
+.check-item .txt { flex: 1; min-width: 0; }
+.check-item .txt strong { display: block; font-size: 13px; color: var(--ng-heading); }
+.check-item .txt span { font-size: 12px; color: var(--ng-muted); }
+
+/* ---- Pricing cards ---- */
+.plan-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 18px; }
+.plan {
+  position: relative; display: flex; flex-direction: column; gap: 14px; padding: 26px 24px;
+  border: 1px solid var(--ng-border-card); border-radius: 16px; background: var(--ng-surface);
+  box-shadow: var(--ng-shadow-card);
+  transition: transform var(--ng-response) var(--ng-spring), border-color var(--ng-dur) var(--ng-ease);
+}
+.plan:hover { transform: translateY(-3px); border-color: var(--ng-accent-border); }
+.plan:active { transform: translateY(-1px) scale(0.995); transition-duration: 80ms; }
+.plan.featured { border-color: var(--ng-accent-border); background: linear-gradient(180deg, var(--ng-accent-soft), var(--ng-surface) 45%); }
+.plan .ribbon {
+  position: absolute; top: -12px; inset-inline-start: 20px; padding: 4px 12px; border-radius: 999px;
+  background: var(--ng-accent-grad); color: #fff; font-size: 11px; font-weight: 800; letter-spacing: 0.2px;
+}
+.plan h3 { font-size: 17px; font-weight: 800; color: var(--ng-heading); }
+.plan .price { font-size: 34px; font-weight: 900; color: var(--ng-heading); line-height: 1; }
+.plan .price small { font-size: 12px; font-weight: 600; color: var(--ng-muted); margin-inline-start: 6px; }
+.plan ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; color: var(--ng-slate-700); font-size: 13px; }
+.plan ul li { display: flex; gap: 8px; align-items: flex-start; line-height: 1.7; }
+.plan ul li::before { content: '✓'; color: var(--ng-ok-text); font-weight: 900; flex: 0 0 auto; }
+.plan .spacer { flex: 1; }
+
+/* ---- Amount chips ---- */
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip {
+  border: 1px solid var(--ng-border-card); background: var(--ng-surface-soft); color: var(--ng-heading);
+  border-radius: 999px; padding: 7px 14px; font-size: 13px; font-weight: 700; cursor: pointer;
+  transition: background var(--ng-dur) var(--ng-ease), border-color var(--ng-dur) var(--ng-ease), transform var(--ng-dur) var(--ng-ease);
+}
+.chip:hover { transform: translateY(-1px); border-color: var(--ng-accent-border); }
+.chip.active { background: var(--ng-accent-soft); border-color: var(--ng-accent); color: var(--ng-accent-strong); }
+
+/* ---- Steps (how payment works) ---- */
+.steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
+.step { display: flex; gap: 12px; padding: 14px; border: 1px solid var(--ng-border); border-radius: var(--ng-radius); background: var(--ng-surface-soft); }
+.step .num { width: 28px; height: 28px; flex: 0 0 auto; border-radius: 999px; display: grid; place-items: center; background: var(--ng-accent-grad); color: #fff; font-weight: 800; font-size: 12px; }
+.step strong { display: block; font-size: 13px; color: var(--ng-heading); margin-bottom: 2px; }
+.step span { font-size: 12px; color: var(--ng-muted); line-height: 1.7; }
+
+/* ---- FAQ / details ---- */
+.faq { border: 1px solid var(--ng-border); border-radius: var(--ng-radius); background: var(--ng-surface-soft); overflow: hidden; }
+.faq + .faq { margin-top: 8px; }
+.faq summary {
+  list-style: none; cursor: pointer; padding: 13px 16px; font-size: 13.5px; font-weight: 700; color: var(--ng-heading);
+  display: flex; justify-content: space-between; align-items: center; gap: 12px;
+}
+.faq summary::-webkit-details-marker { display: none; }
+.faq summary::after { content: '+'; font-size: 18px; color: var(--ng-muted); transition: transform var(--ng-dur) var(--ng-ease); }
+.faq[open] summary::after { transform: rotate(45deg); }
+.faq .faq-body { padding: 0 16px 14px; font-size: 13px; line-height: 1.9; color: var(--ng-slate-700); animation: ng-view-in 220ms var(--ng-ease-out) both; }
+.faq .faq-body code { direction: ltr; unicode-bidi: isolate; font-family: var(--ng-mono); font-size: 12px; background: var(--ng-surface); border: 1px solid var(--ng-border); padding: 1px 6px; border-radius: 6px; }
+
+/* ---- Callouts ---- */
+.callout { display: flex; gap: 12px; padding: 14px 16px; border-radius: var(--ng-radius); border: 1px solid var(--ng-info-border); background: var(--ng-info-surface); color: var(--ng-slate-700); font-size: 13px; line-height: 1.8; }
+.callout.warn { border-color: var(--ng-warn-border); background: var(--ng-warn-surface); }
+.callout.ok { border-color: var(--ng-ok-border); background: var(--ng-ok-surface); }
+.callout.danger { border-color: var(--ng-danger); background: var(--ng-danger-bg); }
+.callout .ci { flex: 0 0 auto; font-size: 18px; line-height: 1.4; }
+.callout strong { color: var(--ng-heading); }
+.banner-ok, .banner-error { display: flex; align-items: center; gap: 10px; animation: ng-view-in 240ms var(--ng-ease-out) both; }
+.banner-error { border-color: var(--ng-danger); background: var(--ng-danger-bg); }
+.banner-ok { border-color: var(--ng-ok-border); background: var(--ng-ok-surface); }
+
+/* ---- Code blocks ---- */
+.code {
+  direction: ltr; text-align: left; margin: 0; padding: 14px 16px; overflow-x: auto;
+  background: var(--ng-code-bg); color: var(--ng-code-text); border: 1px solid var(--ng-border);
+  border-radius: var(--ng-radius); font-family: var(--ng-mono); font-size: 12.5px; line-height: 1.7;
+  white-space: pre;
+}
+.code-wrap { position: relative; }
+.code-wrap .copy {
+  position: absolute; top: 8px; right: 8px; min-height: 26px; padding: 3px 9px; font-size: 11px;
+  background: var(--ng-surface); border: 1px solid var(--ng-border-card); color: var(--ng-muted); border-radius: 6px; cursor: pointer;
+  opacity: 0; transition: opacity var(--ng-dur) var(--ng-ease), color var(--ng-dur) var(--ng-ease);
+}
+.code-wrap:hover .copy, .code-wrap .copy:focus-visible, .code-wrap .copy.done { opacity: 1; }
+.code-wrap .copy.done { color: var(--ng-ok-text); border-color: var(--ng-ok-border); }
+
+/* ---- Topbar: translucent material, content scrolls beneath ---- */
+.topbar {
+  background: color-mix(in srgb, var(--ng-surface) 72%, transparent);
+  backdrop-filter: blur(18px) saturate(160%);
+  -webkit-backdrop-filter: blur(18px) saturate(160%);
+  border-bottom: none;
+}
+.topbar::after {
+  /* A soft edge where floating chrome meets content; visible only once
+     something has scrolled beneath it (see .main.scrolled). */
+  content: ''; position: absolute; left: 0; right: 0; bottom: -14px; height: 14px; pointer-events: none;
+  background: linear-gradient(to bottom, color-mix(in srgb, var(--ng-bg) 70%, transparent), transparent);
+  opacity: 0; transition: opacity var(--ng-response) var(--ng-spring);
+}
+.main.scrolled .topbar::after { opacity: 1; }
+.main.scrolled .topbar { box-shadow: 0 1px 0 var(--ng-border); }
+.sidebar { backdrop-filter: blur(18px) saturate(160%); -webkit-backdrop-filter: blur(18px) saturate(160%); }
+
+/* ---- Topbar: mobile menu button ---- */
+.menu-btn {
+  display: none; width: 38px; height: 38px; border-radius: 10px; border: 1px solid var(--ng-border-card);
+  background: var(--ng-surface-soft); color: var(--ng-heading); cursor: pointer; font-size: 18px; line-height: 1;
+}
+.topbar-title { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.nav-backdrop { display: none; }
+
+@media (max-width: 720px) {
+  .menu-btn { display: grid; place-items: center; }
+  .content { padding: 16px 14px 32px; }
+  .topbar { padding: 0 14px; }
+  .app .sidebar {
+    display: flex; position: fixed; top: 0; bottom: 0; inset-inline-start: 0; z-index: 45;
+    transform: translateX(100%); transition: transform var(--ng-response) var(--ng-spring);
+    box-shadow: none; will-change: transform;
+  }
+  [dir="ltr"] .app .sidebar { transform: translateX(-100%); }
+  .app.nav-open .sidebar { transform: none; box-shadow: var(--ng-shadow-card); transition-timing-function: var(--ng-spring-soft); transition-duration: 380ms; }
+  .app.nav-open .nav-backdrop {
+    display: block; position: fixed; inset: 0; z-index: 40; background: rgba(2, 6, 23, 0.55);
+    backdrop-filter: blur(2px); animation: ng-fade 200ms both;
+  }
+  .plan-grid { grid-template-columns: 1fr; }
+}
+@keyframes ng-fade { from { opacity: 0; } to { opacity: 1; } }
+
+/* ---- Modals: materialise, do not merely fade ---- */
+@keyframes ng-materialise {
+  from { opacity: 0; transform: scale(0.96); filter: blur(6px); }
+  to   { opacity: 1; transform: none; filter: blur(0); }
+}
+.modal-backdrop { animation: ng-fade 200ms both; backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
+.modal-backdrop > .card, .modal-backdrop > .modal { animation: ng-materialise var(--ng-response) var(--ng-spring) both; transform-origin: center; }
+
+/* ---- Boot shell ---- */
+.boot-shell { display: flex; min-height: 100vh; }
+.boot-shell .boot-side { width: var(--ng-sidebar-w); border-inline-start: 1px solid var(--ng-border); background: var(--ng-surface); padding: 22px 16px; display: flex; flex-direction: column; gap: 12px; }
+.boot-shell .boot-main { flex: 1; padding: 22px 24px; display: flex; flex-direction: column; gap: 18px; }
+@media (max-width: 720px) { .boot-shell .boot-side { display: none; } }
+
+/* ---- Utilities ---- */
+.muted { color: var(--ng-muted); }
+.row-between { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+.grid-auto { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; }
+.kpi { padding: 20px 22px; display: flex; flex-direction: column; gap: 8px; }
+.kpi .kpi-label { font-size: 12.5px; color: var(--ng-muted); display: flex; align-items: center; gap: 8px; }
+.kpi .kpi-value { font-size: 26px; font-weight: 800; color: var(--ng-heading); line-height: 1.1; }
+.kpi .kpi-sub { font-size: 11.5px; color: var(--ng-subtle); }
+.kpi-icon { width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; font-size: 16px; background: var(--ng-accent-soft); color: var(--ng-accent-strong); }
+.kpi-icon.ok { background: var(--ng-ok-surface); color: var(--ng-ok-text); }
+.kpi-icon.warn { background: var(--ng-warn-surface); color: var(--ng-warn-text); }
+.kpi-icon.pass { background: var(--ng-pass-surface); color: var(--ng-pass-text); }
+
+@keyframes ng-crossfade { from { opacity: 0; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  /* Motion is replaced, not removed: a short cross-fade still tells the eye
+     that something changed, without any travel. */
+  .view-enter, .fade-in, .stagger > *, .faq .faq-body, .banner-ok, .banner-error, .modal-backdrop > .card, .modal-backdrop > .modal {
+    animation: ng-crossfade 180ms ease both !important; transform: none !important; filter: none !important;
+  }
+  .stagger > * { animation-delay: 0ms !important; }
+  .sk::after, .bar > i { animation: none !important; transform: none !important; }
+  .card, .plan, .chip, .btn, .app .sidebar, .card-hover::after { transition: opacity 150ms ease !important; transform: none !important; }
+  .btn:active:not(:disabled) { transform: none !important; filter: brightness(0.92); }
+}
+@media (prefers-reduced-transparency: reduce) {
+  .topbar, .sidebar { background: var(--ng-surface); backdrop-filter: none; -webkit-backdrop-filter: none; }
+  .modal-backdrop { backdrop-filter: none; -webkit-backdrop-filter: none; background: rgba(2, 6, 23, 0.85); }
+}
+@media (prefers-contrast: more) {
+  .card, .plan, .kpi, .faq, .step, .check-item { border-color: var(--ng-heading); }
+  .btn-outline { border-width: 2px; }
+}

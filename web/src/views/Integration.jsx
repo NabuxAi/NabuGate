@@ -1,6 +1,8 @@
 import Layout from '../components/Layout.jsx';
 import { useState, useEffect } from 'react';
 import * as api from '../api.js';
+import CodeBlock from '../components/CodeBlock.jsx';
+import { Skeleton } from '../components/Skeleton.jsx';
 
 export default function Integration() {
   const origin = typeof window !== 'undefined' ? window.location.origin : 'https://gate.nabuxai.com';
@@ -62,27 +64,19 @@ export default function Integration() {
         <h3 style={{ marginTop: 0, marginBottom: 16 }}>شروع سریع</h3>
 
         <h4 style={{ marginBottom: 8 }}>OpenAI Python SDK</h4>
-        <pre className="code-block" style={codeBlock}>
-          <code>
-{`from openai import OpenAI
+        <CodeBlock code={`from openai import OpenAI
 
 client = OpenAI(base_url="${origin}/v1", api_key="${keyPlaceholder}")
 client.chat.completions.create(
     model="${model}",
     messages=[{"role": "user", "content": "سلام"}],
-)`}
-          </code>
-        </pre>
+)`} />
 
         <h4 style={{ marginTop: 24, marginBottom: 8 }}>cURL</h4>
-        <pre className="code-block" style={codeBlock}>
-          <code>
-{`curl ${origin}/v1/chat/completions \\
+        <CodeBlock code={`curl ${origin}/v1/chat/completions \\
   -H "Authorization: Bearer ${keyPlaceholder}" \\
   -H "Content-Type: application/json" \\
-  -d '{"model":"${model}","messages":[{"role":"user","content":"سلام"}]}'`}
-          </code>
-        </pre>
+  -d '{"model":"${model}","messages":[{"role":"user","content":"سلام"}]}'`} />
       </div>
 
       <div className="card" style={{ marginBottom: 24, padding: 24 }}>
@@ -96,7 +90,7 @@ client.chat.completions.create(
           روترِ در حالِ اجرا خوانده می‌شود.
         </p>
         {aliases.length === 0 ? (
-          <p className="muted" style={{ fontSize: 13, margin: 0 }}>چیزی برای نمایش نیست.</p>
+          <div className="chips"><Skeleton w={110} h={40} /><Skeleton w={130} h={40} /><Skeleton w={100} h={40} /></div>
         ) : (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 12 }}>
             {aliases.map((a) => (

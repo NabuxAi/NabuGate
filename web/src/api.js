@@ -38,7 +38,9 @@ async function req(path, options = {}) {
     } catch {
       /* non-JSON error body */
     }
-    throw new Error(message);
+    const err = new Error(message);
+    err.status = res.status;
+    throw err;
   }
   return res.status === 204 ? null : res.json();
 }

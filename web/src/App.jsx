@@ -23,6 +23,8 @@ import Landing from './views/Landing.jsx';
 import Docs from './views/Docs.jsx';
 import Security from './views/Security.jsx';
 import Requests from './views/Requests.jsx';
+import { BootShell } from './components/Skeleton.jsx';
+import ErrorBoundary from './components/ErrorBoundary.jsx';
 
 const VIEWS = {
   landing: () => <Landing lang={window.location.pathname.startsWith('/fa') ? 'fa' : 'en'} />,
@@ -100,7 +102,7 @@ export default function App() {
     window.dispatchEvent(new PopStateEvent('popstate'));
   };
 
-  if (session === null) return <div className="app-boot">…</div>;
+  if (session === null) return <BootShell />;
   if (!session.authenticated && (view === 'landing' || view === 'docs') && !isPanel && !isAdminPath) {
     const View = VIEWS[view];
     return <View />;
@@ -131,7 +133,11 @@ export default function App() {
   return (
     <div className="app">
       <Sidebar current={safeView} onNavigate={navigate} effectivelyAdmin={effectivelyAdmin} isPanel={isPanel} />
-      {render()}
+      <div className="nav-backdrop" onClick={(e) => e.currentTarget.parentElement.classList.remove('nav-open')} />
+      {/* Keyed on the view so each page mounts fresh and plays its entrance. */}
+      <div key={safeView} className="view-enter" style={{ flex: 1, minWidth: 0, display: 'flex' }}>
+        <ErrorBoundary resetKey={safeView}>{render()}</ErrorBoundary>
+      </div>
     </div>
   );
 }

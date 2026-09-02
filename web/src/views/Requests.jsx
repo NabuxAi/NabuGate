@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import Layout from '../components/Layout.jsx';
 import * as api from '../api.js';
 import { faInt, usd } from '../data/mock.js';
+import { SkeletonTable } from '../components/Skeleton.jsx';
+import EmptyState from '../components/EmptyState.jsx';
 
 export default function Requests() {
   const [data, setData] = useState(null);
@@ -25,12 +27,9 @@ export default function Requests() {
 
       <div className="card">
         {data === null ? (
-          <div className="app-boot">…</div>
+          <SkeletonTable rows={6} cols={7} />
         ) : rows.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--ng-muted)' }}>
-            <div style={{ fontSize: 40, marginBottom: 16, opacity: 0.5 }}>➤</div>
-            هیچ درخواستی ثبت نشده است.
-          </div>
+          <EmptyState icon="➤" title="هنوز درخواستی ثبت نشده" hint="به‌محض اولین تماس با کلیدتان، این فهرست هر ۱۰ ثانیه تازه می‌شود و دلیل هر رد شدن را هم می‌گوید." />
         ) : (
           <table className="tbl" style={{ margin: 0 }}>
             <thead>

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 
 import Layout from '../components/Layout.jsx';
 import * as api from '../api.js';
+import { Skeleton } from '../components/Skeleton.jsx';
 
 /*
  * Providers that actually came up.
@@ -32,7 +33,7 @@ export default function Providers() {
           </thead>
           <tbody>
             {providers === null && (
-              <tr><td colSpan={2} style={{ color: 'var(--ng-muted)', padding: 18 }}>…</td></tr>
+              <tr><td colSpan={2} style={{ padding: 12 }}><div className="sk-stack"><Skeleton h={14} /><Skeleton h={14} w="80%" /><Skeleton h={14} w="60%" /></div></td></tr>
             )}
             {providers?.length === 0 && (
               <tr>

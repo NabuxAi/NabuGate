@@ -240,6 +240,64 @@ export OPENAI_API_KEY="ng_xxxxxxxxxxxxxxxxxxxx"
             </div>
           </div>
         </section>
+
+        <section className="jv-section bg-alt" id="pricing">
+          <div className="jv-container">
+            <div className="jv-section-header">
+              <span className="jv-badge">{isFa ? 'قیمت‌گذاری' : 'Pricing'}</span>
+              <h2>{isFa ? 'پرداخت به‌ازای مصرف، بدون اشتراک' : 'Pay as you go, no subscription'}</h2>
+              <p>{isFa ? 'کیف پول دلاری شارژ می‌کنید؛ هر درخواست به قیمت واقعی مدل کم می‌شود. موجودی منقضی نمی‌شود.' : 'Top up a USD wallet; each request deducts the model\'s real price. Credit never expires.'}</p>
+            </div>
+            <div className="jv-plans">
+              {[
+                { name: isFa ? 'شروع' : 'Starter', amount: 5, blurb: isFa ? 'تست مدل‌ها و پروژه‌های کوچک.' : 'Try the models, small projects.' },
+                { name: isFa ? 'حرفه‌ای' : 'Pro', amount: 25, hot: true, blurb: isFa ? 'توسعهٔ روزمره با Cursor، Cline و Claude Code.' : 'Daily development with Cursor, Cline, Claude Code.' },
+                { name: isFa ? 'تیمی' : 'Team', amount: 100, blurb: isFa ? 'یک کلید برای هر برنامه، گزارش مصرف جدا.' : 'One key per app, separate usage reports.' },
+              ].map((p) => (
+                <a href="/panel/plans" key={p.name} className={'jv-plan' + (p.hot ? ' hot' : '')}>
+                  {p.hot && <span className="jv-plan-ribbon">{isFa ? 'پیشنهاد ما' : 'Recommended'}</span>}
+                  <strong>{p.name}</strong>
+                  <span className="jv-plan-price" dir="ltr">${p.amount}</span>
+                  <small>{p.blurb}</small>
+                  <span className="jv-btn jv-btn-outline" style={{ marginTop: 'auto', width: '100%' }}>{isFa ? 'انتخاب در پنل' : 'Choose in console'}</span>
+                </a>
+              ))}
+            </div>
+            <p style={{ textAlign: 'center', color: '#6b7280', fontSize: '0.85rem', marginTop: '1.5rem' }}>
+              {isFa ? 'هر مبلغی از ۱ تا ۵٬۰۰۰ دلار. پرداخت از درگاه بانکی به تومان با نرخ روز؛ اطلاعات کارت هرگز به ما نمی‌رسد.' : 'Any amount from $1 to $5,000. Paid at the bank\'s page; card details never reach us.'}
+            </p>
+          </div>
+        </section>
+
+        <section className="jv-section" id="faq">
+          <div className="jv-container" style={{ maxWidth: 820 }}>
+            <div className="jv-section-header">
+              <span className="jv-badge">{isFa ? 'سوالات متداول' : 'FAQ'}</span>
+              <h2>{isFa ? 'پاسخ پرسش‌های رایج' : 'Common questions'}</h2>
+            </div>
+            {(isFa ? [
+              ['NabuGate چیست؟', 'یک درگاه سازگار با OpenAI که پشت یک آدرس و یک کلید، مدل‌های OpenAI، Anthropic، Google و بقیه را با fallback خودکار ارائه می‌دهد.'],
+              ['با Cursor و Claude Code کار می‌کند؟', 'بله. Cursor، Cline، Roo Code، Codex و SDK‌های OpenAI با تغییر آدرس پایه وصل می‌شوند؛ Claude Code با متغیرهای ANTHROPIC_*. راهنمای هر کدام در مستندات است.'],
+              ['هزینه چطور حساب می‌شود؟', 'کیف پول دلاری. هر درخواست به قیمت واقعی مدل (به‌ازای میلیون توکن) کم می‌شود و هر پاسخ موجودی باقی‌مانده را در هدر برمی‌گرداند.'],
+              ['اگر پرداختم مشکل داشت؟', 'فاکتور پیش از رفتن به بانک به نام حساب شما ثبت می‌شود و پنل هر بار از خودِ درگاه می‌پرسد. پول کم‌شده‌ای که تأیید نشود ظرف ۷۲ ساعت برمی‌گردد. بخش «مشکلات پرداخت» در مستندات همه را پوشش می‌دهد.'],
+              ['کلید API چطور کار می‌کند؟', 'برای هر برنامه یک کلید می‌سازید، با محدودیت مدل، مبدأ و سقف درخواست. متن کامل کلید فقط یک‌بار نمایش داده می‌شود.'],
+            ] : [
+              ['What is NabuGate?', 'An OpenAI-compatible gateway: one URL, one key, models from OpenAI, Anthropic, Google and more with automatic fallback.'],
+              ['Does it work with Cursor and Claude Code?', 'Yes. Cursor, Cline, Roo Code, Codex and the OpenAI SDKs connect by changing the base URL; Claude Code through the ANTHROPIC_* variables.'],
+              ['How is it billed?', 'A USD wallet. Each request deducts the model\'s real per-million-token price, and every response reports the remaining balance in a header.'],
+              ['What if my payment fails?', 'The invoice is bound to your account before you leave for the bank and the console re-asks the gateway on every visit. An unconfirmed charge is reversed within 72 hours.'],
+              ['How do API keys work?', 'One key per app, limited by model glob, origin and rate. The full key is shown once.'],
+            ]).map(([q, a]) => (
+              <details key={q} className="faq" style={{ background: 'rgba(17, 24, 39, 0.6)', borderColor: 'rgba(255,255,255,0.08)' }}>
+                <summary style={{ color: '#f3f4f6' }}>{q}</summary>
+                <div className="faq-body" style={{ color: '#9ca3af' }}>{a}</div>
+              </details>
+            ))}
+            <div style={{ textAlign: 'center', marginTop: '2rem' }}>
+              <a href="/docs" className="jv-btn jv-btn-primary">{isFa ? 'مستندات کامل' : 'Full documentation'}</a>
+            </div>
+          </div>
+        </section>
       </main>
 
       <footer className="jv-footer">

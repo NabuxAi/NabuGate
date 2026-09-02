@@ -108,6 +108,10 @@ func (s *Server) consoleStatus(w http.ResponseWriter, r *http.Request) {
 		"needs_setup":   s.admin.NeedsSetup(),
 		"authenticated": authed,
 		"is_admin":      info.IsAdmin,
+		// Whether a top-up can be started at all. The panel used to state in
+		// three places that "the payment gateway is not connected yet", and
+		// kept saying so after it was.
+		"payments_enabled": s.pay.Configured(),
 	})
 }
 

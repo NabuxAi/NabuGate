@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import Layout from '../components/Layout.jsx';
 import * as api from '../api.js';
 import { faInt, faDigits } from '../data/mock.js';
+import { Skeleton } from '../components/Skeleton.jsx';
 
 /*
  * Per-app tokens.
@@ -16,7 +17,7 @@ import { faInt, faDigits } from '../data/mock.js';
  * the only chance to copy it.
  */
 export default function Tokens() {
-  const [tokens, setTokens] = useState([]);
+  const [tokens, setTokens] = useState(null);
   const [usage, setUsage] = useState({});
   const [error, setError] = useState(null);
   const [creating, setCreating] = useState(false);
@@ -99,7 +100,14 @@ export default function Tokens() {
             </tr>
           </thead>
           <tbody>
-            {tokens.length === 0 && (
+            {tokens === null && [0, 1, 2].map((i) => (
+              <tr key={'sk' + i}>
+                {Array.from({ length: 9 }).map((_, c) => (
+                  <td key={c}><Skeleton h={12} w={(40 + ((i * 17 + c * 23) % 50)) + '%'} /></td>
+                ))}
+              </tr>
+            ))}
+            {tokens !== null && tokens.length === 0 && (
               <tr>
                 <td colSpan={9} style={{ color: 'var(--ng-muted)', padding: 18 }}>
                   هنوز توکنی ساخته نشده. کلیدهای تعریف‌شده در config.yaml جداگانه کار
@@ -107,7 +115,7 @@ export default function Tokens() {
                 </td>
               </tr>
             )}
-            {tokens.map((t) => {
+            {(tokens || []).map((t) => {
               const u = usage[t.name] || {};
               return (
                 <tr key={t.name} style={t.disabled ? { opacity: 0.5 } : undefined}>
