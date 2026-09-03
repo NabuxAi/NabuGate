@@ -1,4 +1,4 @@
-# NabuGate gateway — Coolify / Docker Compose deployment.
+# Nabu Gate gateway — Coolify / Docker Compose deployment.
 services:
   nabugate:
     build:
