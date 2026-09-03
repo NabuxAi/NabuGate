@@ -1,9 +1,13 @@
 package server
 
 import (
+	"context"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"nabugate/internal/nabupay"
 )
 
 // The console's origin filter is what makes a key safe to embed in a web app:
@@ -76,5 +80,40 @@ func TestOriginRestrictedTokenRefusesNonBrowser(t *testing.T) {
 	}
 	if originAllowed(allowed, requestFrom("null", "")) {
 		t.Error(`an Origin of "null" was treated as a real origin`)
+	}
+}
+
+// TestRechargeDoesNotPreselectAGateway pins the behaviour change.
+//
+// The panel used to fall back to s.payGateway, so every top-up went straight to
+// one gateway. When Aqayepardakht answered -15 the payer met that error instead
+// of a choice, and payment was down for everyone even though other gateways were
+// working. Sending no gateway makes the bridge return NabuPay's own checkout.
+func TestRechargeDoesNotPreselectAGateway(t *testing.T) {
+	var sent map[string]any
+
+	bridge := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewDecoder(r.Body).Decode(&sent)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"success":true,"invoice_number":"inv-1","checkout_url":"https://desk.test/pay/inv-1"}`))
+	}))
+	defer bridge.Close()
+
+	client := nabupay.New(bridge.URL, "gate", "shared-secret")
+	if client == nil {
+		t.Fatal("client should be configured")
+	}
+
+	_, err := client.Start(context.Background(), nabupay.StartOptions{
+		AmountUSD:   5,
+		Description: "top-up",
+		CallbackURL: "https://gate.test/panel/account",
+	})
+	if err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+
+	if got, ok := sent["gateway"]; ok && got != "" {
+		t.Fatalf("a gateway was named (%v); the bridge must be left to offer the choice", got)
 	}
 }
