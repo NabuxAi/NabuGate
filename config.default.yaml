@@ -361,6 +361,15 @@ providers:
     base_url: "https://api.pexels.com/v1"
     api_key_env: "PEXELS_API_KEY"
 
+  # ElevenLabs — text to speech only. Authenticates with xi-api-key and puts the
+  # voice id in the URL, so it needs its own adapter rather than the openai one.
+  # The key already exists in BIKO's environment; set the same value here.
+  elevenlabs:
+    enabled: true
+    type: elevenlabs
+    base_url: "https://api.elevenlabs.io/v1"
+    api_key_env: "ELEVENLABS_API_KEY"
+
   # mrc_imagegen — branded graphics, not a diffusion model.
   #
   # It renders a fixed canvas from a kicker, two headline lines, a theme and a
@@ -1009,6 +1018,53 @@ audio:
     fallback:
       - provider: gemini
         model: "gemini-2.5-flash-preview-tts"
+
+  # Narration voice. ElevenLabs first because it is the one that sounds like a
+  # person reading rather than a model speaking, which is the whole point for a
+  # lesson someone listens to for two minutes. Falls back across two other
+  # vendors so a quota wall does not silence the pipeline.
+  #
+  # `voice` travels in the request, not here: send an ElevenLabs voice name
+  # ("Rachel") or a voice id, and the adapter resolves it.
+  nabu-voice-hd:
+    primary:
+      provider: elevenlabs
+      model: "eleven_v3"
+    fallback:
+      - provider: openai
+        model: "gpt-4o-mini-tts"
+      - provider: gemini
+        model: "gemini-2.5-flash-preview-tts"
+
+  # Persian, Arabic and everything else outside the older models' language list.
+  #
+  # Checked against GET /v1/models on 2026-09-03: of the ElevenLabs catalogue
+  # only `eleven_v3` and `eleven_v3_conversational` list `fa` — 74 languages
+  # each. `eleven_multilingual_v2` (29) and the v2.5 turbo/flash pair (32) do
+  # NOT. Routing Persian to any of those returns audio that reads the script in
+  # the wrong phonology, which is worse than an error because it sounds like a
+  # bad voice rather than a wrong model. The fallbacks here are v3 as well.
+  nabu-voice-fa:
+    primary:
+      provider: elevenlabs
+      model: "eleven_v3"
+    fallback:
+      - provider: elevenlabs
+        model: "eleven_v3_conversational"
+      - provider: gemini
+        model: "gemini-2.5-flash-preview-tts"
+
+  # Two speakers talking rather than one reading — the conversational model is
+  # tuned for dialogue timing, which is what an interactive lesson needs.
+  nabu-voice-chat:
+    primary:
+      provider: elevenlabs
+      model: "eleven_v3_conversational"
+    fallback:
+      - provider: elevenlabs
+        model: "eleven_v3"
+      - provider: openai
+        model: "gpt-4o-mini-tts"
 
 # ─────────────────────────── speech to text ────────────────────────────────
 #

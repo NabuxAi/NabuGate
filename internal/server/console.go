@@ -665,9 +665,12 @@ func (s *Server) rechargeMe(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusNotImplemented, nabupay.ErrNotConfigured.Error())
 		return
 	}
-	if req.Gateway == "" {
-		req.Gateway = s.payGateway
-	}
+	// Deliberately NOT defaulted to s.payGateway any more. Naming a gateway
+	// here sent the payer straight to it, so one gateway being down was payment
+	// being down: Aqayepardakht answering -15 reached the payer as a dead end
+	// rather than as "pick another". Left empty, the bridge returns NabuPay's
+	// own checkout, which shows the invoice and the gateways that are actually
+	// working. A caller that really does want one can still pass it.
 
 	checkout, err := s.pay.Start(r.Context(), nabupay.StartOptions{
 		AmountUSD:   req.Amount,

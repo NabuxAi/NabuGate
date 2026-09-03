@@ -330,6 +330,10 @@ func (c *Config) BuildAdapters() (map[string]provider.Adapter, []string) {
 			adapters[name] = provider.NewGeminiAdapter(name, p.BaseURL, apiKey)
 		case "pexels":
 			adapters[name] = provider.NewPexelsAdapter(name, p.BaseURL, apiKey)
+		case "elevenlabs":
+			// Text-to-speech only. Authenticates with xi-api-key and puts the
+			// voice in the URL, so it cannot ride the openai adapter.
+			adapters[name] = provider.NewElevenLabsAdapter(name, p.BaseURL, apiKey)
 		case "imagegen":
 			// mrc_imagegen: a template renderer, not a diffusion model. See the
 			// adapter for how a prompt maps onto its fields.
