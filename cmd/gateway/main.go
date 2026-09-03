@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"nabugate/internal/config"
+	"nabugate/internal/mcp"
 	"nabugate/internal/nabupay"
 	"nabugate/internal/photos"
 	"nabugate/internal/policy"
@@ -29,6 +30,11 @@ import (
 // defaultPayGateway is the gateway used when NABUPAY_GATEWAY is unset. It must
 // be one the bridge can actually start a hosted checkout with.
 const defaultPayGateway = "aqayepardakht"
+
+// defaultMCPTokenEnv is where the MCP token is read from when mcp.token_env is
+// blank. The value is never in the config file, only the name of the variable
+// carrying it — the same rule every provider key here follows.
+const defaultMCPTokenEnv = "NABUGATE_MCP_TOKEN"
 
 func main() {
 	configPath := flag.String("config", envOr("NABU_CONFIG", "config.yaml"),
@@ -184,6 +190,42 @@ func main() {
 	)
 	if _, ok := web.Assets(); ok {
 		log.Info("admin console available", "path", "/admin/")
+	}
+
+	// The MCP endpoint: a read-only view of this gateway for AI clients, on its
+	// own path behind its own token. Disabled without a token, and said so out
+	// loud — a 404 on /mcp with nothing in the log is a support conversation.
+	//
+	// Deliberately NOT the fail-closed treatment the gateway key gets above.
+	// An absent MCP token must not take the gateway down; disabled-and-said-so
+	// is the right trade, and open-with-no-token never is.
+	mcpToken := ""
+	if cfg.MCP.Enabled {
+		tokenEnv := cfg.MCP.TokenEnv
+		if tokenEnv == "" {
+			tokenEnv = defaultMCPTokenEnv
+		}
+
+		mcpToken = os.Getenv(tokenEnv)
+		if mcpToken == "" {
+			log.Warn("mcp disabled: its token variable is unset", "var", tokenEnv)
+		}
+	} else {
+		// Said out loud for the same reason the branch above is. Config often
+		// arrives inline through NABU_CONFIG_YAML on this deployment, and an
+		// inline config that predates this block leaves mcp.enabled false — so
+		// an operator can set the token, get a 404 on /mcp, and find nothing
+		// anywhere explaining why.
+		log.Warn("mcp disabled: this deployment's config has no `mcp: {enabled: true}` block",
+			"var", defaultMCPTokenEnv)
+	}
+
+	mcpServer := mcp.New("nabugate", mcp.Version, cfg.MCP.Path, mcpToken, log)
+	mcp.Register(mcpServer, r, tracker, agents, srv.Requests())
+	srv = srv.WithMCP(mcpServer)
+
+	if mcpServer.Enabled() {
+		log.Info("mcp endpoint enabled", "path", mcpServer.Path())
 	}
 
 	httpServer := &http.Server{
