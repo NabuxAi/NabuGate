@@ -18,6 +18,7 @@ import (
 	"nabugate/internal/adminstore"
 	"nabugate/internal/agent"
 	"nabugate/internal/flow"
+	"nabugate/internal/mcp"
 	"nabugate/internal/memory"
 	"nabugate/internal/nabupay"
 	"nabugate/internal/photos"
@@ -75,6 +76,12 @@ type Server struct {
 
 	// logins rate-limits console sign-in attempts. See throttle.go.
 	logins *throttle
+
+	// mcp is the Model Context Protocol endpoint. nil, or configured without a
+	// token, means the route is never mounted — this service holds every
+	// provider key in the estate and mints the tokens projects call it with,
+	// and an open MCP endpoint on it would be all of them.
+	mcp *mcp.Server
 }
 
 // SetMemory attaches the conversation store.
@@ -122,6 +129,22 @@ func (s *Server) WithToolExecutor(e *agent.ToolExecutor) *Server {
 	s.toolExec = e
 	return s
 }
+
+// WithMCP attaches the MCP endpoint. Separate from New for the same reason
+// every other attachment here is: a deployment without an MCP token behaves
+// exactly as it did before, and /mcp simply does not exist.
+func (s *Server) WithMCP(m *mcp.Server) *Server {
+	s.mcp = m
+	return s
+}
+
+// Requests exposes the recent-calls ring so main.go can hand it to a reader
+// that is not this package — the MCP endpoint's requests tool, which must not
+// import internal/server.
+//
+// Read-only by construction: RequestLog's only reader is Recent, and the only
+// writer is this package.
+func (s *Server) Requests() *adminstore.RequestLog { return s.requests }
 
 // WithPayments attaches the NabuPay bridge client. Separate from New for the
 // same reason the others are: a deployment with no payment gateway configured
@@ -185,7 +208,40 @@ func (s *Server) Handler() http.Handler {
 	s.mountConsole(mux)
 	s.mountConsoleAPI(mux)
 	s.mountConversationAPI(mux)
-	return mux
+
+	return s.withMCP(mux)
+}
+
+// withMCP puts the MCP endpoint in front of the mux rather than on it.
+//
+// The contract asks for a BARE path — mux.Handle("/mcp", …) rather than
+// "POST /mcp" — so that a client opening an SSE stream with GET, or tearing a
+// session down with DELETE, is told the endpoint is POST-only instead of that
+// it does not exist. On this mux that registration panics at startup: the
+// console bundle is registered as "GET /" and, under Go 1.22 pattern
+// precedence, "/mcp" matches more methods while "GET /" matches fewer paths,
+// so neither is a subset of the other and net/http rejects the pair. The
+// bundle is committed to the repo, so web.Assets() is true in every build —
+// this would have been a panic on boot in the distroless image, not a
+// test-only surprise.
+//
+// Intercepting one exact path ahead of the mux gives the contract exactly what
+// it asked for: every method reaches the MCP handler's own method check, which
+// answers 405 with Allow: POST.
+func (s *Server) withMCP(mux *http.ServeMux) http.Handler {
+	if s.mcp == nil || !s.mcp.Enabled() {
+		return mux
+	}
+
+	handler, path := s.mcp.Handler(), s.mcp.Path()
+
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == path {
+			handler.ServeHTTP(w, r)
+			return
+		}
+		mux.ServeHTTP(w, r)
+	})
 }
 
 // mountConsole serves the embedded admin console (web/dist) under /admin/ when

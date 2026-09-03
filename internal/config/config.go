@@ -56,6 +56,22 @@ type Config struct {
 	// Declared inline here or one-file-each in FlowsDir, for the same reason.
 	Flows    map[string]FlowConfig `yaml:"flows"`
 	FlowsDir string                `yaml:"flows_dir"`
+
+	// MCP is the Model Context Protocol endpoint (see the MCP type).
+	MCP MCP `yaml:"mcp"`
+}
+
+// MCP is the Model Context Protocol endpoint: a read-only view of this
+// service for AI clients, on its own path behind its own token.
+//
+// TokenEnv names the variable the token arrives in rather than holding it,
+// exactly like every other credential in this file, so the config stays
+// committable. An unset variable disables the endpoint — the route is not
+// mounted at all. There is no unauthenticated mode.
+type MCP struct {
+	Enabled  bool   `yaml:"enabled"`
+	Path     string `yaml:"path"`
+	TokenEnv string `yaml:"token_env"`
 }
 
 // FlowConfig is one flow as written in YAML. The name comes from the map key
