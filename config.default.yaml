@@ -101,6 +101,18 @@ server:
       allow: ["nabu-*", "parspack/*", "avalai/*", "gapgpt/*", "gpt-*", "o1", "o3", "o3-mini", "o4-mini", "deepseek-*", "kimi-*", "minimax-*", "glm-*"]
       rate_limit: 240
 
+# The MCP endpoint. Read-only, and it holds no secrets: the token arrives in
+# the named variable, and no tool ever returns a credential.
+#
+# Deliberately NOT a gateway key. This endpoint reads across every project, it
+# is handed to an AI client that may run on a laptop, and it has to be
+# revocable on its own. An unset NABUGATE_MCP_TOKEN leaves the route unmounted
+# (/mcp simply 404s) and the reason is logged at boot — there is no open mode.
+mcp:
+  enabled: true
+  path: /mcp
+  token_env: NABUGATE_MCP_TOKEN
+
 providers:
   openai:
     enabled: true
