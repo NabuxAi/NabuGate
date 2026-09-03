@@ -24,6 +24,13 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 20
 
+    # GitHub does not expose the `secrets` context to a step-level `if:`. Reading
+    # it there is not a condition that evaluates false — it fails validation, so
+    # the whole workflow is rejected before any step runs and no log is produced.
+    # That is why this file failed in 0s on every push since it was added.
+    env:
+      SELFTEST_URL: ${{ secrets.NABUGATE_SELFTEST_URL }}
+
     # Deploying after a failed CI run is deploying a broken build.
     if: >-
       github.event_name == 'workflow_dispatch' ||
@@ -70,9 +77,9 @@ jobs:
       # successful, and this is the difference between "the container started"
       # and "the aliases answer".
       - name: Ask the gateway whether its aliases still answer
-        if: ${{ secrets.NABUGATE_SELFTEST_URL != '' }}
+        if: env.SELFTEST_URL != ''
         env:
-          URL: ${{ secrets.NABUGATE_SELFTEST_URL }}
+          URL: ${{ env.SELFTEST_URL }}
         run: |
           code="$(curl --silent --output /dev/null --write-out '%{http_code}' \
             --max-time 30 "${URL%/}/healthz" || true)"
