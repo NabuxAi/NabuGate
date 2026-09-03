@@ -612,3 +612,34 @@ func TestNoResponseEverContainsASecret(t *testing.T) {
 		}
 	}
 }
+
+// TestOnlyTheBearerSchemeAuthenticates pins what the comment on authorised
+// claims. TrimPrefix is a no-op when the prefix is absent, so the earlier
+// implementation accepted a bare token as a second valid shape — a second place
+// for it to leak from, which is the thing the comment rules out.
+func TestOnlyTheBearerSchemeAuthenticates(t *testing.T) {
+	h := newTestServer(t)
+	body := `{"jsonrpc":"2.0","id":1,"method":"ping"}`
+
+	for _, header := range []string{
+		testToken,             // no scheme at all
+		"bearer " + testToken, // lowercase scheme
+		"Basic " + testToken,  // a different scheme
+		"Token " + testToken,
+	} {
+		req := httptest.NewRequest(http.MethodPost, "/mcp", strings.NewReader(body))
+		req.Header.Set("Authorization", header)
+		req.Header.Set("Content-Type", "application/json")
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusUnauthorized {
+			t.Errorf("Authorization: %q returned %d, want 401", header, rec.Code)
+		}
+	}
+
+	// And the correct shape still works, so this is not passing by rejecting all.
+	if got := post(t, h, testToken, body).Code; got != http.StatusOK {
+		t.Fatalf("a correct Bearer header returned %d, want 200", got)
+	}
+}

@@ -217,7 +217,15 @@ func (s *Server) authorised(r *http.Request) bool {
 		return false
 	}
 
-	presented := strings.TrimSpace(strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer "))
+	// TrimPrefix is a no-op when the prefix is absent, so trimming alone would
+	// have accepted a bare `Authorization: <token>` as well — which is exactly
+	// the second accepted shape this comment says there is not.
+	header := r.Header.Get("Authorization")
+	if !strings.HasPrefix(header, "Bearer ") {
+		return false
+	}
+
+	presented := strings.TrimSpace(strings.TrimPrefix(header, "Bearer "))
 
 	return subtle.ConstantTimeCompare([]byte(presented), []byte(s.token)) == 1
 }
