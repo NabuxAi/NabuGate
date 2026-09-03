@@ -22,7 +22,11 @@ API="${COOLIFY_API_URL%/}"
 
 # --fail-with-body: a bare curl exits 0 on a 401, and a deployment that never
 # started would be reported as a success.
+# --request POST: Coolify changed this endpoint's method and now answers a GET
+# with 405 {"message":"This endpoint has changed to a POST request."}. curl
+# would otherwise send GET, since no body is attached.
 response="$(curl --fail-with-body --silent --show-error \
+  --request POST \
   --header "Authorization: Bearer ${COOLIFY_API_TOKEN}" \
   "${API}/deploy?uuid=${COOLIFY_RESOURCE_UUID}&force=false")" || {
     echo "::error::Coolify refused the deployment request"
