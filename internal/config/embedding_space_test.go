@@ -17,7 +17,7 @@ import (
 // went wrong.
 var storedIndexAliases = []string{
 	"chat-embed", "write-embed", "desk-embed", "gen-embed", "zooey-embed",
-	"rasad-embed", "rasad-embed-local", "nabu-embed-v2",
+	"rasad-embed", "rasad-embed-local", "nabu-embed-v2", "notebook-embed",
 }
 
 // A fallback between two embedding models is not a fallback, it is two indexes.

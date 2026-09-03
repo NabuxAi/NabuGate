@@ -16,6 +16,14 @@ server:
       allow: ["write-*", "nabu-*"]
       rate_limit: 120
 
+    # telegram-notebooklm-mvp. Ingests public Telegram channels, transcribes the
+    # media and answers questions from the archive with citations.
+    # Skipped automatically when NOTEBOOK_KEY is unset.
+    - key: "${NOTEBOOK_KEY}"
+      project: "telegram-notebook"
+      allow: ["nabu-fast", "nabu-smart", "notebook-embed"]
+      rate_limit: 120
+
     # Cinematic Website Generator (cinemate).
     # Allows cine-* agents, standard nabu-* aliases, and photos.
     # Skipped automatically when CINEMATIC_KEY is unset.
@@ -1146,6 +1154,27 @@ embeddings:
   # a STORED index: fail loudly rather than write a second geometry into a
   # collection nobody will think to suspect.
   chat-embed:
+    primary:
+      provider: gemini
+      model: "gemini-embedding-001"
+
+  # telegram-notebooklm-mvp's chunk index — 1536 wide.
+  #
+  # Its corpus is Persian and Arabic: transcripts of Telegram channel media,
+  # searched in the same languages. That is the cross-lingual case documented on
+  # chat-embed and rasad-embed, so gemini-embedding-001 rather than 3-small.
+  #
+  # Single rung, and deliberately so. The vectors are stored — SQLite column
+  # `chunks.embedding` — and no other multilingual model in this gateway shares
+  # gemini's geometry. A fallback could only write a second space into the same
+  # column, where it would read as a plausible cosine and mean nothing. A failed
+  # embed is retryable; a silently poisoned index is not.
+  #
+  # gemini-embedding-001 defaults to 3072, so THE CALLER MUST SEND
+  # `dimensions: 1536`. The project verifies the returned width before every
+  # insert and stores embed_model and embed_dim per row, so a stale vector is
+  # detectable rather than merely wrong.
+  notebook-embed:
     primary:
       provider: gemini
       model: "gemini-embedding-001"
