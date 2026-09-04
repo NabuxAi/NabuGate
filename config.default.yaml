@@ -21,7 +21,9 @@ server:
     # Skipped automatically when NOTEBOOK_KEY is unset.
     - key: "${NOTEBOOK_KEY}"
       project: "telegram-notebook"
-      allow: ["nabu-fast", "nabu-smart", "notebook-embed"]
+      # nabu-transcribe too: the notebook indexes voice notes and video, so
+      # speech-to-text is part of ingestion rather than an extra.
+      allow: ["nabu-fast", "nabu-smart", "notebook-embed", "nabu-transcribe"]
       rate_limit: 120
 
     # Cinematic Website Generator (cinemate).
