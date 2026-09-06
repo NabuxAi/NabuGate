@@ -232,19 +232,19 @@ var catalogue = map[string]Vendor{
 		Color: "#2545F6",
 	},
 	"deepseek": {
-		Label: "DeepSeek", Blurb: "استدلالِ قوی با قیمتِ بسیار پایین. هنوز وصل نشده.",
+		Label: "DeepSeek", Blurb: "استدلالِ قوی با قیمتی که کسی نمی‌زند. دو مدل: chat و reasoner.",
 		Capabilities: []string{CapChat},
 		Site:         "https://deepseek.com", KeysURL: "https://platform.deepseek.com/api_keys",
 		Color: "#4D6BFE",
 	},
 	"xai": {
-		Label: "xAI Grok", Blurb: "گراک، با دسترسی زندهٔ ایکس. هنوز وصل نشده.",
+		Label: "xAI Grok", Blurb: "گراک، با دسترسی زندهٔ ایکس. سازگارِ OpenAI، پس مدل‌هایش مستقیم آدرس‌پذیرند.",
 		Capabilities: []string{CapChat, CapImage},
 		Site:         "https://x.ai", KeysURL: "https://console.x.ai",
 		Color: "#000000",
 	},
 	"fireworks": {
-		Label: "Fireworks AI", Blurb: "مدل‌های باز با سرعتِ بالا و whisper. هنوز وصل نشده.",
+		Label: "Fireworks AI", Blurb: "بیش از ۱۰۰ مدلِ باز با سرعتِ بالا، و یک whisper که رینگِ رونویسی هم هست.",
 		Capabilities: []string{CapChat, CapTranscribe, CapImage},
 		Site:         "https://fireworks.ai", KeysURL: "https://fireworks.ai/account/api-keys",
 		Color: "#7B3FE4",
@@ -279,7 +279,7 @@ var catalogue = map[string]Vendor{
 		Site:         "https://aws.amazon.com/bedrock", Color: "#FF9900",
 	},
 	"perplexity": {
-		Label: "Perplexity", Blurb: "پاسخ با جست‌وجوی زنده و ارجاع. هنوز وصل نشده.",
+		Label: "Perplexity", Blurb: "پاسخ بر پایهٔ جست‌وجوی زنده، با ارجاع. خانوادهٔ Sonar.",
 		Capabilities: []string{CapChat},
 		Site:         "https://perplexity.ai", KeysURL: "https://www.perplexity.ai/settings/api",
 		Color: "#20808D",

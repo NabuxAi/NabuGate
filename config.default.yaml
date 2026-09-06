@@ -6,6 +6,17 @@
 
 server:
   port: 8080
+
+  # Browser origins allowed to call the gateway directly. Empty (the default)
+  # sends no CORS headers at all, which is how this gateway behaved before the
+  # setting existed — so leaving it empty opens nothing. A bare host matches
+  # exactly; "*.example.com" matches the subdomain tree. This decides whether a
+  # browser may make the call; a key's own allowed_origins still decides whether
+  # that key may be used from there, and both must pass.
+  cors_origins: []
+    # - "app.nabuxai.com"
+    # - "*.mrchatgpt.org"
+
   api_keys:
     - "${NABU_API_KEY}"
   keys:
@@ -403,6 +414,50 @@ providers:
     type: speechmatics
     base_url: "https://eu1.asr.api.speechmatics.com/v2"
     api_key_env: "SPEECHMATICS_API_KEY"
+
+  # xAI — Grok, OpenAI-wire with a live /v1/models, so passthrough exposes
+  # "xai/grok-4.6" and friends with no alias needed.
+  xai:
+    enabled: true
+    type: openai
+    base_url: "https://api.x.ai/v1"
+    api_key_env: "XAI_API_KEY"
+    passthrough: true
+
+  # Fireworks — 100+ open models at speed, and a whisper on /audio/transcriptions,
+  # which is why it is also a rung in the transcription chain.
+  fireworks:
+    enabled: true
+    type: openai
+    base_url: "https://api.fireworks.ai/inference/v1"
+    api_key_env: "FIREWORKS_API_KEY"
+    passthrough: true
+
+  # DeepSeek — reasoning at a price nobody else matches. Two models, so the
+  # catalogue is listed rather than discovered.
+  deepseek:
+    enabled: true
+    type: openai
+    base_url: "https://api.deepseek.com/v1"
+    api_key_env: "DEEPSEEK_API_KEY"
+    passthrough: true
+    models:
+      - "deepseek-chat"
+      - "deepseek-reasoner"
+
+  # Perplexity — answers grounded in a live search, with citations. Sonar has no
+  # /v1/models, so its catalogue is a static list the way Cloudflare's is.
+  perplexity:
+    enabled: true
+    type: openai
+    base_url: "https://api.perplexity.ai"
+    api_key_env: "PERPLEXITY_API_KEY"
+    passthrough: true
+    models:
+      - "sonar"
+      - "sonar-pro"
+      - "sonar-reasoning"
+      - "sonar-reasoning-pro"
 
   # Deepgram — the fastest of the transcription rungs, and the only one whose
   # whole exchange is a single request. Nova-3 is its current model. Its own
@@ -1186,6 +1241,9 @@ transcription:
         model: "nova-3"
       - provider: assemblyai
         model: "universal"
+      # Whisper once more, on hardware that is none of the above.
+      - provider: fireworks
+        model: "whisper-v3-turbo"
       - provider: gemini
         model: "gemini-3.5-transcribe"
       - provider: gemini

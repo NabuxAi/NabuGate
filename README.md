@@ -88,6 +88,24 @@ rest queue for an admin, who approves and adds credit in one action. A grant
 only ever concerns the gateway's own key: it can add access, never remove it,
 and it never touches a key baked into the deployment's config.
 
+### Calling it from a browser
+
+The gateway sends no CORS headers unless `server.cors_origins` names some, so by
+default it is server-to-server only and nothing is exposed. List the origins your
+pages are served from and it answers preflights, echoes that one origin (never
+`*`, which cannot carry credentials), and exposes the balance headers so a page
+can read them:
+
+```yaml
+server:
+  cors_origins:
+    - "app.example.com"
+    - "*.example.org"
+```
+
+This decides whether a browser may make the call. A key's own `allowed_origins`
+still decides whether that key may be used from there, and both must pass.
+
 ## SDKs
 
 One client per language, all covering the whole surface above.
