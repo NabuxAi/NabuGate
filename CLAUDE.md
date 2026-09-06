@@ -68,6 +68,13 @@ config.example.yaml        # نمونهٔ پیکربندی (alias‌ها، provi
   تأیید می‌خواهد یا نه. گرنت فقط افزودنی است و فقط به رینگِ کلیدِ دروازه کار دارد؛ کلیدِ
   خودِ کاربر و توکن‌های baked در config (که owner ندارند) هرگز gate نمی‌شوند — برای همین
   عوض‌کردنِ یک provider به `request` نمی‌تواند یکپارچه‌سازیِ موجود را بشکند.
+- **CORS:** `server.cors_origins` تعیین می‌کند کدام originهای مرورگری اجازهٔ تماس دارند.
+  خالی (پیش‌فرض) یعنی **هیچ هدرِ CORS فرستاده نمی‌شود** — دقیقاً رفتارِ قبل از وجودِ این
+  تنظیم، پس ارتقا چیزی را باز نمی‌کند. پاسخ همان یک origin را echo می‌کند نه `*` (چون
+  wildcard با credentials جمع نمی‌شود). preflight **قبل از auth** جواب داده می‌شود چون
+  هدرِ Authorization ندارد. فهرستِ `Access-Control-Allow-Headers` از روی providerهای
+  config ساخته می‌شود، نه دستی — وگرنه هر providerِ تازه هدرِ کلیدش از مرورگر
+  غیرقابل‌ارسال می‌ماند.
 - در چت، بدنهٔ درخواست به‌صورتِ **passthroughِ شفاف** به provider منتقل می‌شود؛ فقط
   `model` (به مدلِ upstream) و پرچم‌های stream بازنویسی می‌شوند. یعنی `tools`,
   `tool_choice`, `response_format`, `top_p`, `stop`, `seed`, penalties و … خودکار رد

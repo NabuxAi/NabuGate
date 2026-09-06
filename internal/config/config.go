@@ -133,6 +133,15 @@ type ServerConfig struct {
 	Port    int                `yaml:"port"`
 	APIKeys []string           `yaml:"api_keys"`
 	Keys    []policy.KeyConfig `yaml:"keys"`
+
+	// CORSOrigins are the browser origins allowed to call the gateway. Empty
+	// sends no CORS headers at all, which is what the gateway did before this
+	// existed — so an upgrade opens nothing. Patterns are the same shape as a
+	// key's allowed_origins: a bare host, or "*.example.com" for a subdomain
+	// tree. It is deliberately separate from that per-key check, which still
+	// runs: this says whether the browser may make the call, that says whether
+	// the key may be used from there.
+	CORSOrigins []string `yaml:"cors_origins"`
 }
 
 // ProviderConfig describes one upstream provider.

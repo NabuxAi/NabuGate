@@ -54,6 +54,11 @@ type Server struct {
 	// only what came up.
 	providers map[string]config.ProviderMeta
 
+	// corsOrigins are the browser origins allowed to call the gateway. Empty —
+	// the default — sends no CORS headers at all, exactly as before this
+	// existed, so upgrading opens nothing.
+	corsOrigins []string
+
 	// admin is the persisted console state: accounts, console-minted tokens and
 	// usage that survives a restart. nil when no state path is configured, in
 	// which case the console API is not mounted and the gateway behaves exactly
@@ -216,7 +221,9 @@ func (s *Server) Handler() http.Handler {
 	s.mountConsoleAPI(mux)
 	s.mountConversationAPI(mux)
 
-	return s.withMCP(mux)
+	// CORS wraps everything, including the MCP endpoint: a preflight carries no
+	// Authorization header, so it has to be answered before any auth runs.
+	return s.cors(s.withMCP(mux))
 }
 
 // withMCP puts the MCP endpoint in front of the mux rather than on it.
@@ -234,7 +241,10 @@ func (s *Server) Handler() http.Handler {
 //
 // Intercepting one exact path ahead of the mux gives the contract exactly what
 // it asked for: every method reaches the MCP handler's own method check, which
-// answers 405 with Allow: POST.
+// answers 405 with Allow: POST. The one exception is a browser preflight when
+// cors_origins is configured — OPTIONS from a permitted origin is answered by
+// the CORS wrapper outside this, which is what a browser needs and what the
+// contract's 405 would defeat.
 func (s *Server) withMCP(mux *http.ServeMux) http.Handler {
 	if s.mcp == nil || !s.mcp.Enabled() {
 		return mux
