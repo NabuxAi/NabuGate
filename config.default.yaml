@@ -386,6 +386,28 @@ providers:
     base_url: "https://generativelanguage.googleapis.com/v1beta"
     api_key_env: "GEMINI_API_KEY"
 
+  # The same Google key through Google's OpenAI-compatible endpoint. The
+  # native `gemini` adapter above carries no tools, so a tool-calling request
+  # (the NabuOS console, every agent with tools) can only reach Gemini here.
+  # Probed 2026-09-06: gemini-3.6-flash, 3.5-flash and 2.5-flash all answer
+  # with tool_calls on this key; gemini-3.1-pro-preview is 429 (quota).
+  gemini-openai:
+    enabled: true
+    type: openai
+    base_url: "https://generativelanguage.googleapis.com/v1beta/openai"
+    api_key_env: "GEMINI_API_KEY"
+
+  # Alibaba Model Studio (Qwen), international endpoint — OpenAI-wire with
+  # tools. The cross-vendor rung under Google: a Google outage or quota does
+  # not take it down with it. Probed 2026-09-06: qwen-plus answers with
+  # tool_calls; the mainland endpoint rejects this key.
+  dashscope:
+    enabled: true
+    type: openai
+    base_url: "https://dashscope-intl.aliyuncs.com/compatible-mode/v1"
+    api_key_env: "DASHSCOPE_API_KEY"
+    passthrough: true
+
   # Pexels stock photos as an image source. An image alias pointed here searches
   # Pexels for the prompt and returns real photos. Skipped when PEXELS_API_KEY
   # is unset, like any other keyed provider.
@@ -571,6 +593,31 @@ providers:
 # param_style belongs to the model, so it is declared once and inherited by
 # every provider serving it.
 model_registry:
+  # Gemini identities served where tools work. 9router's Google account is a
+  # "new user" — Google answers 404 for the 2.5 models there since 2026-09 —
+  # so the direct key comes first and 9router is the spare.
+  gemini-3.6-flash:
+    serves:
+      - provider: gemini-openai
+        model: "gemini-3.6-flash"
+      - provider: 9router
+        model: "gemini/gemini-3.6-flash"
+  gemini-3.5-flash:
+    serves:
+      - provider: gemini-openai
+        model: "gemini-3.5-flash"
+  gemini-2.5-flash:
+    serves:
+      - provider: gemini-openai
+        model: "gemini-2.5-flash"
+  qwen-plus:
+    serves:
+      - provider: dashscope
+        model: "qwen-plus"
+  qwen-turbo:
+    serves:
+      - provider: dashscope
+        model: "qwen-turbo"
   gpt-5.5:
     param_style: reasoning
     serves:
@@ -815,8 +862,10 @@ models:
     # next time, so it looks like a flaky model rather than a broken one.
     # It stays reachable as nabu-minimax.
     primary:
-      model: gpt-4o-mini
+      model: gemini-2.5-flash
     fallback:
+      - model: qwen-turbo
+      - model: gpt-4o-mini
       - model: gpt-4.1-mini
       - model: minimax-m2.7
       # Every rung above resolves to Parspack alone, and Parspack answers 402
@@ -833,18 +882,25 @@ models:
         model: "qwen-local"
 
 
+  # The console's alias, so every rung has to carry tools and hold a 10k-token
+  # prompt. Rewritten 2026-09-06 after the whole chain died at once: 9router's
+  # Gemini rungs went 404 (new-user account), Parspack was over its daily
+  # request cap, OpenRouter had no credit, and the local llama.cpp holds 2k
+  # tokens of context — so the console answered nothing for hours. Google,
+  # then Alibaba, then the Iranian aggregators: three vendors before the floor.
   nabu-smart:
     primary:
-      provider: 9router
-      model: "gemini-2.5-pro"
+      model: gemini-3.6-flash
     fallback:
-      - provider: 9router
-        model: "gemini-2.5-flash"
+      - model: gemini-3.5-flash
+      - model: qwen-plus
+      - model: gemini-2.5-flash
       - model: gpt-5.5
       - model: gpt-4o
       - model: deepseek-v4-pro
       - model: claude-sonnet-5
-      # Ultimate local self-hosted fallback
+      # Ultimate local self-hosted fallback. 2k tokens of context: it holds a
+      # sentence, not the console's prompt.
       - provider: llamacpp
         model: "qwen-local"
 
