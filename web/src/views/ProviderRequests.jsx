@@ -47,7 +47,7 @@ export default function ProviderRequests() {
       {error && <div className="card banner-error">{error}</div>}
 
       <div className="card">
-        <h3 className="card-title">در انتظار تأیید</h3>
+        <div className="card-head"><h3>در انتظار تأیید</h3></div>
         {rows === null ? (
           <SkeletonTable rows={3} cols={4} />
         ) : pending.length === 0 ? (
@@ -71,7 +71,7 @@ export default function ProviderRequests() {
                   <td>
                     <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
                       <input
-                        className="inp ltr"
+                        className="input ltr"
                         style={{ width: 92 }}
                         type="number"
                         min="0"
@@ -93,7 +93,7 @@ export default function ProviderRequests() {
 
       {decided.length > 0 && (
         <div className="card">
-          <h3 className="card-title">تصمیم‌گرفته‌شده</h3>
+          <div className="card-head"><h3>تصمیم‌گرفته‌شده</h3></div>
           <table className="tbl">
             <thead>
               <tr><th>سرویس</th><th>کاربر</th><th>وضعیت</th><th>اعتبار</th><th>توسط</th></tr>

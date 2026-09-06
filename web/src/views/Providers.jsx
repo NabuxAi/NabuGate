@@ -220,7 +220,7 @@ export default function Providers() {
             {editing === p.name && (
               <div className="prov-form">
                 <input
-                  className="inp ltr"
+                  className="input ltr"
                   type="password"
                   autoComplete="off"
                   placeholder={`کلید ${p.label || p.name}`}

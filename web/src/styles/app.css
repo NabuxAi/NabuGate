@@ -1136,6 +1136,23 @@ select.input {
   color: var(--ng-accent, var(--ng-ok-text)); cursor: pointer; text-decoration: underline;
 }
 
+/* A warning banner. There were only ok and error ones, and the case this
+   screen most needs to explain — the gateway has no secret, so it will not
+   store your key — is neither: nothing failed, and nothing is fine. */
+.banner-warn {
+  margin-bottom: 14px;
+  padding: 12px 14px;
+  line-height: 2;
+  color: var(--ng-warn-text);
+  border-color: var(--ng-warn-border);
+  background: var(--ng-warn-surface);
+}
+
+/* Two tag variants the catalogue needs: a live provider, and one that is only
+   listed so it can be asked for. */
+.tag-ok { border-color: var(--ng-ok-border); background: var(--ng-ok-surface); color: var(--ng-ok-text); font-weight: 700; }
+.tag-muted { opacity: .7; }
+
 /* --- provider catalogue ---------------------------------------------------
    A grid of cards rather than the table this screen used to be: each row now
    carries a mark, a sentence, capability chips and up to four actions, none of
@@ -1170,5 +1187,7 @@ select.input {
 .prov-actions > * { flex: 0 0 auto; }
 
 .prov-form { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
-.prov-form .inp { flex: 1 1 160px; min-width: 0; }
+/* .input is display:block/width:100% by default, which in a flex row makes the
+   field push the buttons onto their own line. */
+.prov-form .input { flex: 1 1 160px; width: auto; min-width: 0; }
 .prov-hint { flex-basis: 100%; margin: 2px 0 0; font-size: 11.5px; line-height: 1.9; color: var(--ng-muted); }
