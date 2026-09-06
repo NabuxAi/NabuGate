@@ -40,3 +40,41 @@ func TestShippedTranscribeChainReachesNewVendors(t *testing.T) {
 		}
 	}
 }
+
+// The shipped config must leave cross-origin support off. It is the one setting
+// here whose default decides whether the gateway is reachable from any page on
+// the internet, so it is worth a test rather than a reading of the file.
+func TestShippedConfigLeavesCORSOff(t *testing.T) {
+	c, err := Load("../../config.default.yaml")
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	if got := c.Server.CORSOrigins; len(got) != 0 {
+		t.Errorf("cors_origins = %v; the shipped default must open nothing", got)
+	}
+}
+
+// Every provider the shipped config defines must be reachable by a caller's own
+// key, or say why not. A provider with an api_key_env that BYOK refuses is a
+// silent dead end on the console's catalogue screen.
+func TestShippedProvidersAgreeOnBYOK(t *testing.T) {
+	t.Setenv("NABUGATE_SECRET_KEY", "x")
+	c, err := Load("../../config.default.yaml")
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	for name, meta := range c.ProviderMetas() {
+		if !meta.Enabled {
+			continue
+		}
+		if meta.Access != "auto" && meta.Access != "request" {
+			t.Errorf("%s: access = %q, want auto or request", name, meta.Access)
+		}
+		if !meta.BYOK {
+			continue
+		}
+		if _, ok := c.CallerAdapter(name, "test-key"); !ok {
+			t.Errorf("%s: advertises BYOK on the catalogue but CallerAdapter refuses it", name)
+		}
+	}
+}
