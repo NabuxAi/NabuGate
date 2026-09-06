@@ -44,8 +44,11 @@ type ProviderRequest struct {
 	CreditUSD float64   `json:"credit_usd,omitempty"`
 	Auto      bool      `json:"auto,omitempty"`
 	CreatedAt time.Time `json:"created_at"`
-	DecidedAt time.Time `json:"decided_at,omitempty"`
-	DecidedBy string    `json:"decided_by,omitempty"`
+	// A pointer, because omitempty does nothing for a struct: a pending request
+	// was serialising its zero time as "0001-01-01T00:00:00Z", which any client
+	// formatting a date would render as a real decision in the year one.
+	DecidedAt *time.Time `json:"decided_at,omitempty"`
+	DecidedBy string     `json:"decided_by,omitempty"`
 }
 
 func normEmail(s string) string { return strings.ToLower(strings.TrimSpace(s)) }
@@ -76,7 +79,7 @@ func (s *Store) RequestProvider(owner, provider, note string, auto bool, credit 
 				r.Note = note
 				r.Decision = ""
 				r.CreatedAt = time.Now().UTC()
-				r.DecidedAt = time.Time{}
+				r.DecidedAt = nil
 				r.DecidedBy = ""
 				s.dirty = true
 				if err := s.save(); err != nil {
@@ -98,7 +101,7 @@ func (s *Store) RequestProvider(owner, provider, note string, auto bool, credit 
 	if auto {
 		req.Status = StatusApproved
 		req.Auto = true
-		req.DecidedAt = req.CreatedAt
+		req.DecidedAt = &req.CreatedAt
 		req.DecidedBy = "auto"
 		req.CreditUSD = credit
 		if credit > 0 {
@@ -143,7 +146,8 @@ func (s *Store) DecideProviderRequest(id string, approve bool, credit float64, d
 			r.Status = StatusApproved
 		}
 		r.Decision = decision
-		r.DecidedAt = time.Now().UTC()
+		now := time.Now().UTC()
+		r.DecidedAt = &now
 		r.DecidedBy = by
 		if approve && credit > 0 {
 			r.CreditUSD += credit

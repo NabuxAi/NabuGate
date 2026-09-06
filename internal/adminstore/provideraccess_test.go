@@ -122,6 +122,9 @@ func TestProviderRequestAutoAndManual(t *testing.T) {
 	if req2.Status != StatusPending {
 		t.Errorf("status = %q", req2.Status)
 	}
+	if req2.DecidedAt != nil {
+		t.Errorf("a pending request has a decision date: %v", req2.DecidedAt)
+	}
 	// Asking again must not reset the queue position or duplicate the row.
 	again, _ := s.RequestProvider("me@example.com", "openai", "دوباره", false, 0)
 	if again.CreatedAt != req2.CreatedAt {
@@ -169,6 +172,11 @@ func TestDeniedRequestCanBeReopened(t *testing.T) {
 	}
 	if again.Status != StatusPending || again.Decision != "" {
 		t.Errorf("reopened request = %+v", again)
+	}
+	// A pending request has no decision date. Serialising the zero time made
+	// every client render a decision in the year one.
+	if again.DecidedAt != nil {
+		t.Errorf("reopened request carries a decision date: %v", again.DecidedAt)
 	}
 }
 
