@@ -6,6 +6,7 @@ import (
 	"io"
 	"log/slog"
 	"testing"
+	"time"
 
 	"nabugate/internal/config"
 	"nabugate/internal/provider"
@@ -145,6 +146,43 @@ func TestRouterCatalogModels(t *testing.T) {
 	_ = r.CatalogModels(context.Background())
 	if l.calls != 1 {
 		t.Fatalf("discovery called %d times, want 1 (cached)", l.calls)
+	}
+}
+
+// TestRouterDiscoveryFailureIsNotRetriedAtOnce verifies a provider that refused
+// discovery is left alone for discoveryRetryTTL: a poller on /v1/models must
+// not spend a rate-limited provider's daily cap on repeated 429s.
+func TestRouterDiscoveryFailureIsNotRetriedAtOnce(t *testing.T) {
+	l := &listerAdapter{name: "parspack", err: errors.New("429 daily rate limit exceeded")}
+	adapters := map[string]provider.Adapter{"parspack": l}
+	r := New(adapters, map[string]config.ModelRoute{}, nil, nil, nil, nil,
+		map[string][]string{"parspack": {"curated/model-x"}}, discardLogger())
+	now := time.Now()
+	r.now = func() time.Time { return now }
+
+	for i := 0; i < 5; i++ {
+		r.CatalogModels(context.Background())
+	}
+	if l.calls != 1 {
+		t.Fatalf("discovery called %d times inside the retry window, want 1", l.calls)
+	}
+
+	// After the window the provider is asked again — and answers this time.
+	now = now.Add(discoveryRetryTTL + time.Second)
+	l.err = nil
+	l.models = []string{"openai/gpt-5.5"}
+	got := r.CatalogModels(context.Background())
+	if l.calls != 2 {
+		t.Fatalf("discovery called %d times after the retry window, want 2", l.calls)
+	}
+	found := false
+	for _, info := range got {
+		if info.ID == "parspack/openai/gpt-5.5" {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("recovered catalogue missing the discovered model: %v", got)
 	}
 }
 

@@ -23,6 +23,13 @@ import (
 // cached before the next /v1/models call refreshes it.
 const discoveryTTL = 5 * time.Minute
 
+// discoveryRetryTTL is how long a FAILED discovery is remembered before the
+// provider is asked again. Without it every /v1/models call — and the
+// unauthenticated /api/public/models — retried a provider that had just said
+// no, and a poller hitting that endpoint every two seconds burned Parspack's
+// whole daily request cap on 429s alone (22,000 of 2,000 on 2026-09-06).
+const discoveryRetryTTL = 2 * time.Minute
+
 // Router holds the live adapters and the alias routing tables (one per
 // capability: chat, images, audio).
 
@@ -75,10 +82,12 @@ type Router struct {
 	now     func() time.Time
 }
 
-// catalogEntry is one provider's cached live-discovered model IDs.
+// catalogEntry is one provider's cached live-discovered model IDs, and when
+// the last attempt to refresh them failed.
 type catalogEntry struct {
-	models  []string
-	fetched time.Time
+	models   []string
+	fetched  time.Time
+	failedAt time.Time
 }
 
 // New builds a Router. passthrough maps each passthrough-enabled provider to its
@@ -683,10 +692,16 @@ func (r *Router) discover(ctx context.Context, prov string) []string {
 	}
 
 	r.catMu.Lock()
-	if entry, ok := r.catalog[prov]; ok && r.now().Sub(entry.fetched) < r.ttl {
-		models := entry.models
-		r.catMu.Unlock()
-		return models
+	if entry, ok := r.catalog[prov]; ok {
+		fresh := !entry.fetched.IsZero() && r.now().Sub(entry.fetched) < r.ttl
+		// A provider that just refused is not asked again for a while: the
+		// last good list (or nothing) is served until the retry window passes.
+		cooling := !entry.failedAt.IsZero() && r.now().Sub(entry.failedAt) < discoveryRetryTTL
+		if fresh || cooling {
+			models := entry.models
+			r.catMu.Unlock()
+			return models
+		}
 	}
 	r.catMu.Unlock()
 
@@ -695,10 +710,10 @@ func (r *Router) discover(ctx context.Context, prov string) []string {
 		r.log.Warn("model discovery failed", "provider", prov, "error", err.Error())
 		r.catMu.Lock()
 		defer r.catMu.Unlock()
-		if entry, ok := r.catalog[prov]; ok {
-			return entry.models // serve the last good list rather than nothing
-		}
-		return nil
+		entry := r.catalog[prov]
+		entry.failedAt = r.now()
+		r.catalog[prov] = entry
+		return entry.models // the last good list rather than nothing
 	}
 
 	r.catMu.Lock()
