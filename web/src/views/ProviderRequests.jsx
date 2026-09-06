@@ -96,7 +96,7 @@ export default function ProviderRequests() {
           <div className="card-head"><h3>تصمیم‌گرفته‌شده</h3></div>
           <table className="tbl">
             <thead>
-              <tr><th>سرویس</th><th>کاربر</th><th>وضعیت</th><th>اعتبار</th><th>توسط</th></tr>
+              <tr><th>سرویس</th><th>کاربر</th><th>وضعیت</th><th>اعتبار</th><th>توسط</th><th style={{ width: 120 }}></th></tr>
             </thead>
             <tbody>
               {decided.map((r) => (
@@ -110,6 +110,20 @@ export default function ProviderRequests() {
                   </td>
                   <td className="ltr">{r.credit_usd ? usd(r.credit_usd) : '—'}</td>
                   <td className="ltr">{r.decided_by || '—'}</td>
+                  <td>
+                    {/* A decision that cannot be undone is not a decision, it is
+                        a trapdoor. The endpoint always allowed this; the screen
+                        shipped without the button. */}
+                    {r.status === 'approved' ? (
+                      <button className="btn btn-sm btn-ghost" disabled={busy === r.id} onClick={() => decide(r, false)}>
+                        لغو دسترسی
+                      </button>
+                    ) : (
+                      <button className="btn btn-sm btn-ghost" disabled={busy === r.id} onClick={() => decide(r, true)}>
+                        تأیید
+                      </button>
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>

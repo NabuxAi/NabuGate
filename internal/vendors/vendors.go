@@ -220,13 +220,13 @@ var catalogue = map[string]Vendor{
 	// the answer to "چرا فلان جا نیست؟" is on the same screen as everything
 	// else rather than in someone's head.
 	"deepgram": {
-		Label: "Deepgram", Blurb: "رونویسیِ بلادرنگ با تأخیرِ زیرِ ثانیه. هنوز وصل نشده.",
+		Label: "Deepgram", Blurb: "سریع‌ترین رونویسی — کلِ رفت‌وبرگشت یک درخواست است. مدلِ Nova-3.",
 		Capabilities: []string{CapTranscribe},
 		Site:         "https://deepgram.com", KeysURL: "https://console.deepgram.com",
 		Color: "#13EF93",
 	},
 	"assemblyai": {
-		Label: "AssemblyAI", Blurb: "رونویسی به‌همراه خلاصه و استخراجِ موضوع. هنوز وصل نشده.",
+		Label: "AssemblyAI", Blurb: "رونویسی به‌همراه خلاصه، موضوع و برچسبِ گوینده.",
 		Capabilities: []string{CapTranscribe},
 		Site:         "https://assemblyai.com", KeysURL: "https://www.assemblyai.com/app/account",
 		Color: "#2545F6",
