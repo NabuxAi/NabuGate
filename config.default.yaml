@@ -60,6 +60,16 @@ server:
       allow: ["nabu-*", "desk-*"]
       rate_limit: 240
 
+    # NabuCRM. The same Laravel codebase as NabuDesk, on its own hosts (crm.,
+    # bos.) — hence its own key: usage is attributed to the product a customer
+    # is actually on, and revoking one host's key leaves the other running.
+    # nabu-* covers the console (nabu-smart), the readers (nabu-fast) and
+    # nabu-embed. Skipped automatically when NABUCRM_KEY is unset.
+    - key: "${NABUCRM_KEY}"
+      project: "nabucrm"
+      allow: ["nabu-*"]
+      rate_limit: 240
+
     # NabuGen. Its chat goes through app/core/ai_gateway.py, which prefers
     # NABUGATE_API_KEY over the legacy OPENAI_* variables.
     - key: "${NABUGEN_KEY}"
