@@ -338,6 +338,11 @@ func (c *Config) BuildAdapters() (map[string]provider.Adapter, []string) {
 			// mrc_imagegen: a template renderer, not a diffusion model. See the
 			// adapter for how a prompt maps onto its fields.
 			adapters[name] = provider.NewImagegenAdapter(name, p.BaseURL, apiKey)
+		case "speechmatics":
+			// Batch transcription only, and asynchronous: the adapter submits a
+			// job and polls it to completion inside one call. Neither shape fits
+			// the openai adapter.
+			adapters[name] = provider.NewSpeechmaticsAdapter(name, p.BaseURL, apiKey)
 		case "gamma":
 			// gamma.app: decks, documents and social posts. Asynchronous, and a
 			// chat adapter rather than an image one because what comes back is a

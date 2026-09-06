@@ -387,6 +387,17 @@ providers:
     base_url: "https://api.elevenlabs.io/v1"
     api_key_env: "ELEVENLABS_API_KEY"
 
+  # Speechmatics — speech-to-text only, and the strongest of the rungs below
+  # for accented and code-switched speech, which is most of what passes through
+  # here. Its API is a job queue rather than a request, so it has its own
+  # adapter; see internal/provider/speechmatics.go. Inert until the key is set.
+  # eu1. is the European region — swap the host to move the processing.
+  speechmatics:
+    enabled: true
+    type: speechmatics
+    base_url: "https://eu1.asr.api.speechmatics.com/v2"
+    api_key_env: "SPEECHMATICS_API_KEY"
+
   # mrc_imagegen — branded graphics, not a diffusion model.
   #
   # It renders a fixed canvas from a kicker, two headline lines, a theme and a
@@ -1125,6 +1136,17 @@ transcription:
         model: "whisper-1"
       - provider: openai
         model: "whisper-1"
+      # Below the whisper family entirely, because a chain of one architecture
+      # fails as one. Speechmatics is a different engine with its own accent and
+      # code-switching behaviour; Gemini is a different one again, and being a
+      # language model it repairs the disfluencies whisper transcribes
+      # literally. Both stay inert until their key env is set.
+      - provider: speechmatics
+        model: "enhanced"
+      - provider: gemini
+        model: "gemini-3.5-transcribe"
+      - provider: gemini
+        model: "gemini-3-flash"
 
   # Cheapest path, for bulk work where a few percent of accuracy is worth the
   # price difference. Same shape, fewer rungs.
