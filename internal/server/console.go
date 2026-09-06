@@ -65,6 +65,15 @@ func (s *Server) mountConsoleAPI(mux *http.ServeMux) {
 	mux.Handle("POST /api/users/recharge", s.consoleAuth(requireAdmin(s.adminRechargeUser)))
 	mux.Handle("POST /api/admins", s.consoleAuth(requireAdmin(s.createAdmin)))
 
+	// The provider catalogue: what exists, what is wired up here, whose key
+	// pays for it. See providers.go.
+	mux.Handle("GET /api/providers", s.consoleAuth(s.listProviders))
+	mux.Handle("PUT /api/providers/{name}/key", s.consoleAuth(s.saveProviderKey))
+	mux.Handle("DELETE /api/providers/{name}/key", s.consoleAuth(s.deleteProviderKey))
+	mux.Handle("POST /api/providers/{name}/request", s.consoleAuth(s.requestProvider))
+	mux.Handle("GET /api/provider-requests", s.consoleAuth(requireAdmin(s.listProviderRequests)))
+	mux.Handle("POST /api/provider-requests/decide", s.consoleAuth(requireAdmin(s.decideProviderRequest)))
+
 	mux.Handle("GET /api/agents", s.consoleAuth(requireAdmin(s.listAgents)))
 	mux.Handle("POST /api/agents", s.consoleAuth(requireAdmin(s.saveAgent)))
 	mux.Handle("PATCH /api/agents/{name}", s.consoleAuth(requireAdmin(s.saveAgent)))

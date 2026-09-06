@@ -156,6 +156,15 @@ type ProviderConfig struct {
 	// without implementing verbose_json — Mistral's Voxtral does not.
 	TranscribeFormat string `yaml:"transcribe_format"`
 
+	// Access decides whether a console user may spend *the gateway's* key on
+	// this provider without asking. "auto" (the default, and what every
+	// provider shipped here uses) grants it on request with no human in the
+	// loop; "request" holds the ask for an admin. It never affects a caller
+	// using their own key, and never affects the deployment's own baked keys —
+	// only tokens minted by a console user. Turning a provider to "request"
+	// therefore cannot break an existing integration.
+	Access string `yaml:"access"`
+
 	// Passthrough turns the provider into a first-class multi-model provider:
 	// callers may address any of its models directly as "<provider>/<model>"
 	// (e.g. "parspack/openai/gpt-5.5") with no hand-written alias, and — for
@@ -648,6 +657,46 @@ func (c *Config) Passthroughs(adapters map[string]provider.Adapter) map[string][
 			continue
 		}
 		out[name] = p.Models
+	}
+	return out
+}
+
+// ProviderMeta is what the console needs to know about a provider that the
+// router does not: whether this deployment defines it at all, and whether
+// spending the gateway's key on it needs approval. The router only ever sees
+// providers that came up.
+type ProviderMeta struct {
+	Name        string `json:"name"`
+	Type        string `json:"type"`
+	Enabled     bool   `json:"enabled"`
+	Passthrough bool   `json:"passthrough"`
+	// KeyEnv is named, never read: it is what an operator has to set, and
+	// showing it turns "why is this provider down" into a one-line answer.
+	KeyEnv string `json:"key_env,omitempty"`
+	// Access is "auto" or "request"; empty means auto.
+	Access string `json:"access"`
+	// BYOK is false for a provider with no api_key_env — a local endpoint that
+	// ignores credentials, where offering to take someone's key would be a lie.
+	BYOK bool `json:"byok"`
+}
+
+// ProviderMetas describes every provider this deployment defines, live or not.
+func (c *Config) ProviderMetas() map[string]ProviderMeta {
+	out := make(map[string]ProviderMeta, len(c.Providers))
+	for name, p := range c.Providers {
+		access := strings.ToLower(strings.TrimSpace(p.Access))
+		if access == "" {
+			access = "auto"
+		}
+		out[name] = ProviderMeta{
+			Name:        name,
+			Type:        p.Type,
+			Enabled:     p.Enabled,
+			Passthrough: p.Passthrough,
+			KeyEnv:      p.APIKeyEnv,
+			Access:      access,
+			BYOK:        strings.TrimSpace(p.APIKeyEnv) != "",
+		}
 	}
 	return out
 }

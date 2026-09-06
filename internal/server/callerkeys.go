@@ -67,3 +67,51 @@ func servedByCaller(ctx context.Context) bool {
 	rec, _ := ctx.Value(router.KeySourceCtxKey{}).(*router.KeySource)
 	return rec.Caller()
 }
+
+// withOwnerCredentials layers a console user's saved state onto the request:
+// the upstream keys they stored, and the providers whose gateway credential
+// they are not (yet) allowed to spend.
+//
+// A header always wins over a stored key — explicit beats saved — and
+// X-Nabu-Key-Mode: global still routes through the gateway, so saving a key
+// once does not trap a user into their own credential forever.
+func (s *Server) withOwnerCredentials(ctx context.Context, owner string) context.Context {
+	if s.admin == nil || strings.TrimSpace(owner) == "" {
+		return ctx
+	}
+
+	if stored := s.admin.ProviderKeys(owner); len(stored) > 0 {
+		creds, _ := ctx.Value(router.CallerKeysCtxKey{}).(router.CallerKeys)
+		// Re-derive the mode from the merged set rather than keeping the one
+		// Normalize picked from headers alone: a user with a saved key and no
+		// headers sent has keys, and "global" would ignore every one of them.
+		mode := creds.Mode
+		if len(creds.Keys) == 0 {
+			mode = ""
+		}
+		merged := make(map[string]string, len(stored)+len(creds.Keys))
+		for name, key := range stored {
+			merged[name] = key
+		}
+		for name, key := range creds.Keys {
+			merged[name] = key
+		}
+		ctx = context.WithValue(ctx, router.CallerKeysCtxKey{},
+			router.CallerKeys{Keys: merged, Mode: mode}.Normalize())
+	}
+
+	// Providers this deployment holds back until asked. Only ever the
+	// gateway's own credential: the user's key for the same provider is
+	// unaffected, so a grant can add access and never remove it.
+	denied := map[string]bool{}
+	approved := s.admin.ApprovedProviders(owner)
+	for name, meta := range s.providers {
+		if meta.Access == "request" && !approved[name] {
+			denied[name] = true
+		}
+	}
+	if len(denied) > 0 {
+		ctx = context.WithValue(ctx, router.GatewayDeniedCtxKey{}, denied)
+	}
+	return ctx
+}
