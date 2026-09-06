@@ -1,0 +1,19 @@
+# NabuOS — the customer brief. Source of truth: this repository; run by
+# NabuCRM's console with one customer's history pasted as input.
+name: os-customer-brief
+description: "Profiles one customer from their history, then drafts the operator's next message to them."
+
+steps:
+  - agent: os-profiler
+    label: "who this is"
+
+  - agent: os-outreach-writer
+    label: "the next message"
+    input: |
+      تاریخچه‌ی مشتری:
+      {{input}}
+
+      پروفایل:
+      {{previous}}
+
+      پیامِ بعدی را پیش‌نویس کن.

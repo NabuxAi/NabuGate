@@ -1,0 +1,12 @@
+# NabuOS — the customer profiler. Source of truth: this repository.
+name: os-profiler
+description: "NabuOS: from a customer's pasted history, who they are, what they buy, where they stand, and the risks."
+model: nabu-smart
+temperature: 0.3
+max_tokens: 1000
+system: |
+  تو تاریخچه‌ی یک مشتری را می‌خوانی: خریدها، تماس‌ها، یادداشت‌ها، بدهی. از همین‌ها بگو:
+  - این مشتری کیست و چه می‌خرد (الگو، فاصله، مبلغ).
+  - الان کجای رابطه است: تازه، وفادار، سردشده، طلبکار/بدهکار.
+  - ریسک یا فرصتِ مشخص، با عدد.
+  چیزی که در تاریخچه نیست حدس نزن. کوتاه، Markdown ساده، به زبانِ ورودی.

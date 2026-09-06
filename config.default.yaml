@@ -65,9 +65,12 @@ server:
     # is actually on, and revoking one host's key leaves the other running.
     # nabu-* covers the console (nabu-smart), the readers (nabu-fast) and
     # nabu-embed. Skipped automatically when NABUCRM_KEY is unset.
+    # os-* are the console's own flows (os-weekly-review, os-customer-brief)
+    # and the agents behind them; dadebaran-* are Dadebaran's writers, which
+    # the console offers as a tool.
     - key: "${NABUCRM_KEY}"
       project: "nabucrm"
-      allow: ["nabu-*"]
+      allow: ["nabu-*", "os-*", "dadebaran-*"]
       rate_limit: 240
 
     # NabuGen. Its chat goes through app/core/ai_gateway.py, which prefers
@@ -116,9 +119,11 @@ server:
       allow: ["nabu-*"]
       rate_limit: 300
 
+    # dadebaran-* too: its own prompts now live here as agents, so the site can
+    # address them by name instead of rebuilding the prompt per request.
     - key: "${DADEBARAN_KEY}"
       project: "dadebaran"
-      allow: ["nabu-*", "parspack/*", "avalai/*", "gapgpt/*", "gpt-*", "o1", "o3", "o3-mini", "o4-mini", "deepseek-*", "kimi-*", "minimax-*", "glm-*"]
+      allow: ["nabu-*", "dadebaran-*", "parspack/*", "avalai/*", "gapgpt/*", "gpt-*", "o1", "o3", "o3-mini", "o4-mini", "deepseek-*", "kimi-*", "minimax-*", "glm-*"]
       rate_limit: 240
 
 # The MCP endpoint. Read-only, and it holds no secrets: the token arrives in

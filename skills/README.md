@@ -10,6 +10,7 @@ cp -r skills/nabugate ~/.claude/skills/
 | skill | when it triggers |
 |---|---|
 | [`nabugate`](./nabugate/SKILL.md) | any project that needs an LLM, embeddings, images or TTS; minting a per-app token; restricting a key by origin; debugging routing, empty responses, embedding widths or a Coolify deploy that exits with no logs |
+| [`dadebaran`](./dadebaran/SKILL.md) | calling Dadebaran's Persian writers (prompt, formal, insta, english, study) from any project, or changing them |
 
 ## Why this lives here
 
