@@ -404,6 +404,24 @@ providers:
     base_url: "https://eu1.asr.api.speechmatics.com/v2"
     api_key_env: "SPEECHMATICS_API_KEY"
 
+  # Deepgram — the fastest of the transcription rungs, and the only one whose
+  # whole exchange is a single request. Nova-3 is its current model. Its own
+  # adapter: the body is the audio, the options are query parameters, and it
+  # authenticates with "Token", not "Bearer".
+  deepgram:
+    enabled: true
+    type: deepgram
+    base_url: "https://api.deepgram.com/v1"
+    api_key_env: "DEEPGRAM_API_KEY"
+
+  # AssemblyAI — asynchronous like Speechmatics but a different engine again,
+  # with its own upload endpoint and a bare key in Authorization.
+  assemblyai:
+    enabled: true
+    type: assemblyai
+    base_url: "https://api.assemblyai.com/v2"
+    api_key_env: "ASSEMBLYAI_API_KEY"
+
   # mrc_imagegen — branded graphics, not a diffusion model.
   #
   # It renders a fixed canvas from a kicker, two headline lines, a theme and a
@@ -1162,6 +1180,12 @@ transcription:
       # it is still a rung and not a duplicate of the primary.
       - provider: together
         model: "openai/whisper-large-v3"
+      # Two more engines that share nothing with the rest: Deepgram answers in
+      # one request, AssemblyAI in three. Both stay inert until keyed.
+      - provider: deepgram
+        model: "nova-3"
+      - provider: assemblyai
+        model: "universal"
       - provider: gemini
         model: "gemini-3.5-transcribe"
       - provider: gemini

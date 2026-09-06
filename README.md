@@ -77,6 +77,9 @@ beats a saved key so a one-off override needs no visit to the console.
 Without `NABUGATE_SECRET_KEY` set, the gateway **refuses** to store keys rather
 than writing them in the clear, and the console says so.
 
+Saved keys and grants are managed from the same screen, and an admin can revoke
+a granted provider from the approval queue.
+
 ### Or asking for ours
 
 If you would rather spend the gateway's credential, ask for it on the same

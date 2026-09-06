@@ -374,6 +374,15 @@ func newAdapter(name string, p ProviderConfig, apiKey string) (provider.Adapter,
 		// mrc_imagegen: a template renderer, not a diffusion model. See the
 		// adapter for how a prompt maps onto its fields.
 		return provider.NewImagegenAdapter(name, p.BaseURL, apiKey), ""
+	case "deepgram":
+		// Pre-recorded transcription. The audio is the request body and the
+		// options are query parameters, and the auth scheme is "Token" — none
+		// of which the openai adapter can express.
+		return provider.NewDeepgramAdapter(name, p.BaseURL, apiKey), ""
+	case "assemblyai":
+		// Upload, submit, poll — three calls to one transcript, all inside one
+		// synchronous Transcribe.
+		return provider.NewAssemblyAIAdapter(name, p.BaseURL, apiKey), ""
 	case "speechmatics":
 		// Batch transcription only, and asynchronous: the adapter submits a job
 		// and polls it to completion inside one call. Neither shape fits the
