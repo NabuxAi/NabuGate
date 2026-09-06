@@ -63,11 +63,10 @@ func (a *ElevenLabsAdapter) Transcribe(ctx context.Context, req TranscriptionReq
 	if len(req.Granularities) > 0 {
 		fields["timestamps_granularity"] = "word"
 		fields["diarize"] = "true"
-	} else {
-		// Timestamps and diarization cost latency. A caller that wants only the
-		// words should not pay for them.
-		fields["timestamps_granularity"] = "none"
 	}
+	// No else: timestamps_granularity is an enum of "word" and "character" with
+	// no off value, so a caller that wants only the words gets the field
+	// omitted. Sending "none" is a 422 on every ordinary call.
 	if req.Temperature != nil {
 		fields["temperature"] = strconv.FormatFloat(*req.Temperature, 'f', -1, 64)
 	}

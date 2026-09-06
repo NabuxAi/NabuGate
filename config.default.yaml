@@ -283,6 +283,12 @@ providers:
     base_url: "https://api.mistral.ai/v1"
     api_key_env: "MISTRAL_API_KEY"
     passthrough: true
+    # Voxtral answers /audio/transcriptions in the OpenAI shape but offers
+    # text, SRT and json — not verbose_json — so asking for the default would
+    # fail every transcription call. It also refuses timestamp_granularities
+    # and language together, which the adapter avoids by not sending
+    # granularities outside the verbose shape.
+    transcribe_format: "json"
 
   # NVIDIA NIM — 100+ hosted models (Llama, Mistral, Nemotron, DeepSeek, Qwen,
   # Phi, Gemma, Granite) free on one endpoint.

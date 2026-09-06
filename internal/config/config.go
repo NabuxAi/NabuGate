@@ -149,6 +149,13 @@ type ProviderConfig struct {
 	// non-OpenAI adapters.
 	AuthScheme string `yaml:"auth_scheme"`
 
+	// TranscribeFormat overrides the response_format sent to
+	// /audio/transcriptions on an OpenAI-wire provider. Empty keeps
+	// verbose_json, which is the only shape carrying language, duration and
+	// segments. Set it to "json" for a vendor that speaks the wire format
+	// without implementing verbose_json — Mistral's Voxtral does not.
+	TranscribeFormat string `yaml:"transcribe_format"`
+
 	// Passthrough turns the provider into a first-class multi-model provider:
 	// callers may address any of its models directly as "<provider>/<model>"
 	// (e.g. "parspack/openai/gpt-5.5") with no hand-written alias, and — for
@@ -340,7 +347,9 @@ func newAdapter(name string, p ProviderConfig, apiKey string) (provider.Adapter,
 		// authHeaderOverride is non-nil only when the provider asks for a
 		// non-Bearer Authorization scheme; the adapter applies these extra
 		// headers over its Bearer default across every endpoint it calls.
-		return provider.NewOpenAIAdapter(name, p.BaseURL, apiKey, authHeaderOverride(p.AuthScheme, apiKey)), ""
+		oa := provider.NewOpenAIAdapter(name, p.BaseURL, apiKey, authHeaderOverride(p.AuthScheme, apiKey))
+		oa.SetTranscribeFormat(strings.TrimSpace(p.TranscribeFormat))
+		return oa, ""
 	case "anthropic":
 		return provider.NewAnthropicAdapter(name, p.BaseURL, apiKey), ""
 	case "gemini":
