@@ -120,7 +120,7 @@ export default function App() {
   // rendered an apology.
   let allowed = [
     'dashboard', 'account', 'plans', 'payments',
-    'tokens', 'models', 'requests', 'integration', 'docs',
+    'tokens', 'models', 'providers', 'requests', 'integration', 'docs',
     'profile', 'security',
   ];
 
