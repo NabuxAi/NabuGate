@@ -192,3 +192,32 @@ export const changeMyPassword = (current, next) =>
   });
 
 export const recentRequests = () => req('/requests');
+
+// ---- providers: whose key pays -------------------------------------------
+
+// The catalogue: every upstream this gateway knows of, whether it is wired up
+// here, and where the caller stands on using it.
+export const listProviders = () => req('/providers');
+
+export const saveProviderKey = (name, key) =>
+  req(`/providers/${encodeURIComponent(name)}/key`, {
+    method: 'PUT',
+    body: JSON.stringify({ key }),
+  });
+
+export const deleteProviderKey = (name) =>
+  req(`/providers/${encodeURIComponent(name)}/key`, { method: 'DELETE' });
+
+export const requestProvider = (name, note) =>
+  req(`/providers/${encodeURIComponent(name)}/request`, {
+    method: 'POST',
+    body: JSON.stringify({ note: note || '' }),
+  });
+
+export const listProviderRequests = () => req('/provider-requests');
+
+export const decideProviderRequest = (id, approve, creditUsd, decision) =>
+  req('/provider-requests/decide', {
+    method: 'POST',
+    body: JSON.stringify({ id, approve, credit_usd: Number(creditUsd || 0), decision: decision || '' }),
+  });

@@ -8,6 +8,7 @@ import Tokens from './views/Tokens.jsx';
 import Sidebar from './components/Sidebar.jsx';
 import Dashboard from './views/Dashboard.jsx';
 import Providers from './views/Providers.jsx';
+import ProviderRequests from './views/ProviderRequests.jsx';
 import Models from './views/Models.jsx';
 import Keys from './views/Keys.jsx';
 import Usage from './views/Usage.jsx';
@@ -32,6 +33,7 @@ const VIEWS = {
 
   dashboard: () => <Dashboard />,
   providers: () => <Providers />,
+  'provider-requests': () => <ProviderRequests />,
   opsless: () => <Opsless />,
   models: () => <Models />,
   keys: () => <Keys />,

@@ -76,6 +76,12 @@ type User struct {
 	Balance  float64   `json:"balance"`
 	Name     string    `json:"name"`
 	Payments []Payment `json:"payments,omitempty"`
+
+	// ProviderKeys are the user's own upstream credentials, sealed. Never
+	// serialize a User straight to an API response: build a projection that
+	// carries the prefix and nothing else. Handlers today all do — accountView
+	// in console.go is the pattern — and this field is why they must keep to it.
+	ProviderKeys map[string]StoredKey `json:"provider_keys,omitempty"`
 }
 
 type Token struct {
@@ -151,11 +157,19 @@ type state struct {
 	Sessions     map[string]time.Time   `json:"sessions"`
 	UserSessions map[string]SessionInfo `json:"user_sessions"`
 	Users        map[string]*User       `json:"users,omitempty"` // token hash -> expiry
+	// ProviderRequests are asks to spend the gateway's own upstream credential.
+	// See provideraccess.go — a grant is additive and never removes access.
+	ProviderRequests []ProviderRequest `json:"provider_requests,omitempty"`
 }
 
 // Store is the persisted gateway state.
 type Store struct {
 	path string
+
+	// secret seals stored provider credentials. Empty means this deployment
+	// declines to store them at all; see secrets.go for why that is a refusal
+	// rather than a fallback.
+	secret []byte
 
 	mu    sync.RWMutex
 	st    state
@@ -164,7 +178,7 @@ type Store struct {
 
 // Open loads the state file, creating an empty one if it does not exist.
 func Open(path string) (*Store, error) {
-	s := &Store{path: path, st: state{
+	s := &Store{path: path, secret: DeriveSecret(os.Getenv("NABUGATE_SECRET_KEY")), st: state{
 		Usage:        map[string]Counters{},
 		UsageByModel: map[string]Counters{},
 		UsageByProv:  map[string]Counters{},

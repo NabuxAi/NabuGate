@@ -161,7 +161,10 @@ func (r *Router) attempts(ctx context.Context, targets []config.Target) []attemp
 	for _, t := range targets {
 		global, hasGlobal := r.adapters[t.Provider]
 		globalRung := attempt{Target: t, label: t.Provider}
-		if hasGlobal {
+		switch {
+		case gatewayDenied(ctx, t.Provider):
+			globalRung.reason = errors.New("using the gateway's key for this provider needs approval — request it in the console, or send your own key")
+		case hasGlobal:
 			globalRung.adapter = global
 		}
 
@@ -210,3 +213,23 @@ func (r *Router) attempts(ctx context.Context, targets []config.Target) []attemp
 // SetCallerAdapter enables bring-your-own-key. Without it, caller-supplied keys
 // are refused with a reason rather than silently ignored.
 func (r *Router) SetCallerAdapter(f CallerAdapterFunc) { r.callerAdapter = f }
+
+// GatewayDeniedCtxKey is the context key for the set of providers whose
+// *gateway* credential this caller may not spend. It gates nothing else: the
+// caller's own key for the same provider is untouched, because a grant is about
+// the deployment's money, not about the provider.
+type GatewayDeniedCtxKey struct{}
+
+// gatewayDenied reports whether the caller must ask before spending the
+// gateway's credential on this provider.
+func gatewayDenied(ctx context.Context, providerName string) bool {
+	denied, _ := ctx.Value(GatewayDeniedCtxKey{}).(map[string]bool)
+	return denied[strings.ToLower(providerName)]
+}
+
+// HasProvider reports whether an adapter for this provider came up, which is
+// the same test routing applies.
+func (r *Router) HasProvider(name string) bool {
+	_, ok := r.adapters[name]
+	return ok
+}

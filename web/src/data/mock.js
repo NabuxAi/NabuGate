@@ -12,6 +12,7 @@ export const navGroups = [
     title: 'توسعه‌دهنده',
     items: [
       { id: 'tokens', label: 'کلیدهای API', icon: '🔑' },
+      { id: 'providers', label: 'پرووایدرها', icon: '🔌' },
       { id: 'models', label: 'مدل‌ها', icon: '🧠' },
       { id: 'requests', label: 'درخواست‌ها', icon: '➤' },
       { id: 'integration', label: 'اتصال به دروازه', icon: '🔗' },
@@ -31,7 +32,7 @@ export const navGroups = [
     items: [
       { id: 'usage', label: 'مصرف کل', icon: '◴' },
       { id: 'users', label: 'کاربران', icon: '👑' },
-      { id: 'providers', label: 'پروایدرها', icon: '🔌' },
+      { id: 'provider-requests', label: 'درخواست دسترسی', icon: '📥' },
       { id: 'agents', label: 'عامل‌ها', icon: '🤖' },
       { id: 'keys', label: 'کلیدهای سیستم', icon: '🔐' },
       { id: 'opsless', label: 'اپس‌لس (Zero-UI)', icon: '⚡' },

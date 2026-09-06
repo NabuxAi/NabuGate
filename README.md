@@ -65,6 +65,26 @@ A key is only honoured for a provider this deployment defines — it is not a
 way to reach an arbitrary endpoint through the gateway. If a request tried
 both credentials, the error names which one failed.
 
+### Saving a key instead of sending it
+
+The console's **Providers** screen lists every upstream the gateway knows of —
+including ones it does not route to yet, which are the ones worth asking for —
+and lets you save your own key rather than sending it on every request. Saved
+keys are sealed with AES-GCM under `NABUGATE_SECRET_KEY`, are never returned by
+any endpoint (you see the first characters, nothing more), and a header still
+beats a saved key so a one-off override needs no visit to the console.
+
+Without `NABUGATE_SECRET_KEY` set, the gateway **refuses** to store keys rather
+than writing them in the clear, and the console says so.
+
+### Or asking for ours
+
+If you would rather spend the gateway's credential, ask for it on the same
+screen. Providers marked `access: auto` in the config grant it on the spot; the
+rest queue for an admin, who approves and adds credit in one action. A grant
+only ever concerns the gateway's own key: it can add access, never remove it,
+and it never touches a key baked into the deployment's config.
+
 ## SDKs
 
 One client per language, all covering the whole surface above.

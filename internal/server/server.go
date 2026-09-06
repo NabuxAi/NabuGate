@@ -17,6 +17,7 @@ import (
 
 	"nabugate/internal/adminstore"
 	"nabugate/internal/agent"
+	"nabugate/internal/config"
 	"nabugate/internal/flow"
 	"nabugate/internal/mcp"
 	"nabugate/internal/memory"
@@ -46,6 +47,12 @@ type Server struct {
 	flows  *flow.Registry // nil = no flows configured
 	photos *photos.Client // nil = photo proxy disabled
 	log    *slog.Logger
+
+	// providers is what the config knows about upstreams that the router does
+	// not see — the ones with no key set, and whether spending the gateway's
+	// own key on them needs approval. Empty is fine: the catalogue then shows
+	// only what came up.
+	providers map[string]config.ProviderMeta
 
 	// admin is the persisted console state: accounts, console-minted tokens and
 	// usage that survives a restart. nil when no state path is configured, in
@@ -1125,6 +1132,11 @@ func (s *Server) auth(next http.HandlerFunc) http.HandlerFunc {
 		}
 		token := strings.TrimSpace(strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer "))
 
+		// owner stays empty for a key baked into the deployment's config. Only
+		// a console-minted token belongs to a person, and only a person has
+		// stored credentials or access grants — which is what keeps every
+		// existing internal integration untouched by both.
+		var owner string
 		pol, ok := s.policy.Lookup(token)
 		if !ok {
 			// Not in the baked config — try the tokens minted from the console.
@@ -1165,6 +1177,7 @@ func (s *Server) auth(next http.HandlerFunc) http.HandlerFunc {
 					}
 				}
 				pol = policy.Policy{Project: t.Name, Allow: t.Allow, RateLimit: t.RateLimit, Providers: t.Providers}
+				owner = t.Owner
 				ok = true
 			}
 		}
@@ -1186,6 +1199,7 @@ func (s *Server) auth(next http.HandlerFunc) http.HandlerFunc {
 		}
 		ctx := context.WithValue(r.Context(), policyCtxKey{}, pol)
 		ctx = context.WithValue(ctx, router.AllowedProvidersCtxKey{}, pol.Providers)
+		ctx = s.withOwnerCredentials(ctx, owner)
 		next(w, r.WithContext(ctx))
 	}
 }
