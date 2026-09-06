@@ -8,6 +8,7 @@ import (
 
 	"nabugate/internal/adminstore"
 	"nabugate/internal/config"
+	"nabugate/internal/provider"
 	"nabugate/internal/router"
 )
 
@@ -163,5 +164,60 @@ func TestGatewayGateIsOwnerScopedAndAdditive(t *testing.T) {
 	denied, _ = ctx.Value(router.GatewayDeniedCtxKey{}).(map[string]bool)
 	if denied["openai"] {
 		t.Error("approval did not open the gateway rung")
+	}
+}
+
+// The catalogue must merge two sources that disagree: what this deployment
+// configures, and what exists in the world. Neither alone answers the screen's
+// question.
+func TestCatalogueMergesConfigAndWorld(t *testing.T) {
+	st, err := adminstore.Open(t.TempDir() + "/state.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := &Server{
+		admin:  st,
+		router: router.New(map[string]provider.Adapter{"whisper": nil}, nil, nil, nil, nil, nil, nil, discardLogger()),
+		providers: map[string]config.ProviderMeta{
+			"whisper":      {Name: "whisper", Enabled: true, Access: "auto"},
+			"speechmatics": {Name: "speechmatics", Enabled: true, Access: "auto", BYOK: true, KeyEnv: "SPEECHMATICS_API_KEY"},
+			// Configured but unknown to the vendor catalogue: it must still
+			// render, or adding a provider would mean a frontend change.
+			"somenewthing": {Name: "somenewthing", Enabled: true, Access: "auto", BYOK: true},
+		},
+	}
+
+	rows := map[string]providerView{}
+	for _, row := range s.catalogueFor("me@example.com") {
+		rows[row.Name] = row
+	}
+
+	// Live: configured and its adapter came up.
+	if w := rows["whisper"]; !w.Live || !w.Configured || !w.UsesGatewayKey {
+		t.Errorf("whisper = %+v; it is up and needs no approval", w)
+	}
+	// Configured but keyless: on the list, not usable, and the row names the
+	// env var an operator has to set.
+	if sm := rows["speechmatics"]; sm.Live || !sm.Configured || sm.KeyEnv != "SPEECHMATICS_API_KEY" {
+		t.Errorf("speechmatics = %+v", sm)
+	}
+	// Known to the world, not wired here: this is the row that exists so it can
+	// be asked for.
+	dg, ok := rows["deepgram"]
+	if !ok {
+		t.Fatal("a vendor this gateway does not route to is missing; nobody can ask for it")
+	}
+	if dg.Configured || dg.Access != "request" || dg.Label == "" {
+		t.Errorf("deepgram = %+v", dg)
+	}
+	// Unknown to the catalogue: renders from its own name rather than vanishing.
+	if n := rows["somenewthing"]; !n.Configured || n.Label != "somenewthing" {
+		t.Errorf("uncatalogued provider = %+v", n)
+	}
+	// The key itself is never part of a row, catalogued or not.
+	for name, row := range rows {
+		if row.KeyPrefix != "" && !row.HaveKey {
+			t.Errorf("%s shows a key prefix with no stored key", name)
+		}
 	}
 }
