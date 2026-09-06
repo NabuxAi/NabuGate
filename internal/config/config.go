@@ -693,8 +693,12 @@ type ProviderMeta struct {
 	KeyEnv string `json:"key_env,omitempty"`
 	// Access is "auto" or "request"; empty means auto.
 	Access string `json:"access"`
-	// BYOK is false for a provider with no api_key_env — a local endpoint that
-	// ignores credentials, where offering to take someone's key would be a lie.
+	// BYOK says a caller's own key for this provider can actually be used. It
+	// is false for a provider with no api_key_env — a local endpoint that
+	// ignores credentials — and equally for one whose adapter cannot be built,
+	// which is the case for any OpenAI-wire provider whose base_url comes from
+	// an unset environment variable. Both would otherwise offer a form on the
+	// console that saves a key every request then silently refuses.
 	BYOK bool `json:"byok"`
 }
 
@@ -706,6 +710,14 @@ func (c *Config) ProviderMetas() map[string]ProviderMeta {
 		if access == "" {
 			access = "auto"
 		}
+		// Ask the factory rather than guessing: it is the same code the
+		// per-request path runs, so the console cannot advertise a credential
+		// route that does not exist.
+		byok := false
+		if strings.TrimSpace(p.APIKeyEnv) != "" {
+			a, _ := newAdapter(name, p, "probe")
+			byok = a != nil
+		}
 		out[name] = ProviderMeta{
 			Name:        name,
 			Type:        p.Type,
@@ -713,7 +725,7 @@ func (c *Config) ProviderMetas() map[string]ProviderMeta {
 			Passthrough: p.Passthrough,
 			KeyEnv:      p.APIKeyEnv,
 			Access:      access,
-			BYOK:        strings.TrimSpace(p.APIKeyEnv) != "",
+			BYOK:        byok,
 		}
 	}
 	return out
