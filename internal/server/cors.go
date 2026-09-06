@@ -55,6 +55,12 @@ func (s *Server) cors(next http.Handler) http.Handler {
 		return next
 	}
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Vary goes on every response once this wrapper is installed, not only
+		// the permitted ones: a shared cache that stored the header-less answer
+		// made for a refused origin would otherwise serve it to an allowed one,
+		// which looks exactly like CORS being broken at random.
+		w.Header().Add("Vary", "Origin")
+
 		origin := strings.TrimSpace(r.Header.Get("Origin"))
 		if origin != "" && s.originPermitted(origin) {
 			// Echo the one origin, never "*": a wildcard cannot carry
@@ -63,9 +69,6 @@ func (s *Server) cors(next http.Handler) http.Handler {
 			w.Header().Set("Access-Control-Allow-Origin", origin)
 			w.Header().Set("Access-Control-Allow-Credentials", "true")
 			w.Header().Set("Access-Control-Expose-Headers", corsExposed)
-			// The response differs by Origin, so a shared cache must not serve
-			// one origin's response to another.
-			w.Header().Add("Vary", "Origin")
 		}
 
 		if r.Method == http.MethodOptions && r.Header.Get("Access-Control-Request-Method") != "" {
@@ -89,6 +92,12 @@ func (s *Server) cors(next http.Handler) http.Handler {
 // originPermitted matches an Origin header against the configured list. The
 // patterns are the same shape as a key's allowed_origins — a bare host, or
 // "*.example.com" for a subdomain tree — so an operator learns one syntax.
+//
+// The scheme is checked here even though the per-key origin check ignores it.
+// That check only ever narrows an already-authenticated request; this one hands
+// a page Allow-Credentials, and doing that for an http:// origin would let
+// anyone on the same network read the response. Plain http is accepted only
+// from a loopback host, where it is how local development is served.
 func (s *Server) originPermitted(origin string) bool {
 	u, err := url.Parse(origin)
 	if err != nil {
@@ -96,6 +105,15 @@ func (s *Server) originPermitted(origin string) bool {
 	}
 	host := strings.ToLower(u.Hostname())
 	if host == "" {
+		return false
+	}
+	switch u.Scheme {
+	case "https":
+	case "http":
+		if host != "localhost" && host != "127.0.0.1" && host != "::1" {
+			return false
+		}
+	default:
 		return false
 	}
 	for _, pattern := range s.corsOrigins {

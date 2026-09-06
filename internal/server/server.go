@@ -241,7 +241,10 @@ func (s *Server) Handler() http.Handler {
 //
 // Intercepting one exact path ahead of the mux gives the contract exactly what
 // it asked for: every method reaches the MCP handler's own method check, which
-// answers 405 with Allow: POST.
+// answers 405 with Allow: POST. The one exception is a browser preflight when
+// cors_origins is configured — OPTIONS from a permitted origin is answered by
+// the CORS wrapper outside this, which is what a browser needs and what the
+// contract's 405 would defeat.
 func (s *Server) withMCP(mux *http.ServeMux) http.Handler {
 	if s.mcp == nil || !s.mcp.Enabled() {
 		return mux

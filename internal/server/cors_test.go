@@ -140,3 +140,47 @@ func TestCORSExposesTheBalanceHeaders(t *testing.T) {
 		t.Errorf("expose-headers = %q", w.Header().Get("Access-Control-Expose-Headers"))
 	}
 }
+
+// Allow-Credentials on an http:// origin would let anyone on the same network
+// read the response, so only https is echoed — except from loopback, which is
+// how local development is served.
+func TestCORSRequiresHTTPSExceptLoopback(t *testing.T) {
+	_, h := corsServer("app.nabuxai.com", "localhost")
+
+	for _, tc := range []struct {
+		origin string
+		want   bool
+	}{
+		{"https://app.nabuxai.com", true},
+		{"http://app.nabuxai.com", false},
+		{"http://localhost:5173", true},
+		{"https://localhost:5173", true},
+		{"ftp://app.nabuxai.com", false},
+	} {
+		w := httptest.NewRecorder()
+		r := httptest.NewRequest("POST", "/v1/chat/completions", nil)
+		r.Header.Set("Origin", tc.origin)
+		h.ServeHTTP(w, r)
+		got := w.Header().Get("Access-Control-Allow-Origin") != ""
+		if got != tc.want {
+			t.Errorf("%s: allowed = %v, want %v", tc.origin, got, tc.want)
+		}
+	}
+}
+
+// Vary must be set whether or not the origin was permitted, or a shared cache
+// serves the refused answer to an allowed origin.
+func TestCORSAlwaysVariesOnOrigin(t *testing.T) {
+	_, h := corsServer("app.nabuxai.com")
+	for _, origin := range []string{"https://app.nabuxai.com", "https://evil.example", ""} {
+		w := httptest.NewRecorder()
+		r := httptest.NewRequest("POST", "/v1/chat/completions", nil)
+		if origin != "" {
+			r.Header.Set("Origin", origin)
+		}
+		h.ServeHTTP(w, r)
+		if !strings.Contains(w.Header().Get("Vary"), "Origin") {
+			t.Errorf("origin %q: no Vary: Origin", origin)
+		}
+	}
+}
