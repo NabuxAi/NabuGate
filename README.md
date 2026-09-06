@@ -65,6 +65,48 @@ A key is only honoured for a provider this deployment defines — it is not a
 way to reach an arbitrary endpoint through the gateway. If a request tried
 both credentials, the error names which one failed.
 
+### Several keys for one provider
+
+Repeat the header. The keys are tried in the order given, so the second one
+takes over when the first is refused — a spending cap, a rotation, a project
+someone deleted:
+
+```http
+X-Nabu-Key-Gemini: AIza...primary
+X-Nabu-Key-Gemini: AIza...spare
+```
+
+Repeated headers are the list, and only repeated headers: a comma inside a
+value is part of the key, never a separator. Splitting on one would quietly
+turn a single valid credential into two invalid ones.
+
+Each key is a rung of its own in the fallback chain and is named separately in
+any error — `gemini (your key #2)`, not a second `gemini` — because three
+refusals of three credentials is a different problem from one provider being
+down three times.
+
+Signed-in console users can also save keys per provider (sealed with
+`NABUGATE_SECRET_KEY`; without it the gateway refuses to store rather than
+keeping plaintext). Saved keys are tried **after** any sent on the request, so
+an explicit header still wins and a saved key stays useful as the fallback.
+
+## Subscriptions
+
+A deployment can sell the right to spend *its own* vendor keys. Declare the
+offers under `plans:` (see `config.default.yaml`), and a console user buys a
+term out of the balance they already topped up.
+
+Two charges, deliberately separate:
+
+- the **plan fee**, once per term, which buys access;
+- the **calls**, metered against the same balance at the plan's `markup`,
+  never below `min_charge_usd` per call.
+
+Someone running on their own key pays neither — their vendor billed them, and
+the gateway records that usage at zero cost. A plan only matters for providers
+marked `access: request`; everything else stays reachable as it always was, and
+a token baked into the config has no owner and is never gated.
+
 ### Saving a key instead of sending it
 
 The console's **Providers** screen lists every upstream the gateway knows of —

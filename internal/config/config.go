@@ -59,6 +59,82 @@ type Config struct {
 
 	// MCP is the Model Context Protocol endpoint (see the MCP type).
 	MCP MCP `yaml:"mcp"`
+
+	// Plans are the subscriptions a user can buy to spend the gateway's own
+	// vendor keys. No plans declared means nobody can buy one, and the only way
+	// to reach a gated provider stays an admin's approval — which is exactly
+	// how every deployment behaves before this file gains a `plans:` block.
+	Plans []Plan `yaml:"plans"`
+}
+
+// Plan is one subscription offer.
+//
+// It sells two things at once and they are priced separately on purpose: the
+// fee unlocks the gateway's credentials, and Markup sets what each call served
+// on them costs against the user's balance. A caller using their own key is
+// touched by neither.
+type Plan struct {
+	ID   string `yaml:"id"`
+	Name string `yaml:"name"`
+	// Description is shown on the plan card; one sentence, in the console's
+	// language, not English-only.
+	Description string `yaml:"description"`
+
+	PriceUSD float64 `yaml:"price_usd"`
+	// Days is one term. 30 is a month here; nothing computes calendar months,
+	// because a term that ends on a different day of the month each time is a
+	// support ticket waiting to happen.
+	Days int `yaml:"days"`
+
+	// Providers are globs (`*`, `gem*`, `openai`) naming whose gateway key this
+	// plan unlocks. Empty unlocks nothing, which makes an incomplete plan
+	// useless rather than dangerously generous.
+	Providers []string `yaml:"providers"`
+
+	// Markup multiplies the metered cost of a call served on the gateway's key.
+	// Unset or below 1 means at cost.
+	Markup float64 `yaml:"markup"`
+	// MinChargeUSD floors one such call. Without it a model with no `pricing:`
+	// entry meters at zero and any markup of zero is still zero — the gateway
+	// would hand out its own credentials free of charge and the console would
+	// show a busy month that earned nothing.
+	MinChargeUSD float64 `yaml:"min_charge_usd"`
+
+	// IncludesCreditUSD is credit granted on purchase, for a plan priced as a
+	// bundle rather than as pure access.
+	IncludesCreditUSD float64 `yaml:"includes_credit_usd"`
+
+	// Popular marks the one the console highlights.
+	Popular bool `yaml:"popular"`
+}
+
+// Term returns the plan's term in days, defaulting to a month.
+func (p Plan) Term() int {
+	if p.Days <= 0 {
+		return 30
+	}
+	return p.Days
+}
+
+// Rate returns the multiplier to apply to a gateway-served call, never below 1:
+// a plan that discounted the gateway's own cost would bill less than the call
+// spent, and no configuration mistake should be able to do that.
+func (p Plan) Rate() float64 {
+	if p.Markup < 1 {
+		return 1
+	}
+	return p.Markup
+}
+
+// Plan looks up one offer by id.
+func (c *Config) Plan(id string) (Plan, bool) {
+	id = strings.ToLower(strings.TrimSpace(id))
+	for _, p := range c.Plans {
+		if strings.ToLower(strings.TrimSpace(p.ID)) == id {
+			return p, true
+		}
+	}
+	return Plan{}, false
 }
 
 // MCP is the Model Context Protocol endpoint: a read-only view of this

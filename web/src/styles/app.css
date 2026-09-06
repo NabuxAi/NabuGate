@@ -1218,3 +1218,80 @@ select.input {
    which reads as a second action rather than the escape from the first. */
 .prov-form .btn { padding-inline: 10px; }
 .prov-hint { flex-basis: 100%; margin: 2px 0 0; font-size: 11.5px; line-height: 1.9; color: var(--ng-muted); }
+
+/* The saved keys for one provider, in the order they are tried. Numbered
+   because the order is the feature: #1 is the one that normally serves and #2
+   is what happens when it does not, and a bulleted list would hide that. */
+.prov-keys {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 12px;
+}
+.prov-keys li { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.prov-key-n {
+  flex: 0 0 auto;
+  min-width: 17px;
+  height: 17px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 5px;
+  background: var(--ng-chip-bg);
+  color: var(--ng-muted);
+  font-size: 10.5px;
+}
+.prov-keys code { font-size: 11px; color: var(--ng-muted); }
+/* The label is the only part that can be arbitrarily long, so it is the part
+   that gives way. */
+.prov-key-label {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--ng-muted);
+}
+.prov-keys .btn { flex: 0 0 auto; margin-inline-start: auto; padding-inline: 8px; }
+
+/* One plan, on the subscription screen. Sits next to the top-up cards, so it
+   borrows their shape and states its own terms rather than a list of perks. */
+.sub-card { display: flex; flex-direction: column; gap: 10px; }
+/* Qualified with .plan on purpose. The perk lists on this screen are styled by
+   `.plan ul` and `.plan ul li` in polish.css, which are more specific than a
+   lone class — an unqualified .sub-terms lost its row layout and inherited the
+   perk list's ✓ bullet, turning the plan's terms into a list of claims. */
+.plan ul.sub-terms {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 12.5px;
+}
+.plan ul.sub-terms li {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  padding: 5px 9px;
+  border-radius: 8px;
+  background: var(--ng-chip-bg);
+  line-height: 1.7;
+}
+.plan ul.sub-terms li::before { content: none; }
+.plan ul.sub-terms b { font-weight: 600; color: var(--ng-heading); }
+.sub-live { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+
+/* Cap the column. .plan-grid's 1fr maximum is right for the three top-up cards
+   that always fill the row; a deployment selling one subscription got a single
+   card stretched to the full page, which reads as a banner and puts its buy
+   button across the whole width. */
+.plan-grid.sub-plans {
+  grid-template-columns: repeat(auto-fit, minmax(240px, 340px));
+  justify-content: start;
+}

@@ -91,6 +91,7 @@ func main() {
 	// with no key set, and whether spending the gateway's key on them needs
 	// approval. The console catalogue is built from this.
 	srv.SetProviderMetas(cfg.ProviderMetas())
+	srv.SetPlans(cfg.Plans)
 	// Browser origins allowed to call the gateway. Empty — the default — sends
 	// no CORS headers at all, so a deployment that names none is unchanged.
 	srv.SetCORSOrigins(cfg.Server.CORSOrigins)

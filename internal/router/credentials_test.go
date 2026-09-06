@@ -30,7 +30,17 @@ func byokRouter(global map[string]provider.Adapter, caller CallerAdapterFunc) *R
 	return r
 }
 
+// One key per provider, which is what most of these tests are about. The
+// multi-key cases build the lists directly.
 func ctxWithKeys(mode string, keys map[string]string) (context.Context, *KeySource) {
+	lists := map[string][]string{}
+	for name, key := range keys {
+		lists[name] = []string{key}
+	}
+	return ctxWithKeyLists(mode, lists)
+}
+
+func ctxWithKeyLists(mode string, keys map[string][]string) (context.Context, *KeySource) {
 	rec := NewKeySource()
 	ctx := context.WithValue(context.Background(), CallerKeysCtxKey{}, CallerKeys{Keys: keys, Mode: mode})
 	return context.WithValue(ctx, KeySourceCtxKey{}, rec), rec

@@ -53,6 +53,9 @@ type Server struct {
 	// own key on them needs approval. Empty is fine: the catalogue then shows
 	// only what came up.
 	providers map[string]config.ProviderMeta
+	// plans are the subscriptions this deployment sells; empty means it sells
+	// none and gated providers stay admin-approval only.
+	plans []config.Plan
 
 	// corsOrigins are the browser origins allowed to call the gateway. Empty —
 	// the default — sends no CORS headers at all, exactly as before this
@@ -333,6 +336,12 @@ func (s *Server) record(r *http.Request, prov, model string, u provider.Usage) {
 		// is still recorded so the console shows what ran; the cost is zero so
 		// the gateway does not bill for someone else's spend.
 		cost = 0
+	} else {
+		// Served on the gateway's own credential, so the gateway's money paid
+		// the vendor. What the user is charged for that is their plan's rate —
+		// the metered cost when they have no plan, which is how every
+		// deployment behaved before subscriptions existed.
+		cost = gatewayRateFrom(r.Context()).apply(cost)
 	}
 	s.usage.RecordAt(project, prov, model, u, cost)
 	// Also accumulate into the persisted counters, so the console's numbers are

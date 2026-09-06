@@ -199,20 +199,36 @@ export const recentRequests = () => req('/requests');
 // here, and where the caller stands on using it.
 export const listProviders = () => req('/providers');
 
-export const saveProviderKey = (name, key) =>
+// Adds a key rather than replacing one: several keys per provider are tried in
+// turn, so a key that dies costs a fallback and not the request.
+export const saveProviderKey = (name, key, label) =>
   req(`/providers/${encodeURIComponent(name)}/key`, {
     method: 'PUT',
-    body: JSON.stringify({ key }),
+    body: JSON.stringify({ key, label: label || '' }),
   });
 
-export const deleteProviderKey = (name) =>
-  req(`/providers/${encodeURIComponent(name)}/key`, { method: 'DELETE' });
+// No id removes every key for the provider, which is what "remove my key"
+// means when there is one.
+export const deleteProviderKey = (name, id) =>
+  req(
+    `/providers/${encodeURIComponent(name)}/key` + (id ? `?id=${encodeURIComponent(id)}` : ''),
+    { method: 'DELETE' },
+  );
 
 export const requestProvider = (name, note) =>
   req(`/providers/${encodeURIComponent(name)}/request`, {
     method: 'POST',
     body: JSON.stringify({ note: note || '' }),
   });
+
+// ---- subscriptions: paying to spend the gateway's own keys ----------------
+
+export const listPlans = () => req('/plans');
+
+export const subscribe = (id) =>
+  req(`/plans/${encodeURIComponent(id)}/subscribe`, { method: 'POST' });
+
+export const cancelSubscription = () => req('/subscription', { method: 'DELETE' });
 
 export const listProviderRequests = () => req('/provider-requests');
 

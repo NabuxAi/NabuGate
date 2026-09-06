@@ -71,6 +71,12 @@ func (s *Server) mountConsoleAPI(mux *http.ServeMux) {
 	mux.Handle("PUT /api/providers/{name}/key", s.consoleAuth(s.saveProviderKey))
 	mux.Handle("DELETE /api/providers/{name}/key", s.consoleAuth(s.deleteProviderKey))
 	mux.Handle("POST /api/providers/{name}/request", s.consoleAuth(s.requestProvider))
+	// Subscriptions: buying the right to spend the gateway's keys. See plans.go.
+	mux.Handle("GET /api/plans", s.consoleAuth(s.listPlans))
+	mux.Handle("POST /api/plans/{id}/subscribe", s.consoleAuth(s.subscribe))
+	mux.Handle("DELETE /api/subscription", s.consoleAuth(s.cancelSubscription))
+	mux.Handle("POST /api/subscriptions", s.consoleAuth(requireAdmin(s.adminSetSubscription)))
+
 	mux.Handle("GET /api/provider-requests", s.consoleAuth(requireAdmin(s.listProviderRequests)))
 	mux.Handle("POST /api/provider-requests/decide", s.consoleAuth(requireAdmin(s.decideProviderRequest)))
 

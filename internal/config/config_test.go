@@ -529,3 +529,38 @@ func TestShippedFlowsLoad(t *testing.T) {
 		}
 	}
 }
+
+// The shipped plan has to be one a user could actually buy, and one that bills.
+// A plan with no providers unlocks nothing, and a markup of zero would hand out
+// the gateway's own credentials free — both are silent, and both are only
+// visible at the end of a month.
+func TestShippedPlansAreSellable(t *testing.T) {
+	raw, err := os.ReadFile("../../config.default.yaml")
+	if err != nil {
+		t.Fatalf("read config.default.yaml: %v", err)
+	}
+	cfg, err := Parse(string(raw))
+	if err != nil {
+		t.Fatalf("parse config.default.yaml: %v", err)
+	}
+	if len(cfg.Plans) == 0 {
+		t.Skip("this deployment sells no subscriptions")
+	}
+	for _, p := range cfg.Plans {
+		if strings.TrimSpace(p.ID) == "" || strings.TrimSpace(p.Name) == "" {
+			t.Errorf("plan %+v has no id or name", p)
+		}
+		if len(p.Providers) == 0 {
+			t.Errorf("plan %q unlocks nothing; buying it would change nothing the buyer can see", p.ID)
+		}
+		if p.PriceUSD <= 0 {
+			t.Errorf("plan %q is free", p.ID)
+		}
+		if p.MinChargeUSD <= 0 {
+			t.Errorf("plan %q has no floor; every unpriced model on it bills zero", p.ID)
+		}
+		if _, ok := cfg.Plan(p.ID); !ok {
+			t.Errorf("plan %q cannot be looked up by its own id", p.ID)
+		}
+	}
+}

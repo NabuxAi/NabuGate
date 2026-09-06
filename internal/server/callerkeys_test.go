@@ -22,11 +22,11 @@ func TestCallerKeysFromHeaders(t *testing.T) {
 	// Provider names are matched case-insensitively against the config, so the
 	// header casing a client happens to send must not decide whether its key
 	// is found.
-	if got.Keys["gemini"] != "AIza-secret" {
-		t.Errorf("gemini key = %q", got.Keys["gemini"])
+	if k := got.Keys["gemini"]; len(k) != 1 || k[0] != "AIza-secret" {
+		t.Errorf("gemini key = %q", k)
 	}
-	if got.Keys["speechmatics"] != "sm-secret" {
-		t.Errorf("speechmatics key = %q", got.Keys["speechmatics"])
+	if k := got.Keys["speechmatics"]; len(k) != 1 || k[0] != "sm-secret" {
+		t.Errorf("speechmatics key = %q", k)
 	}
 	if _, ok := got.Keys["empty"]; ok {
 		t.Error("a blank header became a key; it would be tried and fail")

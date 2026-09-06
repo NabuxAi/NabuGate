@@ -24,11 +24,49 @@ export default function Plans() {
   const [selected, setSelected] = useState(null);
   const [custom, setCustom] = useState(25);
   const [status, setStatus] = useState(null);
+  const [subs, setSubs] = useState(null); // { plans, subscription, active, balance }
+  const [subBusy, setSubBusy] = useState(null);
+  const [subError, setSubError] = useState(null);
+  const [subNotice, setSubNotice] = useState(null);
   const payment = usePayment(() => navigate('account'));
+
+  const loadSubs = () => api.listPlans().then(setSubs).catch(() => setSubs({ plans: [] }));
 
   useEffect(() => {
     api.status().then(setStatus).catch(() => setStatus({}));
+    loadSubs();
   }, []);
+
+  const buyPlan = async (id) => {
+    setSubBusy(id);
+    setSubError(null);
+    setSubNotice(null);
+    try {
+      const r = await api.subscribe(id);
+      setSubNotice(
+        `اشتراک فعال شد تا ${new Date(r.subscription.expires_at).toLocaleDateString('fa-IR')}.`,
+      );
+      await loadSubs();
+    } catch (e) {
+      setSubError(e.message);
+    } finally {
+      setSubBusy(null);
+    }
+  };
+
+  const endPlan = async () => {
+    setSubBusy('cancel');
+    setSubError(null);
+    try {
+      await api.cancelSubscription();
+      setSubNotice('اشتراک همین حالا پایان یافت. کلیدهای خودت بدون تغییر کار می‌کنند.');
+      await loadSubs();
+    } catch (e) {
+      setSubError(e.message);
+    } finally {
+      setSubBusy(null);
+    }
+  };
 
   const enabled = status?.payments_enabled !== false;
 
@@ -72,6 +110,84 @@ export default function Plans() {
           </div>
         ))}
       </div>
+
+      {subs?.plans?.length > 0 && (
+        <div className="card">
+          <div className="card-head">
+            <h3>اشتراک کلیدهای ما</h3>
+            <span className="badge badge-muted">جدا از شارژ اعتبار</span>
+          </div>
+          <p className="muted" style={{ fontSize: 13, lineHeight: 1.9, margin: '0 0 12px' }}>
+            اشتراک، اجازهٔ استفاده از کلیدهای خودِ سرور ما را می‌خرد؛ خودِ مصرف جداگانه از همین اعتبار
+            کم می‌شود. اگر با کلید خودت کار می‌کنی، نه اشتراک لازم داری و نه چیزی از اعتبارت کم می‌شود —
+            صورت‌حسابت را همان سرویس‌دهنده می‌فرستد.
+          </p>
+
+          {subError && <div className="banner-error" style={{ marginBottom: 10 }}>{subError}</div>}
+          {subNotice && <div className="banner-ok" style={{ marginBottom: 10 }}>{subNotice}</div>}
+
+          {subs.subscription && (
+            <div className={subs.active ? 'callout ok' : 'callout warn'} style={{ marginBottom: 12 }}>
+              <span className="ci">{subs.active ? '✓' : '⏸'}</span>
+              <div className="sub-live">
+                <div>
+                  <strong>{subs.subscription.name || subs.subscription.plan_id}</strong>{' '}
+                  {subs.active ? 'فعال تا' : 'منقضی شده در'}{' '}
+                  <span className="ltr">
+                    {new Date(subs.subscription.expires_at).toLocaleDateString('fa-IR')}
+                  </span>
+                </div>
+                {subs.active && (
+                  <button className="btn btn-sm btn-ghost" disabled={subBusy === 'cancel'} onClick={endPlan}>
+                    پایان اشتراک
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+
+          <div className="plan-grid sub-plans stagger">
+            {subs.plans.map((pl) => (
+              <div key={pl.id} className={'plan sub-card' + (pl.popular ? ' featured' : '')}>
+                {pl.popular && <div className="ribbon">پیشنهاد ما</div>}
+                <h3>{pl.name}</h3>
+                <div className="price" dir="ltr">{usd(pl.price_usd)}<small>/ {faInt(pl.days)} روز</small></div>
+                {pl.description && (
+                  <p className="muted" style={{ fontSize: 13, lineHeight: 1.7, margin: 0 }}>{pl.description}</p>
+                )}
+                <ul className="sub-terms">
+                  <li>
+                    <b>{pl.unlocks_all ? 'همهٔ سرویس‌ها' : `${faInt(pl.unlocks)} سرویس`}</b>
+                    <span>با کلید ما</span>
+                  </li>
+                  <li>
+                    <b dir="ltr">×{pl.markup}</b>
+                    <span>نرخ مصرف روی کلید ما</span>
+                  </li>
+                  {pl.includes_credit_usd > 0 && (
+                    <li><b dir="ltr">{usd(pl.includes_credit_usd)}</b><span>اعتبار هدیه</span></li>
+                  )}
+                </ul>
+                <div className="spacer" />
+                <button
+                  className={'btn btn-lg ' + (pl.popular ? 'btn-primary' : 'btn-outline')}
+                  disabled={subBusy === pl.id}
+                  onClick={() => buyPlan(pl.id)}
+                >
+                  {subBusy === pl.id
+                    ? 'در حال فعال‌سازی…'
+                    : subs.active && subs.subscription?.plan_id === pl.id
+                      ? `تمدید ${faInt(pl.days)} روز`
+                      : `فعال‌سازی — ${usd(pl.price_usd)}`}
+                </button>
+                <p className="muted" style={{ fontSize: 11.5, lineHeight: 1.9, margin: 0 }}>
+                  از موجودی حسابت کم می‌شود، نه از کارت. اگر موجودی کافی نداری، اول از همین صفحه شارژ کن.
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="card" style={{ marginTop: 6 }}>
         <div className="card-head"><h3>مبلغ دلخواه</h3><span className="badge badge-muted">حداقل ۱ و حداکثر ۵٬۰۰۰ دلار</span></div>

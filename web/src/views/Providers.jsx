@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import Layout from '../components/Layout.jsx';
 import VendorIcon from '../components/VendorIcon.jsx';
 import * as api from '../api.js';
+import { faInt } from '../data/mock.js';
 import { Skeleton } from '../components/Skeleton.jsx';
 
 /*
@@ -47,7 +48,10 @@ export default function Providers() {
   const [filter, setFilter] = useState('all');
   const [editing, setEditing] = useState(null); // provider name whose key form is open
   const [draftKey, setDraftKey] = useState('');
+  const [draftLabel, setDraftLabel] = useState('');
   const [busy, setBusy] = useState(null);
+  const [maxKeys, setMaxKeys] = useState(8);
+  const [sub, setSub] = useState(null);
 
   const load = () =>
     api
@@ -55,6 +59,8 @@ export default function Providers() {
       .then((d) => {
         setRows(d.providers || []);
         setCanStore(d.can_store_keys !== false);
+        if (d.max_keys) setMaxKeys(d.max_keys);
+        setSub(d.subscribed ? d.subscription : null);
       })
       .catch((e) => setError(e.message));
 
@@ -78,10 +84,13 @@ export default function Providers() {
     setBusy(name);
     setError(null);
     try {
-      await api.saveProviderKey(name, draftKey.trim());
-      setNotice(`کلید شما برای ${name} ذخیره شد. از این به بعد درخواست‌هایتان اول با همان می‌رود.`);
+      await api.saveProviderKey(name, draftKey.trim(), draftLabel.trim());
+      setNotice(
+        `کلید شما برای ${name} ذخیره شد. کلیدها به ترتیبِ افزودن امتحان می‌شوند؛ اگر اولی جواب ندهد، خودکار سراغ بعدی می‌رود.`,
+      );
       setEditing(null);
       setDraftKey('');
+      setDraftLabel('');
       await load();
     } catch (e) {
       setError(e.message);
@@ -90,10 +99,10 @@ export default function Providers() {
     }
   };
 
-  const dropKey = async (name) => {
+  const dropKey = async (name, id) => {
     setBusy(name);
     try {
-      await api.deleteProviderKey(name);
+      await api.deleteProviderKey(name, id);
       setNotice(`کلید شما برای ${name} پاک شد.`);
       await load();
     } catch (e) {
@@ -128,6 +137,13 @@ export default function Providers() {
     >
       {error && <div className="card banner-error">{error}</div>}
       {notice && <div className="card banner-ok">{notice}</div>}
+      {sub && (
+        <div className="card banner-ok">
+          اشتراک <strong>{sub.name || sub.plan_id}</strong> فعال است تا{' '}
+          <span className="ltr">{new Date(sub.expires_at).toLocaleDateString('fa-IR')}</span> — سرویس‌هایی که
+          پوشش می‌دهد با کلید خودِ ما در دسترس‌اند و مصرفشان از اعتبارت کم می‌شود.
+        </div>
+      )}
       {!canStore && (
         <div className="card banner-warn">
           این دروازه <code className="ltr">NABUGATE_SECRET_KEY</code> ندارد، پس کلید را ذخیره نمی‌کند —
@@ -187,22 +203,44 @@ export default function Providers() {
               ) : (
                 <span className="prov-no">با کلید ما هنوز در دسترس نیست</span>
               )}
+              {p.plan_covers && !p.uses_gateway_key && (
+                <span className="prov-ok">اشتراکت این را باز می‌کند</span>
+              )}
               {p.have_key && (
                 <span className="prov-mine">
-                  کلید خودت ذخیره است <code className="ltr">{p.key_prefix}</code>
+                  {p.keys.length > 1
+                    ? `${faInt(p.keys.length)} کلید خودت — به ترتیب امتحان می‌شوند`
+                    : 'کلید خودت ذخیره است'}
                 </span>
               )}
             </div>
 
+            {p.have_key && (
+              <ol className="prov-keys">
+                {p.keys.map((k, i) => (
+                  <li key={k.id}>
+                    <span className="prov-key-n">{faInt(i + 1)}</span>
+                    <code className="ltr">{k.prefix}</code>
+                    {k.label && <span className="prov-key-label">{k.label}</span>}
+                    <button
+                      className="btn btn-sm btn-ghost"
+                      disabled={busy === p.name}
+                      onClick={() => dropKey(p.name, k.id)}
+                    >
+                      حذف
+                    </button>
+                  </li>
+                ))}
+              </ol>
+            )}
+
             <div className="prov-actions">
-              {p.byok && canStore && editing !== p.name && (
-                <button className="btn btn-sm" onClick={() => { setEditing(p.name); setDraftKey(''); }}>
-                  {p.have_key ? 'تعویض کلیدم' : 'کلید خودم را بگذار'}
-                </button>
-              )}
-              {p.have_key && (
-                <button className="btn btn-sm btn-ghost" disabled={busy === p.name} onClick={() => dropKey(p.name)}>
-                  حذف کلیدم
+              {p.byok && canStore && editing !== p.name && (p.keys?.length || 0) < maxKeys && (
+                <button
+                  className="btn btn-sm"
+                  onClick={() => { setEditing(p.name); setDraftKey(''); setDraftLabel(''); }}
+                >
+                  {p.have_key ? 'کلید دیگری اضافه کن' : 'کلید خودم را بگذار'}
                 </button>
               )}
               {!p.uses_gateway_key && p.grant !== 'pending' && (
@@ -227,6 +265,14 @@ export default function Providers() {
                   value={draftKey}
                   onChange={(e) => setDraftKey(e.target.value)}
                 />
+                <input
+                  className="input"
+                  type="text"
+                  autoComplete="off"
+                  placeholder="اسمی برایش بگذار (اختیاری) — مثلاً «حساب کاری»"
+                  value={draftLabel}
+                  onChange={(e) => setDraftLabel(e.target.value)}
+                />
                 <button className="btn btn-sm" disabled={!draftKey.trim() || busy === p.name} onClick={() => saveKey(p.name)}>
                   ذخیره
                 </button>
@@ -234,6 +280,8 @@ export default function Providers() {
                 <p className="prov-hint">
                   رمزنگاری‌شده ذخیره می‌شود و هرگز در هیچ پاسخی برنمی‌گردد — فقط چند حرف اولش را می‌بینی.
                   فراخوانی‌ای که با کلید خودت انجام شود، از اعتبار تو نزد ما کم نمی‌کند.
+                  می‌توانی تا {faInt(maxKeys)} کلید برای هر سرویس بگذاری؛ اگر یکی از کار بیفتد، درخواست
+                  خودش می‌رود سراغ بعدی.
                 </p>
               </div>
             )}

@@ -22,7 +22,7 @@ func TestStoredKeyNeverLeavesTheStore(t *testing.T) {
 		t.Fatal(err)
 	}
 	const secret = "sk-do-not-print-me"
-	if err := st.SetProviderKey("me@example.com", "openai", secret); err != nil {
+	if _, err := st.AddProviderKey("me@example.com", "openai", "", secret); err != nil {
 		t.Fatal(err)
 	}
 
@@ -88,10 +88,10 @@ func TestStoredKeysMergeUnderHeaders(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := st.SetProviderKey("me@example.com", "openai", "sk-stored"); err != nil {
+	if _, err := st.AddProviderKey("me@example.com", "openai", "", "sk-stored"); err != nil {
 		t.Fatal(err)
 	}
-	if err := st.SetProviderKey("me@example.com", "gemini", "AIza-stored"); err != nil {
+	if _, err := st.AddProviderKey("me@example.com", "gemini", "", "AIza-stored"); err != nil {
 		t.Fatal(err)
 	}
 	s := &Server{admin: st}
@@ -102,11 +102,11 @@ func TestStoredKeysMergeUnderHeaders(t *testing.T) {
 	ctx = s.withOwnerCredentials(ctx, "me@example.com")
 
 	creds, _ := ctx.Value(router.CallerKeysCtxKey{}).(router.CallerKeys)
-	if creds.Keys["openai"] != "sk-from-header" {
-		t.Errorf("openai = %q; an explicit header must beat the stored key", creds.Keys["openai"])
+	if got := creds.Keys["openai"]; len(got) == 0 || got[0] != "sk-from-header" {
+		t.Errorf("openai = %q; an explicit header must be tried before the stored key", got)
 	}
-	if creds.Keys["gemini"] != "AIza-stored" {
-		t.Errorf("gemini = %q; the stored key should fill in where no header was sent", creds.Keys["gemini"])
+	if got := creds.Keys["gemini"]; len(got) != 1 || got[0] != "AIza-stored" {
+		t.Errorf("gemini = %q; the stored key should fill in where no header was sent", got)
 	}
 
 	// With nothing but stored keys, the mode must not stay "global" — that is
@@ -216,8 +216,13 @@ func TestCatalogueMergesConfigAndWorld(t *testing.T) {
 	}
 	// The key itself is never part of a row, catalogued or not.
 	for name, row := range rows {
-		if row.KeyPrefix != "" && !row.HaveKey {
-			t.Errorf("%s shows a key prefix with no stored key", name)
+		if len(row.Keys) > 0 != row.HaveKey {
+			t.Errorf("%s: have_key disagrees with the key list", name)
+		}
+		for _, k := range row.Keys {
+			if k.Prefix == "" {
+				t.Errorf("%s: a saved key rendered with nothing to identify it", name)
+			}
 		}
 	}
 }
