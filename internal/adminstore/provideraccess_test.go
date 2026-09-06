@@ -22,17 +22,23 @@ func TestProviderKeyRoundTrip(t *testing.T) {
 	if !s.SecretConfigured() {
 		t.Fatal("secret not configured")
 	}
-	if err := s.SetProviderKey("Me@Example.com", "Gemini", "AIza-super-secret-value"); err != nil {
+	if _, err := s.AddProviderKey("Me@Example.com", "Gemini", "", "AIza-super-secret-value"); err != nil {
 		t.Fatalf("set: %v", err)
 	}
 
 	// The console sees which key is saved, never the key.
-	prefixes := s.ProviderKeyPrefixes("me@example.com")
-	if got := prefixes["gemini"]; got == "" || strings.Contains(got, "super") {
+	listed := s.ProviderKeyList("me@example.com")["gemini"]
+	if len(listed) != 1 {
+		t.Fatalf("listed = %v, want one key", listed)
+	}
+	if got := listed[0].Prefix; got == "" || strings.Contains(got, "super") {
 		t.Errorf("prefix = %q; it must identify the key without revealing it", got)
 	}
+	if listed[0].Blob != "" {
+		t.Error("the listing carried the sealed material")
+	}
 
-	if got := s.ProviderKeys("me@example.com")["gemini"]; got != "AIza-super-secret-value" {
+	if got := s.ProviderKeys("me@example.com")["gemini"]; len(got) != 1 || got[0] != "AIza-super-secret-value" {
 		t.Errorf("decrypted = %q", got)
 	}
 
@@ -42,7 +48,7 @@ func TestProviderKeyRoundTrip(t *testing.T) {
 		t.Fatal("the key was written to disk in the clear")
 	}
 
-	if err := s.DeleteProviderKey("me@example.com", "gemini"); err != nil {
+	if err := s.DeleteProviderKey("me@example.com", "gemini", ""); err != nil {
 		t.Fatalf("delete: %v", err)
 	}
 	if len(s.ProviderKeys("me@example.com")) != 0 {
@@ -57,7 +63,7 @@ func TestProviderKeyRefusedWithoutSecret(t *testing.T) {
 	if s.SecretConfigured() {
 		t.Fatal("reported a secret it does not have")
 	}
-	err := s.SetProviderKey("me@example.com", "gemini", "sk-1")
+	_, err := s.AddProviderKey("me@example.com", "gemini", "", "sk-1")
 	if err != ErrNoSecret {
 		t.Fatalf("err = %v, want ErrNoSecret", err)
 	}
@@ -77,7 +83,7 @@ func TestProviderKeySurvivesRotationAsSkipped(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := s1.SetProviderKey("me@example.com", "gemini", "sk-old"); err != nil {
+	if _, err := s1.AddProviderKey("me@example.com", "gemini", "", "sk-old"); err != nil {
 		t.Fatal(err)
 	}
 	if err := s1.Persist(); err != nil {
@@ -91,7 +97,7 @@ func TestProviderKeySurvivesRotationAsSkipped(t *testing.T) {
 	}
 	// Still listed — the user can see it is there and replace it — but not
 	// usable, and reading it does not error.
-	if _, ok := s2.ProviderKeyPrefixes("me@example.com")["gemini"]; !ok {
+	if _, ok := s2.ProviderKeyList("me@example.com")["gemini"]; !ok {
 		t.Error("the stored key vanished from the listing")
 	}
 	if got := s2.ProviderKeys("me@example.com"); len(got) != 0 {

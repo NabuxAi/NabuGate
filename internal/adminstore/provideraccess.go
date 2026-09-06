@@ -1,8 +1,11 @@
 package adminstore
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -49,6 +52,19 @@ type ProviderRequest struct {
 	// formatting a date would render as a real decision in the year one.
 	DecidedAt *time.Time `json:"decided_at,omitempty"`
 	DecidedBy string     `json:"decided_by,omitempty"`
+}
+
+// newID is a short random identifier for a stored key. Random rather than an
+// index, so deleting the second of three keys does not renumber the third out
+// from under a console that is still holding the old list.
+func newID() string {
+	var raw [8]byte
+	if _, err := rand.Read(raw[:]); err != nil {
+		// A store that cannot read randomness has worse problems; a time-based
+		// id still distinguishes the keys of one user, which is all it must do.
+		return strconv.FormatInt(time.Now().UnixNano(), 36)
+	}
+	return hex.EncodeToString(raw[:])
 }
 
 func normEmail(s string) string { return strings.ToLower(strings.TrimSpace(s)) }
@@ -204,20 +220,35 @@ func (s *Store) ApprovedProviders(owner string) map[string]bool {
 }
 
 // --- stored credentials ---
+//
+// Several keys per provider, tried in order. A vendor key dies for reasons that
+// have nothing to do with this gateway — a spending cap, a rotation, a project
+// someone deleted — and one dead key should cost a user a fallback, not their
+// whole request. So the store holds a list and the router walks it.
+//
+// Order is the order they were added, oldest first: a user's first key is the
+// one they mean by default, and a key added later is a spare. Nothing here
+// reorders on failure — a key that failed once may be fine on the next request,
+// and silently demoting it would hide a problem the user should see.
 
-// SetProviderKey seals a user's own upstream credential. It refuses rather than
-// storing plaintext when the deployment has no secret.
-func (s *Store) SetProviderKey(owner, provider, key string) error {
+// MaxKeysPerProvider caps a list that is otherwise unbounded. Eight is past any
+// real use and short enough that a full walk of dead keys still times out
+// sensibly rather than holding a request open for minutes.
+const MaxKeysPerProvider = 8
+
+// AddProviderKey seals another of a user's own upstream credentials. It refuses
+// rather than storing plaintext when the deployment has no secret.
+func (s *Store) AddProviderKey(owner, provider, label, key string) (StoredKey, error) {
 	owner, provider = normEmail(owner), normProv(provider)
-	key = strings.TrimSpace(key)
+	key, label = strings.TrimSpace(key), strings.TrimSpace(label)
 	if owner == "" || provider == "" || key == "" {
-		return errors.New("adminstore: need an owner, a provider and a key")
+		return StoredKey{}, errors.New("adminstore: need an owner, a provider and a key")
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	blob, err := seal(s.secret, key)
 	if err != nil {
-		return err
+		return StoredKey{}, err
 	}
 	if s.st.Users == nil {
 		s.st.Users = map[string]*User{}
@@ -228,48 +259,83 @@ func (s *Store) SetProviderKey(owner, provider, key string) error {
 		s.st.Users[owner] = u
 	}
 	if u.ProviderKeys == nil {
-		u.ProviderKeys = map[string]StoredKey{}
+		u.ProviderKeys = map[string][]StoredKey{}
 	}
-	u.ProviderKeys[provider] = StoredKey{Prefix: keyPrefix(key), Blob: blob}
+	if len(u.ProviderKeys[provider]) >= MaxKeysPerProvider {
+		return StoredKey{}, fmt.Errorf("adminstore: %s already has the maximum of %d keys — remove one first", provider, MaxKeysPerProvider)
+	}
+	rec := StoredKey{
+		ID:      newID(),
+		Prefix:  keyPrefix(key),
+		Blob:    blob,
+		Label:   label,
+		AddedAt: time.Now().UTC(),
+	}
+	u.ProviderKeys[provider] = append(u.ProviderKeys[provider], rec)
 	s.dirty = true
-	return s.save()
+	if err := s.save(); err != nil {
+		return StoredKey{}, err
+	}
+	return rec.Public(), nil
 }
 
-// DeleteProviderKey forgets a stored credential.
-func (s *Store) DeleteProviderKey(owner, provider string) error {
+// DeleteProviderKey forgets one stored credential. An empty id forgets every
+// key for that provider, which is what "remove my OpenAI key" means when there
+// is only one.
+func (s *Store) DeleteProviderKey(owner, provider, id string) error {
 	owner, provider = normEmail(owner), normProv(provider)
+	id = strings.TrimSpace(id)
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	u := s.st.Users[owner]
 	if u == nil || u.ProviderKeys == nil {
 		return nil
 	}
-	delete(u.ProviderKeys, provider)
+	if id == "" {
+		delete(u.ProviderKeys, provider)
+	} else {
+		kept := u.ProviderKeys[provider][:0]
+		for _, k := range u.ProviderKeys[provider] {
+			if k.ID != id {
+				kept = append(kept, k)
+			}
+		}
+		if len(kept) == 0 {
+			delete(u.ProviderKeys, provider)
+		} else {
+			u.ProviderKeys[provider] = kept
+		}
+	}
 	s.dirty = true
 	return s.save()
 }
 
-// ProviderKeyPrefixes reports which providers a user has saved a key for, and
-// the identifying head of each. It never decrypts, so it is what a console
-// response is built from.
-func (s *Store) ProviderKeyPrefixes(owner string) map[string]string {
+// ProviderKeyList reports the keys a user has saved, per provider, with the
+// sealed material stripped. It never decrypts, so it is what a console response
+// is built from.
+func (s *Store) ProviderKeyList(owner string) map[string][]StoredKey {
 	owner = normEmail(owner)
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	out := map[string]string{}
+	out := map[string][]StoredKey{}
 	if u := s.st.Users[owner]; u != nil {
-		for name, k := range u.ProviderKeys {
-			out[name] = k.Prefix
+		for name, keys := range u.ProviderKeys {
+			pub := make([]StoredKey, 0, len(keys))
+			for _, k := range keys {
+				pub = append(pub, k.Public())
+			}
+			out[name] = pub
 		}
 	}
 	return out
 }
 
-// ProviderKeys decrypts a user's stored credentials for use on one request. A
-// key that will not decrypt — the usual cause is a rotated secret — is left out
-// rather than failing the lot, so the request falls through to the gateway's
-// own credential instead of erroring.
-func (s *Store) ProviderKeys(owner string) map[string]string {
+// ProviderKeys decrypts a user's stored credentials for use on one request, in
+// the order they should be tried. A key that will not decrypt — the usual cause
+// is a rotated secret — is left out rather than failing the lot, so the request
+// falls through to the next key, or to the gateway's own credential, instead of
+// erroring.
+func (s *Store) ProviderKeys(owner string) map[string][]string {
 	owner = normEmail(owner)
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -277,13 +343,15 @@ func (s *Store) ProviderKeys(owner string) map[string]string {
 	if u == nil || len(u.ProviderKeys) == 0 {
 		return nil
 	}
-	out := map[string]string{}
-	for name, k := range u.ProviderKeys {
-		plain, err := unseal(s.secret, k.Blob)
-		if err != nil {
-			continue
+	out := map[string][]string{}
+	for name, keys := range u.ProviderKeys {
+		for _, k := range keys {
+			plain, err := unseal(s.secret, k.Blob)
+			if err != nil {
+				continue
+			}
+			out[name] = append(out[name], plain)
 		}
-		out[name] = plain
 	}
 	if len(out) == 0 {
 		return nil

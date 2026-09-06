@@ -81,7 +81,12 @@ type User struct {
 	// serialize a User straight to an API response: build a projection that
 	// carries the prefix and nothing else. Handlers today all do — accountView
 	// in console.go is the pattern — and this field is why they must keep to it.
-	ProviderKeys map[string]StoredKey `json:"provider_keys,omitempty"`
+	ProviderKeys map[string][]StoredKey `json:"provider_keys,omitempty"`
+
+	// Subscription is what lets this user spend the gateway's own vendor keys,
+	// and at what rate. A pointer because most users have never bought one, and
+	// an empty struct in every record would be a lie about its dates.
+	Subscription *Subscription `json:"subscription,omitempty"`
 }
 
 type Token struct {

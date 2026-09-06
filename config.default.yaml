@@ -1612,3 +1612,37 @@ pricing:
   "anthropic/claude-3-5-haiku-latest": { input: 0.8, output: 4 }
   "gemini/gemini-1.5-pro": { input: 1.25, output: 5 }
   "groq/llama-3.1-70b-versatile": { input: 0.59, output: 0.79 }
+
+# Subscriptions: buying the right to spend *this gateway's* vendor keys.
+#
+# Two separate charges, and keeping them apart is the whole point:
+#
+#   - the plan fee, taken from the balance once per term, which buys access;
+#   - the calls, metered against the same balance at the plan's `markup`.
+#
+# A caller running on their own key pays neither — their vendor billed them
+# already, and this gateway records the usage at zero. So "our keys cost extra"
+# is not a surcharge on top of something; it is the only thing there is to
+# charge for.
+#
+# A plan only matters for providers marked `access: request`. Nothing in this
+# file is, which is deliberate: switching a provider to `request` immediately
+# requires every console user to hold a grant or a plan before their existing
+# key reaches it. Do that one provider at a time, after telling the people using
+# it — a deployment token baked into this config has no owner and is never
+# gated, so internal integrations are unaffected either way.
+plans:
+  - id: gateway
+    name: "کلیدهای گیت‌وی"
+    description: "دسترسی به کلیدهای خود سرور، با هزینهٔ مصرف جدا از اشتراک."
+    price_usd: 9
+    days: 30
+    providers: ["*"]
+    # 1 is at cost. Above 1 is what the gateway keeps for carrying the account,
+    # the quota and the bill.
+    markup: 1.4
+    # The floor per call. A model with no `pricing:` entry above meters at zero,
+    # and any multiple of zero is zero — without this, a month of transcription
+    # on the gateway's own keys would bill nothing at all.
+    min_charge_usd: 0.0002
+    popular: true

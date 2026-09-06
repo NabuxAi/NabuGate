@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"time"
 )
 
 // --- Encrypted provider credentials ---
@@ -37,8 +38,24 @@ var ErrNoSecret = errors.New("adminstore: no NABUGATE_SECRET_KEY, so provider ke
 // console can show which key is saved without ever decrypting it; Blob is the
 // sealed value and must never leave this package.
 type StoredKey struct {
+	// ID names one key among several for the same provider, so the console can
+	// delete the third one without deleting the other two.
+	ID     string `json:"id"`
 	Prefix string `json:"prefix"`
 	Blob   string `json:"blob"`
+	// Label is whatever the user called it ("work account", "the free one").
+	// Keys for one provider look identical once sealed, and a prefix is four
+	// characters; without a name, a list of three is unmanageable.
+	Label   string    `json:"label,omitempty"`
+	AddedAt time.Time `json:"added_at,omitempty"`
+}
+
+// Public strips the sealed material, leaving what a console response may carry.
+// Building the projection here rather than at each handler means a new field on
+// StoredKey cannot leak by being forgotten in one of them.
+func (k StoredKey) Public() StoredKey {
+	k.Blob = ""
+	return k
 }
 
 // DeriveSecret turns whatever string the deployment set into a 32-byte key. Any

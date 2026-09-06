@@ -3,6 +3,7 @@ package router
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"sync"
 
@@ -46,10 +47,15 @@ const (
 // CallerKeysCtxKey is the context key for the caller-supplied credentials.
 type CallerKeysCtxKey struct{}
 
-// CallerKeys is what a request carries: a key per provider name, and the order
-// to try them in.
+// CallerKeys is what a request carries: the keys per provider name, and the
+// order to try them in.
+//
+// Several keys per provider, tried in order, because a vendor key dies for
+// reasons that have nothing to do with this gateway — a spending cap, a
+// rotation, a project someone deleted. One dead key should cost the caller a
+// fallback, not the request.
 type CallerKeys struct {
-	Keys map[string]string
+	Keys map[string][]string
 	Mode string
 }
 
@@ -168,44 +174,70 @@ func (r *Router) attempts(ctx context.Context, targets []config.Target) []attemp
 			globalRung.adapter = global
 		}
 
-		key := creds.Keys[strings.ToLower(t.Provider)]
-		ownRung := attempt{
-			Target: t,
-			label:  t.Provider + " (your key)",
-			caller: true,
-		}
-		switch {
-		case key == "":
-			ownRung.reason = errors.New("no key of yours for this provider")
-		case r.callerAdapter == nil:
-			ownRung.reason = errors.New("this gateway does not accept caller-supplied keys")
-		default:
-			if a, ok := r.callerAdapter(t.Provider, key); ok {
-				ownRung.adapter = a
-			} else {
-				ownRung.reason = errors.New("this gateway does not define that provider, so your key for it cannot be used")
-			}
-		}
+		keys := creds.Keys[strings.ToLower(t.Provider)]
+		ownRungs := r.ownRungs(t, keys)
 
 		switch creds.Mode {
 		case ModeOwn:
-			out = append(out, ownRung)
+			out = append(out, ownRungs...)
 		case ModeOwnFirst:
 			// A key the caller never sent is not a failure worth reporting on
 			// every rung; drop the empty own rung and go straight to the
 			// gateway's, which is what own-first means in that case.
-			if ownRung.adapter != nil || key != "" {
-				out = append(out, ownRung)
+			if len(keys) > 0 {
+				out = append(out, ownRungs...)
 			}
 			out = append(out, globalRung)
 		case ModeGlobalFirst:
 			out = append(out, globalRung)
-			if ownRung.adapter != nil || key != "" {
-				out = append(out, ownRung)
+			if len(keys) > 0 {
+				out = append(out, ownRungs...)
 			}
 		default: // ModeGlobal
 			out = append(out, globalRung)
 		}
+	}
+	return out
+}
+
+// ownRungs turns a caller's keys for one provider into the rungs to try, in the
+// order given. With no keys it still returns one rung, carrying the reason —
+// mode "own" has to say why it skipped a provider rather than reporting an
+// empty chain.
+//
+// Every rung is labelled distinctly. Three rungs all called "gemini" in one
+// error would say a provider failed three times when what happened is that
+// three different credentials did, which is a different problem with a
+// different fix.
+func (r *Router) ownRungs(t config.Target, keys []string) []attempt {
+	if len(keys) == 0 {
+		return []attempt{{
+			Target: t,
+			label:  t.Provider + " (your key)",
+			caller: true,
+			reason: errors.New("no key of yours for this provider"),
+		}}
+	}
+	out := make([]attempt, 0, len(keys))
+	for i, key := range keys {
+		label := t.Provider + " (your key)"
+		if len(keys) > 1 {
+			label = fmt.Sprintf("%s (your key #%d)", t.Provider, i+1)
+		}
+		rung := attempt{Target: t, label: label, caller: true}
+		switch {
+		case strings.TrimSpace(key) == "":
+			rung.reason = errors.New("that key of yours is empty")
+		case r.callerAdapter == nil:
+			rung.reason = errors.New("this gateway does not accept caller-supplied keys")
+		default:
+			if a, ok := r.callerAdapter(t.Provider, key); ok {
+				rung.adapter = a
+			} else {
+				rung.reason = errors.New("this gateway does not define that provider, so your key for it cannot be used")
+			}
+		}
+		out = append(out, rung)
 	}
 	return out
 }
