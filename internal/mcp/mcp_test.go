@@ -643,3 +643,30 @@ func TestOnlyTheBearerSchemeAuthenticates(t *testing.T) {
 		t.Fatalf("a correct Bearer header returned %d, want 200", got)
 	}
 }
+
+// The endpoint's one promise, stated where a client reads it: every tool is a
+// read. A console that asks a person before an action must not ask before
+// nabugate_usage_get.
+func TestEveryToolIsAnnotatedReadOnly(t *testing.T) {
+	rec := post(t, newTestServer(t), testToken, `{"jsonrpc":"2.0","id":1,"method":"tools/list"}`)
+
+	var out struct {
+		Result struct {
+			Tools []struct {
+				Name        string         `json:"name"`
+				Annotations map[string]any `json:"annotations"`
+			} `json:"tools"`
+		} `json:"result"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &out); err != nil {
+		t.Fatalf("not JSON: %s", rec.Body.String())
+	}
+	if len(out.Result.Tools) == 0 {
+		t.Fatal("no tools listed")
+	}
+	for _, tool := range out.Result.Tools {
+		if tool.Annotations["readOnlyHint"] != true || tool.Annotations["destructiveHint"] != false {
+			t.Errorf("%s: annotations = %v, want read-only", tool.Name, tool.Annotations)
+		}
+	}
+}
