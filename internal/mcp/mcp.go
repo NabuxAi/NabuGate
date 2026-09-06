@@ -84,6 +84,17 @@ type toolDescriptor struct {
 	Name        string         `json:"name"`
 	Description string         `json:"description"`
 	InputSchema map[string]any `json:"inputSchema"`
+	// Every tool here reads — that is the endpoint's one promise — and the
+	// annotations say so, because a client that gates actions behind a
+	// person's approval (the NabuOS console does) otherwise has to ask before
+	// every usage query.
+	Annotations map[string]any `json:"annotations"`
+}
+
+// readOnlyAnnotations is the MCP way of saying "this only reads": both hints,
+// because a client that checks one and not the other would still be right.
+func readOnlyAnnotations() map[string]any {
+	return map[string]any{"readOnlyHint": true, "destructiveHint": false}
 }
 
 // Tool is one callable this service exposes.
@@ -256,7 +267,7 @@ func (s *Server) dispatch(ctx context.Context, req rpcRequest) rpcResponse {
 				schema = ObjectSchema(nil, nil)
 			}
 
-			list = append(list, toolDescriptor{Name: t.Name, Description: t.Description, InputSchema: schema})
+			list = append(list, toolDescriptor{Name: t.Name, Description: t.Description, InputSchema: schema, Annotations: readOnlyAnnotations()})
 		}
 
 		out.Result = map[string]any{"tools": list}
