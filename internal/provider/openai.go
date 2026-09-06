@@ -17,7 +17,18 @@ type OpenAIAdapter struct {
 	baseURL      string
 	apiKey       string
 	extraHeaders map[string]string
+
+	// transcribeFormat is the response_format asked of /audio/transcriptions.
+	// Empty means verbose_json, the only shape that carries language, duration
+	// and segments. A vendor that speaks the OpenAI wire format without
+	// implementing that shape (Mistral's Voxtral offers text, SRT and json)
+	// needs a different value or every call 422s.
+	transcribeFormat string
 }
+
+// SetTranscribeFormat overrides the transcription response_format. Called from
+// the config when a provider declares transcribe_format.
+func (a *OpenAIAdapter) SetTranscribeFormat(f string) { a.transcribeFormat = f }
 
 // NewOpenAIAdapter builds an OpenAI-compatible adapter.
 func NewOpenAIAdapter(name, baseURL, apiKey string, extraHeaders map[string]string) *OpenAIAdapter {

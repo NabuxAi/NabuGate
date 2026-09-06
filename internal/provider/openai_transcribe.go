@@ -85,18 +85,28 @@ func (a *OpenAIAdapter) Transcribe(ctx context.Context, req TranscriptionRequest
 		fields["temperature"] = strconv.FormatFloat(*req.Temperature, 'f', -1, 64)
 	}
 	// verbose_json is the only format that carries language, duration and
-	// segments. Ask for it whenever timestamps were requested; a caller that
-	// wants nothing but the words still gets them from this shape.
-	fields["response_format"] = "verbose_json"
+	// segments, so it is the default: a caller that wants nothing but the words
+	// still gets them from this shape. A provider that speaks the OpenAI wire
+	// format without implementing verbose_json says so in its config.
+	format := a.transcribeFormat
+	if format == "" {
+		format = "verbose_json"
+	}
+	fields["response_format"] = format
 	for k, v := range fields {
 		if err := form.WriteField(k, v); err != nil {
 			return TranscriptionResponse{}, err
 		}
 	}
-	for _, g := range req.Granularities {
-		// Repeated field, PHP-style brackets — what the OpenAI API expects.
-		if err := form.WriteField("timestamp_granularities[]", g); err != nil {
-			return TranscriptionResponse{}, err
+	// Timestamps only exist in the verbose shape. Asking a provider on another
+	// format for them is at best ignored and at worst rejected — Mistral refuses
+	// timestamp_granularities and language in the same request.
+	if format == "verbose_json" {
+		for _, g := range req.Granularities {
+			// Repeated field, PHP-style brackets — what the OpenAI API expects.
+			if err := form.WriteField("timestamp_granularities[]", g); err != nil {
+				return TranscriptionResponse{}, err
+			}
 		}
 	}
 	if err := form.Close(); err != nil {

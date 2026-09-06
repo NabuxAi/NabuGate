@@ -22,6 +22,7 @@ OpenAI-wire compatible, so any OpenAI client works by changing the base URL:
 | `POST /v1/embeddings` | Vectors, with `dimensions` |
 | `POST /v1/images/generations` | Images |
 | `POST /v1/audio/speech` | Text to speech |
+| `POST /v1/audio/transcriptions` | Speech to text |
 | `GET /v1/models` | Aliases, agents and passthrough catalogues |
 | `GET /v1/agents` | Agents with their model and tool names |
 | `GET /v1/usage` | Tokens and cost for the calling key |
@@ -31,6 +32,38 @@ Request bodies pass through to the provider untouched — only `model` and the
 stream flags are rewritten. So `tools`, `tool_choice`, `response_format`,
 `seed`, `top_p`, `stop` and penalties all work, and `tool_calls` come back in
 the response, whether or not the gateway names them.
+
+## Bringing your own key
+
+A request can carry its own upstream credentials and have the gateway spend
+those instead of — or before — the ones this deployment holds:
+
+```http
+X-Nabu-Key-Gemini: AIza...
+X-Nabu-Key-Openai: sk-...
+X-Nabu-Key-Mode:   own-first
+```
+
+The header suffix is the provider name as the config spells it, matched
+case-insensitively. The mode decides the order the two credential sources are
+tried in:
+
+| Mode | Meaning |
+|---|---|
+| `own` | Only your keys. A provider you sent no key for is skipped, and says so. |
+| `own-first` | Yours, then the gateway's. **The default** when you send any key. |
+| `global-first` | The gateway's, then yours as the backstop. |
+| `global` | The gateway's only. The default when you send no keys. |
+
+Two things follow from this:
+
+- **Nothing is stored.** The keys live for the request and are gone with it.
+- **A call served by your key is not billed here.** Your vendor already
+  charged you; the gateway records the usage but not the cost.
+
+A key is only honoured for a provider this deployment defines — it is not a
+way to reach an arbitrary endpoint through the gateway. If a request tried
+both credentials, the error names which one failed.
 
 ## SDKs
 

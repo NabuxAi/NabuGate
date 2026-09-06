@@ -149,6 +149,13 @@ type ProviderConfig struct {
 	// non-OpenAI adapters.
 	AuthScheme string `yaml:"auth_scheme"`
 
+	// TranscribeFormat overrides the response_format sent to
+	// /audio/transcriptions on an OpenAI-wire provider. Empty keeps
+	// verbose_json, which is the only shape carrying language, duration and
+	// segments. Set it to "json" for a vendor that speaks the wire format
+	// without implementing verbose_json — Mistral's Voxtral does not.
+	TranscribeFormat string `yaml:"transcribe_format"`
+
 	// Passthrough turns the provider into a first-class multi-model provider:
 	// callers may address any of its models directly as "<provider>/<model>"
 	// (e.g. "parspack/openai/gpt-5.5") with no hand-written alias, and — for
@@ -309,51 +316,92 @@ func (c *Config) BuildAdapters() (map[string]provider.Adapter, []string) {
 			continue
 		}
 
-		switch p.Type {
-		case "openai":
-			// Every OpenAI-wire provider needs a base_url (keyless ones were
-			// already checked above; keyed ones — e.g. an ArvanCloud endpoint
-			// whose ${ARVAN_AIAAS_ENDPOINT} was left unset — are checked here so
-			// they are skipped with a clear warning instead of building an
-			// adapter that would fail every request against an empty URL).
-			if strings.TrimSpace(p.BaseURL) == "" {
-				warnings = append(warnings, fmt.Sprintf("provider %q disabled: openai providers need a base_url", name))
-				continue
-			}
-			// authHeaderOverride is non-nil only when the provider asks for a
-			// non-Bearer Authorization scheme; the adapter applies these extra
-			// headers over its Bearer default across every endpoint it calls.
-			adapters[name] = provider.NewOpenAIAdapter(name, p.BaseURL, apiKey, authHeaderOverride(p.AuthScheme, apiKey))
-		case "anthropic":
-			adapters[name] = provider.NewAnthropicAdapter(name, p.BaseURL, apiKey)
-		case "gemini":
-			adapters[name] = provider.NewGeminiAdapter(name, p.BaseURL, apiKey)
-		case "pexels":
-			adapters[name] = provider.NewPexelsAdapter(name, p.BaseURL, apiKey)
-		case "elevenlabs":
-			// Text-to-speech only. Authenticates with xi-api-key and puts the
-			// voice in the URL, so it cannot ride the openai adapter.
-			adapters[name] = provider.NewElevenLabsAdapter(name, p.BaseURL, apiKey)
-		case "imagegen":
-			// mrc_imagegen: a template renderer, not a diffusion model. See the
-			// adapter for how a prompt maps onto its fields.
-			adapters[name] = provider.NewImagegenAdapter(name, p.BaseURL, apiKey)
-		case "speechmatics":
-			// Batch transcription only, and asynchronous: the adapter submits a
-			// job and polls it to completion inside one call. Neither shape fits
-			// the openai adapter.
-			adapters[name] = provider.NewSpeechmaticsAdapter(name, p.BaseURL, apiKey)
-		case "gamma":
-			// gamma.app: decks, documents and social posts. Asynchronous, and a
-			// chat adapter rather than an image one because what comes back is a
-			// hosted URL. See the adapter.
-			adapters[name] = provider.NewGammaAdapter(name, p.BaseURL, apiKey)
-		default:
-			warnings = append(warnings, fmt.Sprintf("provider %q has unknown type %q", name, p.Type))
+		a, warning := newAdapter(name, p, apiKey)
+		if a == nil {
+			warnings = append(warnings, warning)
+			continue
 		}
+		adapters[name] = a
 	}
 
 	return adapters, warnings
+}
+
+// newAdapter builds one adapter from a provider's config and an explicit key.
+// It is separate from BuildAdapters because the key is a parameter rather than
+// an environment lookup: the same provider is also built per-request against a
+// key the caller supplied, and the two paths must agree on base URL, auth
+// scheme and adapter type or a caller's own key would behave differently from
+// the gateway's. A nil adapter comes with a warning explaining why.
+func newAdapter(name string, p ProviderConfig, apiKey string) (provider.Adapter, string) {
+	switch p.Type {
+	case "openai":
+		// Every OpenAI-wire provider needs a base_url (keyless ones are checked
+		// by the caller; keyed ones — e.g. an ArvanCloud endpoint whose
+		// ${ARVAN_AIAAS_ENDPOINT} was left unset — are checked here so they are
+		// skipped with a clear warning instead of building an adapter that would
+		// fail every request against an empty URL).
+		if strings.TrimSpace(p.BaseURL) == "" {
+			return nil, fmt.Sprintf("provider %q disabled: openai providers need a base_url", name)
+		}
+		// authHeaderOverride is non-nil only when the provider asks for a
+		// non-Bearer Authorization scheme; the adapter applies these extra
+		// headers over its Bearer default across every endpoint it calls.
+		oa := provider.NewOpenAIAdapter(name, p.BaseURL, apiKey, authHeaderOverride(p.AuthScheme, apiKey))
+		oa.SetTranscribeFormat(strings.TrimSpace(p.TranscribeFormat))
+		return oa, ""
+	case "anthropic":
+		return provider.NewAnthropicAdapter(name, p.BaseURL, apiKey), ""
+	case "gemini":
+		return provider.NewGeminiAdapter(name, p.BaseURL, apiKey), ""
+	case "pexels":
+		return provider.NewPexelsAdapter(name, p.BaseURL, apiKey), ""
+	case "elevenlabs":
+		// Speech both ways: text-to-speech, and Scribe for transcription. It
+		// authenticates with xi-api-key and puts the voice in the URL, so it
+		// cannot ride the openai adapter.
+		return provider.NewElevenLabsAdapter(name, p.BaseURL, apiKey), ""
+	case "imagegen":
+		// mrc_imagegen: a template renderer, not a diffusion model. See the
+		// adapter for how a prompt maps onto its fields.
+		return provider.NewImagegenAdapter(name, p.BaseURL, apiKey), ""
+	case "speechmatics":
+		// Batch transcription only, and asynchronous: the adapter submits a job
+		// and polls it to completion inside one call. Neither shape fits the
+		// openai adapter.
+		return provider.NewSpeechmaticsAdapter(name, p.BaseURL, apiKey), ""
+	case "gamma":
+		// gamma.app: decks, documents and social posts. Asynchronous, and a chat
+		// adapter rather than an image one because what comes back is a hosted
+		// URL. See the adapter.
+		return provider.NewGammaAdapter(name, p.BaseURL, apiKey), ""
+	default:
+		return nil, fmt.Sprintf("provider %q has unknown type %q", name, p.Type)
+	}
+}
+
+// CallerAdapter builds an adapter for one provider against a key the caller
+// sent with a request, so the gateway can spend the caller's credential instead
+// of its own. It refuses a provider this deployment does not define or has
+// switched off: a key is not permission to reach an arbitrary URL through here.
+//
+// The gateway's own key is never consulted, and nothing is cached — the adapter
+// lives as long as the request that carried the key.
+func (c *Config) CallerAdapter(name, apiKey string) (provider.Adapter, bool) {
+	if strings.TrimSpace(apiKey) == "" {
+		return nil, false
+	}
+	p, ok := c.Providers[name]
+	if !ok || !p.Enabled {
+		return nil, false
+	}
+	// A keyless provider is a local endpoint that ignores credentials; handing
+	// it someone's key would silently do nothing.
+	if strings.TrimSpace(p.APIKeyEnv) == "" {
+		return nil, false
+	}
+	a, _ := newAdapter(name, p, apiKey)
+	return a, a != nil
 }
 
 // authHeaderOverride returns the extra headers that make the OpenAI adapter use

@@ -310,7 +310,14 @@ func (s *Server) lookupConsoleToken(token string) (adminstore.Token, bool) {
 
 func (s *Server) record(r *http.Request, prov, model string, u provider.Usage) {
 	project := s.project(r)
-	cost := s.usage.Record(project, prov, model, u)
+	cost := s.usage.Cost(prov, model, u)
+	if servedByCaller(r.Context()) {
+		// The caller's own vendor account already paid for this call. The usage
+		// is still recorded so the console shows what ran; the cost is zero so
+		// the gateway does not bill for someone else's spend.
+		cost = 0
+	}
+	s.usage.RecordAt(project, prov, model, u, cost)
 	// Also accumulate into the persisted counters, so the console's numbers are
 	// real across restarts rather than resetting to zero on every redeploy.
 	if s.admin != nil {
@@ -1108,6 +1115,10 @@ func (s *Server) auth(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Cap the body before any handler reads it (bounds memory / slow-loris).
 		r.Body = http.MaxBytesReader(w, r.Body, maxRequestBytes)
+		// Caller-supplied upstream credentials ride on every request, whether or
+		// not this deployment enforces its own keys.
+		keyCtx, _ := withCallerKeys(r.Context(), r)
+		r = r.WithContext(keyCtx)
 		if !s.policy.Enabled() {
 			next(w, r)
 			return
