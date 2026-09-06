@@ -71,6 +71,10 @@ func main() {
 
 	passthrough := cfg.Passthroughs(adapters)
 	r := router.New(adapters, cfg.Models, cfg.Images, cfg.Audio, cfg.Embeddings, cfg.Transcription, passthrough, log)
+	// Bring your own key: a request may carry its own upstream credentials, and
+	// the router builds an adapter for them through the same factory the
+	// gateway's own providers came from.
+	r.SetCallerAdapter(cfg.CallerAdapter)
 	r.SetRegistry(cfg.Registry)
 	enforcer := policy.New(cfg.Server.APIKeys, cfg.Server.Keys)
 	tracker := usage.New(cfg.Pricing)

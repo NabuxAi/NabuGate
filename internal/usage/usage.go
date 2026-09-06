@@ -61,7 +61,15 @@ func (t *Tracker) Cost(providerName, model string, u provider.Usage) float64 {
 // Record attributes a call's usage and cost to the project and model, returning
 // the computed cost (useful for logging).
 func (t *Tracker) Record(project, providerName, model string, u provider.Usage) float64 {
-	cost := t.Cost(providerName, model, u)
+	return t.RecordAt(project, providerName, model, u, t.Cost(providerName, model, u))
+}
+
+// RecordAt meters a call at an explicit cost rather than the tracker's price
+// for that model. It exists for work the gateway did not pay for: a request
+// served by the caller's own vendor key still belongs in the usage numbers —
+// the console should show what ran — but charging for it would bill the caller
+// twice, once here and once by the vendor.
+func (t *Tracker) RecordAt(project, providerName, model string, u provider.Usage, cost float64) float64 {
 	if project == "" {
 		project = "(unscoped)"
 	}

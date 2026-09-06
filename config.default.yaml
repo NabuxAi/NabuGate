@@ -1143,6 +1143,19 @@ transcription:
       # literally. Both stay inert until their key env is set.
       - provider: speechmatics
         model: "enhanced"
+      # ElevenLabs Scribe: a different engine again, and the one that holds up
+      # best on the languages whisper handles worst. Its wire format is its own
+      # (/speech-to-text, model_id, xi-api-key), hence the adapter method.
+      - provider: elevenlabs
+        model: "scribe_v2"
+      # Voxtral. OpenAI-wire, so it needs no adapter — only a key. Mistral
+      # bills it by the minute and it carries word timestamps and diarization.
+      - provider: mistral
+        model: "voxtral-mini-latest"
+      # Whisper again, but on hardware that is not ours and not Parspack's, so
+      # it is still a rung and not a duplicate of the primary.
+      - provider: together
+        model: "openai/whisper-large-v3"
       - provider: gemini
         model: "gemini-3.5-transcribe"
       - provider: gemini
