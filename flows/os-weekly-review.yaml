@@ -1,0 +1,26 @@
+# NabuOS — the weekly review. Source of truth: this repository; run by
+# NabuCRM's console (os_run_flow) with the week's figures pasted as input.
+#
+# Three specialists in order: read, advise, argue. The critic sees the figures
+# as well as the advice, because handed only the advice it can tell you the
+# writing is good; it cannot tell you it answers the wrong question.
+name: os-weekly-review
+description: "Reads the week's figures, proposes three actions, and argues with them before answering."
+
+steps:
+  - agent: os-analyst
+    label: "read the figures"
+
+  - agent: os-advisor
+    label: "three actions"
+
+  - agent: os-critic
+    label: "argue with them"
+    input: |
+      اعدادِ هفته:
+      {{input}}
+
+      سه اقدامِ پیشنهادی:
+      {{previous}}
+
+      این‌ها را در برابرِ اعداد نقد کن و فقط نسخه‌ی نهایی را برگردان.
