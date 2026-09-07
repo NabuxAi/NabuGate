@@ -593,15 +593,15 @@ providers:
 # param_style belongs to the model, so it is declared once and inherited by
 # every provider serving it.
 model_registry:
-  # Gemini identities served where tools work. 9router's Google account is a
-  # "new user" — Google answers 404 for the 2.5 models there since 2026-09 —
-  # so the direct key comes first and 9router is the spare.
+  # Gemini identities served where tools work. 9router used to be the spare
+  # here and is not any more: asked for a plain completion it answers 200
+  # with an SSE stream ("data: {...chunk...}") that the adapter cannot read,
+  # and each such attempt cost the console 5–16 s before the chain moved on
+  # (measured 2026-09-07). It is still reachable as a passthrough.
   gemini-3.6-flash:
     serves:
       - provider: gemini-openai
         model: "gemini-3.6-flash"
-      - provider: 9router
-        model: "gemini/gemini-3.6-flash"
   gemini-3.5-flash:
     serves:
       - provider: gemini-openai
