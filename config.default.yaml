@@ -1391,6 +1391,13 @@ embeddings:
     fallback:
       - provider: openrouter
         model: "openai/text-embedding-3-small"
+      # 2026-09: both rungs above were dead at once — Parspack still 402 on its
+      # wallet, OpenRouter refusing this model — and desk's every embedding
+      # failed. OpenAI direct is the same weights and therefore the same space,
+      # so it costs no re-index; it is last because it is the dearest of the
+      # three, not because it is least trusted.
+      - provider: openai
+        model: "text-embedding-3-small"
 
   # NabuGen's content memory — 1024 wide, matching the column its schema
   # already declares, so enabling the feature needs no re-index.
