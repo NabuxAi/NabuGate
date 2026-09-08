@@ -610,6 +610,12 @@ model_registry:
     serves:
       - provider: gemini-openai
         model: "gemini-2.5-flash"
+  # Alibaba's flagship. Probed 2026-09-08 on the international endpoint with
+  # this key: all three of max, plus and turbo answer.
+  qwen-max:
+    serves:
+      - provider: dashscope
+        model: "qwen-max"
   qwen-plus:
     serves:
       - provider: dashscope
@@ -1005,6 +1011,25 @@ models:
       # Last resort, and not Kimi at all.
       - provider: openai
         model: "gpt-4o"
+
+  # Qwen, asked for by name.
+  #
+  # nabu-smart already falls through to qwen-plus when Google is down, but a
+  # caller that *wants* Qwen — because it was tested against Qwen, or because
+  # the tenant asked for it — had no way to say so: every project key here is
+  # limited to `nabu-*` aliases and `qwen-plus` is not one of them. This is that
+  # door, and it is why picking "Qwen" in a product's model list can now mean
+  # what it says instead of quietly resolving to whatever nabu-smart picked.
+  nabu-qwen:
+    primary:
+      model: qwen-max
+    fallback:
+      - model: qwen-plus
+      - model: qwen-turbo
+      # Not Qwen at all, and last on purpose — same trade as nabu-kimi's final
+      # rung: a Qwen outage degrades the answer instead of failing the request,
+      # and the usage log names what actually carried it.
+      - model: gemini-2.5-flash
 
   nabu-local:
     primary:
