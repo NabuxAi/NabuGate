@@ -35,8 +35,8 @@ type Config struct {
 	Audio     map[string]ModelRoute     `yaml:"audio"`  // text-to-speech aliases
 	// Speech-to-text. Separate from Audio because they are opposite directions
 	// with different upstream models, and one alias cannot serve both.
-	Transcription map[string]ModelRoute  `yaml:"transcription"`
-	Embeddings    map[string]ModelRoute  `yaml:"embeddings"` // text-embedding aliases
+	Transcription map[string]ModelRoute `yaml:"transcription"`
+	Embeddings    map[string]ModelRoute `yaml:"embeddings"` // text-embedding aliases
 	// Live is realtime full-duplex voice (GPT-Live): the browser speaks to the
 	// vendor over WebRTC and the gateway does the signalling. Billed per
 	// minute (usage.Price.PerMinute), not per token.
