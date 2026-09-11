@@ -2,6 +2,7 @@ package config
 
 import (
 	"os"
+	"strings"
 	"testing"
 )
 
@@ -51,8 +52,13 @@ func TestStoredIndexAliasesHaveExactlyOneRung(t *testing.T) {
 		// model is a second index, whatever its width. (2026-08: desk-embed
 		// gained an openrouter rung carrying the identical OpenAI model after
 		// parspack's wallet hit 402; that is the shape this permits.)
+		// The same weights carry a different upstream name per provider:
+		// "openai/text-embedding-3-small" on an aggregator, bare
+		// "text-embedding-3-small" at OpenAI itself. The identity is the
+		// segment after the vendor prefix; comparing the full coordinate
+		// would refuse the one fallback that keeps the space intact.
 		for i, rung := range route.Fallback {
-			if rung.Model != route.Primary.Model {
+			if modelIdentity(rung.Model) != modelIdentity(route.Primary.Model) {
 				t.Errorf("%s fallback rung %d names model %q, primary names %q; an alias backing a stored index "+
 					"must stay in one embedding space, so every rung must carry the identical model — "+
 					"a different model writes a second geometry into the same collection with no error raised",
@@ -155,4 +161,12 @@ func loadDefaultConfig(t *testing.T) *Config {
 		t.Fatalf("parse config.default.yaml: %v", err)
 	}
 	return cfg
+}
+
+// modelIdentity strips an aggregator's vendor prefix ("openai/gpt-x" → "gpt-x").
+func modelIdentity(model string) string {
+	if i := strings.LastIndex(model, "/"); i >= 0 {
+		return model[i+1:]
+	}
+	return model
 }
