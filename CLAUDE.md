@@ -87,6 +87,13 @@ config.example.yaml        # نمونهٔ پیکربندی (alias‌ها، provi
   `nabu-image`) به آن نگاشت می‌شود. `Chat` را پشتیبانی نمی‌کند و فقط باید هدفِ
   aliasهای تصویری باشد.
 - سکرت‌ها فقط از env خوانده می‌شوند؛ هرگز در کد/کانفیگِ ایمیج نوشته نشوند.
+- **صدای زندهٔ realtime (GPT-Live):** `POST /v1/live/sessions` فقط signalling است — بدنهٔ
+  vendor با `model` به‌صورتِ alias (بالا یا داخلِ `session.model`)، دروازه alias را با مدلِ
+  upstream عوض می‌کند و پاسخ (id + SDP answer) را دست‌نخورده برمی‌گرداند. صدا هرگز از
+  دروازه رد نمی‌شود؛ مرورگر مستقیم با vendor روی WebRTC حرف می‌زند. صورت‌حساب با
+  `POST /v1/live/sessions/{id}/usage` و `{seconds, final}` است: **snapshot تجمعی نه
+  increment**، پس گزارشِ تکراری یا دیرآمده دوباره شارژ نمی‌کند. قیمت با `per_minute` در
+  `pricing` (نه per-token). alias زیرِ `live:`. راهنما: `docs/live.md`.
 - providerی که env کلیدش خالی باشد خودکار رد می‌شود تا دروازه با زیرمجموعه‌ای از
   providerها هم بالا بیاید.
 - پارامترِ `dimensions` در `/v1/embeddings` تا آداپتور می‌رود: OpenAI همان

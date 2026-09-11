@@ -76,6 +76,7 @@ func main() {
 	// gateway's own providers came from.
 	r.SetCallerAdapter(cfg.CallerAdapter)
 	r.SetRegistry(cfg.Registry)
+	r.SetLive(cfg.Live)
 	enforcer := policy.New(cfg.Server.APIKeys, cfg.Server.Keys)
 	tracker := usage.New(cfg.Pricing)
 	agents, agentWarnings := cfg.BuildAgents()

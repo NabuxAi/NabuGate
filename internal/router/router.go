@@ -55,6 +55,7 @@ type Router struct {
 	audio         map[string]config.ModelRoute
 	transcription map[string]config.ModelRoute
 	embeddings    map[string]config.ModelRoute
+	live          map[string]config.ModelRoute
 	log           *slog.Logger
 
 	// passthrough maps a passthrough-enabled provider name to its static model

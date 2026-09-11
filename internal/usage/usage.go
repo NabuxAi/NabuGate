@@ -8,10 +8,13 @@ import (
 	"nabugate/internal/provider"
 )
 
-// Price is the cost of a model in USD per 1,000,000 tokens.
+// Price is the cost of a model in USD per 1,000,000 tokens — or, for a
+// realtime voice model that is billed by the clock, USD per minute of
+// session. A live model has no tokens to count: the vendor meters seconds.
 type Price struct {
-	Input  float64 `yaml:"input"`
-	Output float64 `yaml:"output"`
+	Input     float64 `yaml:"input"`
+	Output    float64 `yaml:"output"`
+	PerMinute float64 `yaml:"per_minute"`
 }
 
 // Stat is the aggregated usage for a project or a model.
@@ -56,6 +59,16 @@ func (t *Tracker) Cost(providerName, model string, u provider.Usage) float64 {
 		return 0
 	}
 	return float64(u.PromptTokens)/1e6*p.Input + float64(u.CompletionTokens)/1e6*p.Output
+}
+
+// SecondsCost returns the USD cost of a live session's duration, 0 for a model
+// with no per-minute price. Seconds are charged pro rata, as the vendor does.
+func (t *Tracker) SecondsCost(providerName, model string, seconds int64) float64 {
+	p, ok := t.prices[providerName+"/"+model]
+	if !ok || seconds <= 0 {
+		return 0
+	}
+	return float64(seconds) / 60 * p.PerMinute
 }
 
 // Record attributes a call's usage and cost to the project and model, returning

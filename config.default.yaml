@@ -1198,6 +1198,16 @@ images:
       provider: imagegen
       model: "story"
 
+# Realtime full-duplex voice (GPT-Live). The browser speaks to the vendor over
+# WebRTC; the gateway only signals (POST /v1/live/sessions) and bills the
+# minutes the caller reports back (POST /v1/live/sessions/{id}/usage).
+# No fallback across vendors: the SDP answer comes from exactly one of them.
+live:
+  nabu-live:
+    primary:
+      provider: openai
+      model: "gpt-live-1"
+
 audio:
   nabu-voice:
     primary:
@@ -1637,6 +1647,8 @@ agents_dir: "/app/agents"
 flows_dir: "/app/flows"
 
 pricing:
+  # Per minute of session, billed per second — a live model has no tokens.
+  "openai/gpt-live-1": { per_minute: 0.05 }
   "openai/gpt-4o": { input: 2.5, output: 10 }
   "openai/gpt-4o-mini": { input: 0.15, output: 0.6 }
   "openai/text-embedding-3-small": { input: 0.02, output: 0 }

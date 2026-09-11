@@ -37,7 +37,11 @@ type Config struct {
 	// with different upstream models, and one alias cannot serve both.
 	Transcription map[string]ModelRoute  `yaml:"transcription"`
 	Embeddings    map[string]ModelRoute  `yaml:"embeddings"` // text-embedding aliases
-	Pricing       map[string]usage.Price `yaml:"pricing"`    // USD per 1M tokens, keyed by "provider/model"
+	// Live is realtime full-duplex voice (GPT-Live): the browser speaks to the
+	// vendor over WebRTC and the gateway does the signalling. Billed per
+	// minute (usage.Price.PerMinute), not per token.
+	Live    map[string]ModelRoute  `yaml:"live"`
+	Pricing map[string]usage.Price `yaml:"pricing"` // USD per 1M tokens (or per minute), keyed by "provider/model"
 
 	// Registry maps a logical model name to the providers that can serve it.
 	// A target naming a model with no provider expands through this, so one
