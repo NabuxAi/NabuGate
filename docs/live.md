@@ -70,3 +70,11 @@ key that created a session may report on it — anything else is `404`.
 The delegated backend model's tokens are billed by the vendor to the
 gateway's own account and are not metered per session here; price the
 `per_minute` rate with that in mind.
+
+## Actions and the browser SDK
+
+A call that can *do* things — search, create, book — needs the actions
+run inside the product, as the signed-in user. `packages/live-web` is the
+browser side (WebRTC, events, function-call relay, usage); the product
+adds three endpoints. See `packages/live-web/README.md`, and
+`docs/live-costs.md` for what a minute costs per engine.

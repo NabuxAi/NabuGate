@@ -94,6 +94,8 @@ config.example.yaml        # نمونهٔ پیکربندی (alias‌ها، provi
   `POST /v1/live/sessions/{id}/usage` و `{seconds, final}` است: **snapshot تجمعی نه
   increment**، پس گزارشِ تکراری یا دیرآمده دوباره شارژ نمی‌کند. قیمت با `per_minute` در
   `pricing` (نه per-token). alias زیرِ `live:`. راهنما: `docs/live.md`.
+  SDK مرورگر برای همهٔ محصولات: `packages/live-web` (اکشن‌ها داخلِ محصول، با هویتِ
+  کاربرِ لاگین‌شده اجرا می‌شوند، نه در دروازه). هزینهٔ هر دقیقه: `docs/live-costs.md`.
 - providerی که env کلیدش خالی باشد خودکار رد می‌شود تا دروازه با زیرمجموعه‌ای از
   providerها هم بالا بیاید.
 - پارامترِ `dimensions` در `/v1/embeddings` تا آداپتور می‌رود: OpenAI همان
