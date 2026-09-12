@@ -5,6 +5,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
+	"regexp"
 	"strings"
 )
 
@@ -35,20 +38,43 @@ type LiveAdapter interface {
 	CreateLiveSession(ctx context.Context, req LiveSessionRequest) (LiveSessionResponse, error)
 }
 
+// LiveUpstreamError is the vendor refusing to open a live session. It keeps
+// the vendor's status so the gateway can answer in the same class — a bad
+// offer is the caller's to fix, a rejected key is ours — instead of a blanket
+// 502 that reads the same for both.
+type LiveUpstreamError struct {
+	Status int
+	// Message is what the vendor told its client: one line, anything shaped
+	// like a credential masked. Safe to hand back to the caller.
+	Message string
+}
+
+func (e *LiveUpstreamError) Error() string {
+	return fmt.Sprintf("live session upstream %d: %s", e.Status, e.Message)
+}
+
+// maxLiveAnswerBytes bounds what is read of the vendor's answer. An SDP answer
+// is a few kilobytes; anything near this is not one.
+const maxLiveAnswerBytes = 1 << 20
+
 // CreateLiveSession implements LiveAdapter over OpenAI's POST /live/sessions.
 func (a *OpenAIAdapter) CreateLiveSession(ctx context.Context, req LiveSessionRequest) (LiveSessionResponse, error) {
 	body, err := rewriteLiveModel(req.Body, req.Model)
 	if err != nil {
 		return LiveSessionResponse{}, err
 	}
-	// The offer is a fixed body, so replaying it on a transient failure is
-	// safe: the browser has not applied any answer yet.
-	status, raw, err := postJSON(ctx, a.baseURL+"/live/sessions", a.headers(), body, a.name+" live session")
+	// Exactly one attempt. A create whose answer was lost — a 5xx after the
+	// vendor had already opened the session, a connection cut mid-response —
+	// leaves a session running on the vendor's clock. Replaying the offer opens
+	// a second one and nothing ever closes the first, so the retries every
+	// other endpoint gets would be billed here. The browser retries the whole
+	// call instead, with a fresh offer.
+	status, raw, err := postJSONOnce(ctx, a.baseURL+"/live/sessions", a.headers(), body)
 	if err != nil {
 		return LiveSessionResponse{}, fmt.Errorf("live session request failed: %w", err)
 	}
 	if status < 200 || status >= 300 {
-		return LiveSessionResponse{}, fmt.Errorf("live session upstream %d: %s", status, truncateBody(raw, 300))
+		return LiveSessionResponse{}, &LiveUpstreamError{Status: status, Message: vendorErrorMessage(raw)}
 	}
 	var parsed struct {
 		Session struct {
@@ -65,6 +91,65 @@ func (a *OpenAIAdapter) CreateLiveSession(ctx context.Context, req LiveSessionRe
 		return LiveSessionResponse{}, fmt.Errorf("live session upstream returned no session id")
 	}
 	return LiveSessionResponse{ID: id, Body: raw}, nil
+}
+
+// postJSONOnce is postJSON without the retries, for the one call whose replay
+// is not safe: opening something the vendor bills by the second.
+func postJSONOnce(ctx context.Context, url string, headers map[string]string, body []byte) (int, []byte, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))
+	if err != nil {
+		return 0, nil, err
+	}
+	for k, v := range headers {
+		req.Header.Set(k, v)
+	}
+	resp, err := sharedHTTPClient.Do(req)
+	if err != nil {
+		return 0, nil, err
+	}
+	defer resp.Body.Close()
+	raw, err := io.ReadAll(io.LimitReader(resp.Body, maxLiveAnswerBytes))
+	if err != nil {
+		return resp.StatusCode, nil, err
+	}
+	return resp.StatusCode, raw, nil
+}
+
+// credentialShaped matches what in an error body could be a secret: an
+// "sk-"-style key or a bearer token. Vendors mask their own echo of a rejected
+// key, but a proxy in between may not.
+var credentialShaped = regexp.MustCompile(`(?i)(sk-[a-z0-9_\-]{6,}|bearer\s+[a-z0-9._\-]{8,})`)
+
+// vendorErrorMessage is what the caller may read of a vendor's refusal: the
+// message the vendor wrote for its client when the body carries one, a short
+// excerpt otherwise — on one line, with anything credential-shaped masked.
+func vendorErrorMessage(raw []byte) string {
+	var parsed struct {
+		Error   json.RawMessage `json:"error"`
+		Message string          `json:"message"`
+	}
+	msg := ""
+	if json.Unmarshal(raw, &parsed) == nil {
+		var inner struct {
+			Message string `json:"message"`
+		}
+		if json.Unmarshal(parsed.Error, &inner) == nil && inner.Message != "" {
+			msg = inner.Message
+		} else if s := ""; json.Unmarshal(parsed.Error, &s) == nil && s != "" {
+			msg = s
+		} else {
+			msg = parsed.Message
+		}
+	}
+	if msg == "" {
+		msg = string(raw)
+	}
+	msg = strings.Join(strings.Fields(msg), " ")
+	msg = credentialShaped.ReplaceAllString(msg, "[redacted]")
+	if msg == "" {
+		return "(empty response)"
+	}
+	return truncateBody([]byte(msg), 300)
 }
 
 // rewriteLiveModel sets session.model on the caller's body. The alias the

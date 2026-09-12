@@ -10,7 +10,8 @@
 //   4. function calls → onToolCall(call) — YOUR server runs the action with
 //      the signed-in user's rights and returns a result the model speaks from
 //   5. usage seconds → onUsage — YOUR server relays them to
-//      POST /v1/live/sessions/{id}/usage so the minutes are billed
+//      POST /v1/live/sessions/{id}/usage so the minutes are billed (or
+//      reports its own clock instead; the gateway bills the highest snapshot)
 //
 // Event names follow the vendor's GPT-Live contract at the time of writing;
 // they are exported so a product can pin or override them.
@@ -48,9 +49,38 @@ export function appendTranscriptDelta(turns, role, delta) {
     return [...list, { role, text, at: new Date().toISOString() }];
 }
 
+// The vendor reports a call's duration inside `event.usage` — on
+// session.closed, and on session.usage.updated if it sends one. Its docs show
+// that object without naming the field, so every plausible spelling is read,
+// seconds first and then milliseconds, and an unknown shape is ignored rather
+// than thrown on. Billing does not hang on this: a product that times the call
+// itself (NabuCRM does) can report its own clock instead.
+const USAGE_SECOND_FIELDS = ["seconds", "duration_seconds", "session_seconds", "total_seconds", "audio_seconds", "duration"];
+const USAGE_MILLISECOND_FIELDS = ["duration_ms", "milliseconds", "total_ms"];
+
+function finiteNumber(value) {
+    if (typeof value === "number" && Number.isFinite(value)) return value;
+    if (typeof value === "string" && value.trim() !== "" && Number.isFinite(Number(value))) return Number(value);
+    return null;
+}
+
 export function usageSecondsFrom(event) {
-    const s = event?.usage?.seconds;
-    return typeof s === "number" && Number.isFinite(s) ? Math.max(0, Math.floor(s)) : null;
+    try {
+        const usage = event && typeof event === "object" ? event.usage : null;
+        if (!usage || typeof usage !== "object") return null;
+        for (const key of USAGE_SECOND_FIELDS) {
+            const nested = usage[key] && typeof usage[key] === "object" ? usage[key].seconds : usage[key];
+            const n = finiteNumber(nested);
+            if (n !== null) return Math.max(0, Math.floor(n));
+        }
+        for (const key of USAGE_MILLISECOND_FIELDS) {
+            const n = finiteNumber(usage[key]);
+            if (n !== null) return Math.max(0, Math.floor(n / 1000));
+        }
+    } catch {
+        // An unrecognised usage shape is not an error: report nothing.
+    }
+    return null;
 }
 
 export function functionCallFrom(event) {
@@ -200,8 +230,12 @@ export async function connectLive({
             onDelegation?.(event.delegation, replyFor(event.delegation.id));
             return;
         }
-        const seconds = usageSecondsFrom(event);
-        if (seconds !== null) onUsage?.(seconds);
+        // Only the session's own events: a backend response's token usage
+        // rides in response.* envelopes and is not a duration.
+        if (type.startsWith("session.")) {
+            const seconds = usageSecondsFrom(event);
+            if (seconds !== null) onUsage?.(seconds);
+        }
         if (type === EVENTS.closed) return void teardown(event.reason || "closed");
         if (type === "error" || type === "session.error") {
             onError?.(event?.error?.message || event?.message || "Voice session error");

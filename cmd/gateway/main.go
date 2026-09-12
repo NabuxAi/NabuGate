@@ -77,6 +77,14 @@ func main() {
 	r.SetCallerAdapter(cfg.CallerAdapter)
 	r.SetRegistry(cfg.Registry)
 	r.SetLive(cfg.Live)
+	// Checked before the first call, because no call would ever report it: a
+	// live alias with no per-minute price connects fine and bills nothing. The
+	// alias is refused alone; everything else keeps serving.
+	liveProblems := cfg.LiveProblems()
+	for alias, reason := range liveProblems {
+		log.Error("live alias refused", "alias", alias, "reason", reason)
+	}
+	r.SetLiveProblems(liveProblems)
 	enforcer := policy.New(cfg.Server.APIKeys, cfg.Server.Keys)
 	tracker := usage.New(cfg.Pricing)
 	agents, agentWarnings := cfg.BuildAgents()
@@ -129,6 +137,13 @@ func main() {
 	stateDir := os.Getenv("NABU_STATE_DIR")
 	if stateDir == "" {
 		stateDir = "/data"
+	}
+
+	// Live sessions are signalled now and billed later, from usage reported
+	// while the call runs. On the state volume, so a redeploy mid-call does not
+	// turn the rest of its minutes into "unknown live session" — unbilled.
+	if err := srv.SetLiveStateFile(filepath.Join(stateDir, "live-sessions.json")); err != nil {
+		log.Warn("live session registry is memory-only", "error", err)
 	}
 
 	// Conversation memory: a project sends conversation_id and the gateway

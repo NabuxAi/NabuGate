@@ -58,6 +58,12 @@ type Router struct {
 	live          map[string]config.ModelRoute
 	log           *slog.Logger
 
+	// liveProblems are live aliases refused on purpose (SetLiveProblems);
+	// liveStatus is the last upstream answer per live alias (noteLive).
+	liveProblems map[string]string
+	liveMu       sync.Mutex
+	liveStatus   map[string]liveStatus
+
 	// passthrough maps a passthrough-enabled provider name to its static model
 	// catalogue. Its presence as a key is what makes "<provider>/<model>" direct
 	// routing (and live discovery) legal for that provider.
@@ -650,6 +656,17 @@ func (r *Router) AliasInfos() []AliasInfo {
 	add(r.images)
 	add(r.audio)
 	add(r.embeddings)
+	// Live aliases list like the rest — a caller deciding whether it can place
+	// a voice call reads this — except one refused for want of a price, which
+	// would be offered and then answer 503 every time.
+	for alias, route := range r.live {
+		if _, refused := r.liveProblems[alias]; refused {
+			continue
+		}
+		if owner, ok := r.firstReachableProvider(route); ok {
+			out = append(out, AliasInfo{ID: alias, Owner: owner})
+		}
+	}
 	return out
 }
 
