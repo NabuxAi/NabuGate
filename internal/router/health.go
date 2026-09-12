@@ -2,6 +2,7 @@ package router
 
 import (
 	"sort"
+	"time"
 
 	"nabugate/internal/config"
 )
@@ -33,10 +34,22 @@ type AliasHealth struct {
 	// Warnings are the ways this alias is weaker than it looks. Empty is the
 	// healthy case.
 	Warnings []string `json:"warnings,omitempty"`
+
+	// Disabled is an alias the gateway refuses on purpose — a live alias with
+	// no per-minute price — however many providers stand behind it.
+	Disabled bool `json:"disabled,omitempty"`
+
+	// LastError, LastErrorAt and LastOKAt are the last upstream answer for this
+	// alias. Only live aliases carry them: health is config-only everywhere
+	// else, and a live alias is the one whose upstream is never contacted
+	// until somebody places a call.
+	LastError   string     `json:"last_error,omitempty"`
+	LastErrorAt *time.Time `json:"last_error_at,omitempty"`
+	LastOKAt    *time.Time `json:"last_ok_at,omitempty"`
 }
 
 // Healthy reports whether anything at all can serve this alias.
-func (a AliasHealth) Healthy() bool { return a.Live > 0 }
+func (a AliasHealth) Healthy() bool { return a.Live > 0 && !a.Disabled }
 
 // AliasHealthAll reports every configured alias's standing.
 //
@@ -58,6 +71,7 @@ func (r *Router) AliasHealthAll() []AliasHealth {
 		{"audio", r.audio},
 		{"embedding", r.embeddings},
 		{"transcription", r.transcription},
+		{"live", r.live},
 	}
 
 	for _, kind := range kinds {
@@ -113,15 +127,21 @@ func (r *Router) aliasHealth(alias, kind string, route config.ModelRoute) AliasH
 		// Two models behind one key share one quota and one outage: that is one
 		// target, not two, and a chain of them fails twice at once.
 		health.Warnings = append(health.Warnings, "fallback does not cross vendors — every rung is served by "+health.Providers[0])
-	case health.Live == 1 && kind != "embedding":
+	case health.Live == 1 && kind != "embedding" && kind != "live":
 		// An embedding alias with one rung is usually deliberate: crossing
 		// vector widths mid-flight corrupts a stored index, so no fallback is
-		// the correct configuration there and warning about it is noise.
+		// the correct configuration there and warning about it is noise. A
+		// live alias names one vendor's voice model that no other vendor
+		// serves, so one rung is the only configuration there is.
 		health.Warnings = append(health.Warnings, "no fallback — one provider outage takes this alias down")
 	}
 
 	if health.Live < health.Configured && health.Live > 0 {
 		health.Warnings = append(health.Warnings, "shorter than configured — some rungs name providers with no key here")
+	}
+
+	if kind == "live" {
+		r.liveHealth(alias, &health)
 	}
 
 	return health

@@ -25,6 +25,15 @@ services:
       - NABUGEN_KEY=${NABUGEN_KEY:-}
       - NABUSU_KEY=${NABUSU_KEY:-}
       - ZOOEY_KEY=${ZOOEY_KEY:-}
+      # config.default.yaml names these five as well. Without a line here Coolify
+      # never hands them to the container, the key reads as unset, and that
+      # project's key is skipped — every call it makes is a 401 (NabuCRM's live
+      # voice included).
+      - NABUCRM_KEY=${NABUCRM_KEY:-}
+      - CLAUDEBRIDGE_KEY=${CLAUDEBRIDGE_KEY:-}
+      - DADEBARAN_KEY=${DADEBARAN_KEY:-}
+      - NOTEBOOK_KEY=${NOTEBOOK_KEY:-}
+      - RASAD_KEY=${RASAD_KEY:-}
       # Coolify magic variable: auto-assign a domain for this service and route
       # it to the gateway's port 8080. Coolify fills it in (or use your own
       # domain under Configuration → Domains). Ignored outside Coolify.

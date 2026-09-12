@@ -2,23 +2,29 @@ package server
 
 import (
 	"encoding/json"
+	"errors"
+	"fmt"
 	"io"
+	"io/fs"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
 
 	"nabugate/internal/adminstore"
 	"nabugate/internal/provider"
+	"nabugate/internal/router"
 )
 
 // Realtime voice (GPT-Live) is the one capability whose traffic does not pass
 // through the gateway: after the SDP handshake the browser and the vendor
 // talk directly over WebRTC, and only the vendor knows how long the call ran.
 // So the session is billed in two steps — created here, then charged as the
-// caller reports the duration the vendor's usage events told it. The caller
-// is the key holder's own server, which is as trusted as any request on that
-// key; a browser is never handed the key.
+// caller reports the duration. The caller is the key holder's own server,
+// which is as trusted as any request on that key; a browser is never handed
+// the key.
 
 // liveSessionTTL bounds how long an unreported session stays in the registry.
 // A vendor session cannot outlive this; one that was never closed properly is
@@ -31,46 +37,72 @@ type liveSession struct {
 	model    string
 	alias    string
 	created  time.Time
+	// byCaller is a session opened on the caller's own vendor key. The vendor
+	// bills them for every minute of it, so the gateway must not — on the
+	// usage reports as much as on the request that created it.
+	byCaller bool
 	// billedSeconds is the cumulative duration already charged. Usage reports
 	// are snapshots, not increments, so a repeated or out-of-order report can
 	// never double-bill.
 	billedSeconds int64
 }
 
+// liveSessionRecord is a session as it is kept on disk.
+type liveSessionRecord struct {
+	ID            string    `json:"id"`
+	Project       string    `json:"project"`
+	Provider      string    `json:"provider"`
+	Model         string    `json:"model"`
+	Alias         string    `json:"alias"`
+	Created       time.Time `json:"created"`
+	ByCaller      bool      `json:"by_caller,omitempty"`
+	BilledSeconds int64     `json:"billed_seconds"`
+}
+
 type liveSessions struct {
 	mu       sync.Mutex
 	sessions map[string]*liveSession
+	// path is where the registry is kept between restarts. Empty keeps it in
+	// memory alone — tests, and a deployment with no state volume.
+	path string
 }
 
 func newLiveSessions() *liveSessions {
 	return &liveSessions{sessions: map[string]*liveSession{}}
 }
 
-func (l *liveSessions) put(id string, s *liveSession) {
+func (l *liveSessions) put(id string, s *liveSession) error {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	l.prune()
 	l.sessions[id] = s
+	return l.saveLocked()
 }
 
 // take returns the session for a project's usage report and how many new
-// seconds it accounts for, advancing the billed mark. final removes it.
-func (l *liveSessions) take(id, project string, seconds int64, final bool) (*liveSession, int64, bool) {
+// seconds it accounts for, advancing the billed mark. final removes it. The
+// session comes back as a copy, read under the lock.
+func (l *liveSessions) take(id, project string, seconds int64, final bool) (liveSession, int64, bool, error) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	s, ok := l.sessions[id]
 	if !ok || s.project != project {
-		return nil, 0, false
+		return liveSession{}, 0, false, nil
 	}
 	delta := seconds - s.billedSeconds
 	if delta < 0 {
 		delta = 0
 	}
 	s.billedSeconds += delta
+	snapshot := *s
 	if final {
 		delete(l.sessions, id)
 	}
-	return s, delta, true
+	var err error
+	if delta > 0 || final {
+		err = l.saveLocked()
+	}
+	return snapshot, delta, true, err
 }
 
 func (l *liveSessions) prune() {
@@ -80,6 +112,83 @@ func (l *liveSessions) prune() {
 			delete(l.sessions, id)
 		}
 	}
+}
+
+// persistTo keeps the registry at path from now on: what is already there is
+// loaded (minus anything past its TTL), and every change is written back —
+// to a temporary file, then renamed over the old one, so a crash mid-write
+// leaves the previous registry rather than half of a new one.
+func (l *liveSessions) persistTo(path string) error {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+		return err
+	}
+	raw, err := os.ReadFile(path)
+	switch {
+	case errors.Is(err, fs.ErrNotExist):
+	case err != nil:
+		return err
+	default:
+		var records []liveSessionRecord
+		if err := json.Unmarshal(raw, &records); err != nil {
+			return fmt.Errorf("live sessions %s: %w", path, err)
+		}
+		for _, rec := range records {
+			if rec.ID == "" {
+				continue
+			}
+			l.sessions[rec.ID] = &liveSession{
+				project:       rec.Project,
+				provider:      rec.Provider,
+				model:         rec.Model,
+				alias:         rec.Alias,
+				created:       rec.Created,
+				byCaller:      rec.ByCaller,
+				billedSeconds: rec.BilledSeconds,
+			}
+		}
+	}
+	l.path = path
+	l.prune()
+	return l.saveLocked()
+}
+
+func (l *liveSessions) saveLocked() error {
+	if l.path == "" {
+		return nil
+	}
+	records := make([]liveSessionRecord, 0, len(l.sessions))
+	for id, s := range l.sessions {
+		records = append(records, liveSessionRecord{
+			ID:            id,
+			Project:       s.project,
+			Provider:      s.provider,
+			Model:         s.model,
+			Alias:         s.alias,
+			Created:       s.created,
+			ByCaller:      s.byCaller,
+			BilledSeconds: s.billedSeconds,
+		})
+	}
+	raw, err := json.Marshal(records)
+	if err != nil {
+		return err
+	}
+	tmp := l.path + ".tmp"
+	if err := os.WriteFile(tmp, raw, 0o600); err != nil {
+		return err
+	}
+	return os.Rename(tmp, l.path)
+}
+
+// SetLiveStateFile keeps the live-session registry at path between restarts.
+// A session is signalled here and billed afterwards, from usage the product
+// reports while the call runs; held in memory alone, a redeploy mid-call
+// turned every later report into "unknown live session", and those minutes
+// were never billed.
+func (s *Server) SetLiveStateFile(path string) error {
+	return s.live.persistTo(path)
 }
 
 // liveRequestAlias reads the alias from the caller's body: top-level "model"
@@ -97,6 +206,29 @@ func liveRequestAlias(body []byte) string {
 		return top.Model
 	}
 	return top.Session.Model
+}
+
+// liveErrStatus answers a failed session request in the class of what went
+// wrong. A refused alias is 503. A vendor refusal keeps its class where the
+// caller can act on it — a rejected body or offer is 400, the vendor's rate
+// limit 429 — and is 502 where only the gateway's operator can: a rejected
+// key, a vendor 5xx.
+func liveErrStatus(err error) int {
+	var refused *router.LiveMisconfiguredError
+	if errors.As(err, &refused) {
+		return http.StatusServiceUnavailable
+	}
+	var vendor *provider.LiveUpstreamError
+	if errors.As(err, &vendor) {
+		switch vendor.Status {
+		case http.StatusTooManyRequests:
+			return http.StatusTooManyRequests
+		case http.StatusBadRequest, http.StatusUnprocessableEntity:
+			return http.StatusBadRequest
+		}
+		return http.StatusBadGateway
+	}
+	return aliasErrStatus(err, "unknown live alias")
 }
 
 // handleLiveSession — POST /v1/live/sessions. The body is the vendor's session
@@ -124,18 +256,23 @@ func (s *Server) handleLiveSession(w http.ResponseWriter, r *http.Request) {
 
 	result, err := s.router.LiveSession(r.Context(), alias, body)
 	if err != nil {
-		writeError(w, aliasErrStatus(err, "unknown live alias"), err.Error())
+		writeError(w, liveErrStatus(err), err.Error())
 		return
 	}
 
 	project := s.project(r)
-	s.live.put(result.ID, &liveSession{
+	if err := s.live.put(result.ID, &liveSession{
 		project:  project,
 		provider: result.Provider,
 		model:    result.Model,
 		alias:    alias,
 		created:  time.Now(),
-	})
+		byCaller: servedByCaller(r.Context()),
+	}); err != nil {
+		// The call is already open at the vendor; failing the caller now would
+		// strand it. Said out loud so an unwritable volume gets noticed.
+		s.log.Warn("persist live sessions", "error", err)
+	}
 	// The creation itself is a request on the books with no cost yet; the
 	// minutes follow through usage reports.
 	s.record(r, result.Provider, result.Model, provider.Usage{})
@@ -148,8 +285,8 @@ func (s *Server) handleLiveSession(w http.ResponseWriter, r *http.Request) {
 }
 
 type liveUsageBody struct {
-	// Seconds is the session's cumulative duration so far, as the vendor's
-	// session.usage.updated / session.closed events report it.
+	// Seconds is the session's cumulative duration so far — from the vendor's
+	// usage events, or from the product's own clock.
 	Seconds int64 `json:"seconds"`
 	// Final marks the session closed: it is billed and forgotten.
 	Final bool `json:"final"`
@@ -178,7 +315,10 @@ func (s *Server) handleLiveUsage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	project := s.project(r)
-	session, delta, ok := s.live.take(id, project, body.Seconds, body.Final)
+	session, delta, ok, saveErr := s.live.take(id, project, body.Seconds, body.Final)
+	if saveErr != nil {
+		s.log.Warn("persist live sessions", "error", saveErr)
+	}
 	if !ok {
 		// Unknown to this key: either never created here, already finalised,
 		// or someone else's. All three read the same to the caller.
@@ -187,7 +327,7 @@ func (s *Server) handleLiveUsage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	cost := s.usage.SecondsCost(session.provider, session.model, delta)
-	if servedByCaller(r.Context()) {
+	if session.byCaller || servedByCaller(r.Context()) {
 		cost = 0
 	} else {
 		cost = gatewayRateFrom(r.Context()).apply(cost)

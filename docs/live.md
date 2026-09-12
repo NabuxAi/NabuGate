@@ -46,13 +46,38 @@ pricing:
   "openai/gpt-live-1": { per_minute: 0.05 }
 ```
 
+**Every live alias needs a `per_minute` price** for each provider/model it can
+land on. That price is the only thing a live minute is billed from, so an
+unpriced alias would connect and bill nothing. The gateway checks at start-up:
+an unpriced alias is logged (`live alias refused`), answers every session
+request with `503 live alias misconfigured: …`, is left out of `/v1/models`,
+and shows `"disabled": true` in `/v1/health` — while everything else keeps
+serving. `NABU_CONFIG_YAML` replaces the baked config wholesale, so an inline
+config needs its own `live:` block and price.
+
+**Creating a session is one attempt, never retried.** A create whose answer was
+lost may already be running on the vendor's clock; replaying the offer would
+open a second session that nothing ever closes. Retry from the browser, with a
+fresh offer. A vendor refusal keeps its class: `400` for a body or offer the
+vendor rejected, `429` for the vendor's rate limit, `502` for anything only the
+gateway's operator can fix (a rejected key, a vendor 5xx). The vendor's own
+message comes back on one line, with anything credential-shaped masked.
+
 ## Billing — `POST /v1/live/sessions/{id}/usage`
 
-Only the vendor knows how long a call ran, and it tells the *browser*, in
-`session.usage.updated` and `session.closed` events on the data channel. Your
-server relays that duration here; the gateway charges the key's owner the
-seconds it has not yet billed at the model's `per_minute` price (times the
-plan rate, like any other metered call):
+Only the vendor knows exactly how long a call ran, and it tells the *browser*:
+`session.closed` carries a `usage` object (the SDK also reads a
+`session.usage.updated` event if the vendor sends one). The vendor's docs show
+that object without naming its duration field, so `packages/live-web` reads the
+plausible spellings — `seconds`, `duration_seconds`, … and millisecond
+variants — and ignores a shape it does not recognise rather than throwing.
+
+**Billing does not depend on that event.** A product can report seconds from its
+own clock instead — NabuCRM does, every 15 seconds and once more on hang-up,
+capped at the call's allowance. Either way your server relays the duration
+here; the gateway charges the key's owner the seconds it has not yet billed at
+the model's `per_minute` price (times the plan rate, like any other metered
+call):
 
 ```json
 { "seconds": 90, "final": true }
@@ -67,9 +92,38 @@ repeated or out-of-order report never bills twice. `final` closes the
 session; a session nobody finalises is forgotten after six hours. Only the
 key that created a session may report on it — anything else is `404`.
 
+The registry of open sessions lives in `live-sessions.json` on the state volume
+(`NABU_STATE_DIR`, `/data` in the image), rewritten on every change, so a
+redeploy in the middle of a call does not turn its remaining reports into
+`404 unknown live session` — minutes that would otherwise never be billed. A
+session opened on the caller's own vendor key (`X-Nabu-Key-openai`) stays
+unbilled for its whole life, not only on the request that created it.
+
 The delegated backend model's tokens are billed by the vendor to the
 gateway's own account and are not metered per session here; price the
 `per_minute` rate with that in mind.
+
+## Seeing whether it works
+
+`GET /v1/health` lists live aliases with the rest (`"kind": "live"`): how many
+rungs have a key in this deployment, `"disabled": true` with the reason when
+the alias is refused, and — since health never contacts a vendor — the last
+session request's outcome (`last_ok_at`, `last_error`, `last_error_at`).
+`GET /v1/models` lists a live alias to every key allowed to use it.
+
+A real signalling check, never part of a plain `go test ./...`:
+
+```bash
+NABUGATE_LIVE_SMOKE=1 OPENAI_API_KEY=sk-… go test ./internal/provider -run TestLiveSmoke -v
+```
+
+It opens one real session (client delegation, so no backend model runs) with a
+synthetic SDP offer and checks the vendor answers with a session id and an SDP
+answer. The session never connects media and ends when ICE gives up, so expect
+a few seconds of billing at most. If the vendor rejects the synthetic offer,
+capture a real one in a browser (`pc.localDescription.sdp` after ICE
+gathering), save it, and pass `NABUGATE_LIVE_SMOKE_OFFER=/path/to/offer.sdp`.
+The only complete test is a person on a microphone.
 
 ## Actions and the browser SDK
 
