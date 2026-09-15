@@ -624,6 +624,19 @@ model_registry:
     serves:
       - provider: dashscope
         model: "qwen-turbo"
+  # Qwen3-Coder: purpose-built for code tasks — agentic coding, repo-level
+  # understanding, multi-turn tool interactions. Served by DashScope on the
+  # international endpoint (same key as qwen-max/plus/turbo). qwen3-coder-plus
+  # is the 480B MoE flagship (256K context); qwen3-coder-next is a newer variant
+  # at similar quality. Both are OpenAI-wire compatible.
+  qwen3-coder-plus:
+    serves:
+      - provider: dashscope
+        model: "qwen3-coder-plus"
+  qwen3-coder-next:
+    serves:
+      - provider: dashscope
+        model: "qwen3-coder-next"
   gpt-5.5:
     param_style: reasoning
     serves:
@@ -1029,6 +1042,18 @@ models:
       # Not Qwen at all, and last on purpose — same trade as nabu-kimi's final
       # rung: a Qwen outage degrades the answer instead of failing the request,
       # and the usage log names what actually carried it.
+      - model: gemini-2.5-flash
+
+  # Qwen3-Coder alias. For callers that want a code-specialised model
+  # instead of a general-purpose one: agentic coding, repo-level context,
+  # multi-turn tool use. Falls back to the lighter "next" variant and then
+  # to a general model so a DashScope outage does not kill the request.
+  nabu-qwen-code:
+    primary:
+      model: qwen3-coder-plus
+    fallback:
+      - model: qwen3-coder-next
+      - model: qwen-plus
       - model: gemini-2.5-flash
 
   nabu-local:
@@ -1656,6 +1681,10 @@ pricing:
   "anthropic/claude-3-5-haiku-latest": { input: 0.8, output: 4 }
   "gemini/gemini-1.5-pro": { input: 1.25, output: 5 }
   "groq/llama-3.1-70b-versatile": { input: 0.59, output: 0.79 }
+  # DashScope (Qwen3-Coder): approximate USD per 1M tokens, base tier ≤32k context.
+  # Tiered billing applies — longer contexts cost more (see DashScope docs).
+  "dashscope/qwen3-coder-plus": { input: 0.55, output: 2.20 }
+  "dashscope/qwen3-coder-next": { input: 0.15, output: 0.55 }
 
 # Subscriptions: buying the right to spend *this gateway's* vendor keys.
 #
