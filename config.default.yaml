@@ -20,6 +20,14 @@ server:
   api_keys:
     - "${NABU_API_KEY}"
   keys:
+    # NabuAcademy — ساختِ تمرینِ تعاملی H5P و دستیارِ دوره‌ها.
+    # فقط دو aliasِ عمومی لازم دارد: تولیدِ محتوای تمرین و پاسخِ دستیار.
+    # Skipped automatically when NABUACADEMY_KEY is unset.
+    - key: "${NABUACADEMY_KEY}"
+      project: "nabuacademy"
+      allow: ["nabu-fast", "nabu-smart"]
+      rate_limit: 120
+
     # NabuWrite. Covers its three write-* agents, write-embed, and nabu-* aliases.
     # Skipped automatically when NABUWRITE_KEY is unset.
     - key: "${NABUWRITE_KEY}"
