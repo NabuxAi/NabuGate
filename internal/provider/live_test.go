@@ -67,7 +67,7 @@ func TestCreateLiveSessionReturnsTheVendorsAnswer(t *testing.T) {
 	if resp.ID != "live_9" || !strings.Contains(string(resp.Body), "v=0 answer") {
 		t.Fatalf("answer not passed through: %+v", resp)
 	}
-	if auth != "Bearer k" || path != "/live/sessions" {
+	if auth != "Bearer k" || path != "/realtime/sessions" {
 		t.Fatalf("auth %q path %q", auth, path)
 	}
 }

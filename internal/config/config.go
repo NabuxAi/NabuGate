@@ -477,6 +477,11 @@ func newAdapter(name string, p ProviderConfig, apiKey string) (provider.Adapter,
 		// and polls it to completion inside one call. Neither shape fits the
 		// openai adapter.
 		return provider.NewSpeechmaticsAdapter(name, p.BaseURL, apiKey), ""
+	case "replicate":
+		// replicate.com: a marketplace of models behind a predictions API, not
+		// an OpenAI-wire endpoint — there is no /chat/completions to point a
+		// base_url at, so it needs its own adapter. Chat and image both.
+		return provider.NewReplicateAdapter(name, p.BaseURL, apiKey), ""
 	case "gamma":
 		// gamma.app: decks, documents and social posts. Asynchronous, and a chat
 		// adapter rather than an image one because what comes back is a hosted

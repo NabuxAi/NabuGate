@@ -206,6 +206,66 @@ providers:
     api_key_env: "TOKENROUTER_API_KEY"
     passthrough: true
 
+
+  # Replicate (replicate.com) — a marketplace of thousands of open models:
+  # Llama/Qwen/DeepSeek text, FLUX/SDXL images, and a long tail of everything
+  # else. It is NOT OpenAI-wire — there is no /chat/completions to point a
+  # base_url at, only a predictions API — so it has its own adapter
+  # (type: replicate) rather than riding the openai one. base_url defaults to
+  # https://api.replicate.com/v1 and is only worth setting for a proxy.
+  #
+  # Auth is a normal Bearer token (REPLICATE_API_TOKEN); the provider is skipped
+  # automatically when that is unset.
+  #
+  # passthrough → address any model directly as "replicate/<owner>/<name>" (the
+  # router splits on the FIRST "/", so owner/name keeps its own slash):
+  #   • current version:  replicate/meta/meta-llama-3-8b-instruct
+  #   • pinned version:   replicate/meta/meta-llama-3-8b-instruct:5a6809ca…
+  # Replicate's /v1/models lists the whole public catalogue (thousands, paged),
+  # which is not a useful menu, so the adapter does not discover live — the
+  # static `models:` list below is what /v1/models advertises. Add the ones you
+  # actually use.
+  #
+  # Each model publishes its own input schema, which no gateway can know. A
+  # plain-text prompt is mapped onto the fields the common text models share
+  # (prompt, system_prompt, max_tokens, temperature, top_p); send a JSON object
+  # as the prompt to supply that model's own `input` verbatim instead.
+  replicate:
+    enabled: true
+    type: replicate
+    api_key_env: "REPLICATE_API_TOKEN"
+    passthrough: true
+    models:
+      - "meta/meta-llama-3-8b-instruct"
+      - "meta/meta-llama-3-70b-instruct"
+      - "deepseek-ai/deepseek-v3"
+      - "black-forest-labs/flux-schnell"
+      - "black-forest-labs/flux-dev"
+      - "stability-ai/sdxl"
+
+  # RunPod (runpod.io) — serverless GPUs. A Serverless endpoint running the vLLM
+  # worker exposes a genuinely OpenAI-compatible surface, so it needs no new
+  # code: type openai, Bearer auth with the RunPod API key.
+  #
+  # The endpoint id is part of the URL, so base_url is templated from
+  # ${RUNPOD_ENDPOINT_ID} the same way Cloudflare's account id is. Both env vars
+  # are required together — with the key set and the id missing the URL is
+  # malformed and every request 404s, so set both or neither.
+  #
+  # The "model" is whatever that endpoint has loaded (usually the HF repo id,
+  # e.g. "meta-llama/Llama-3.1-8B-Instruct"); vLLM answers /v1/models with it,
+  # so the gateway discovers the endpoint's catalogue live.
+  #
+  # One provider block = one endpoint. Running several models means several
+  # endpoints, so copy this block per endpoint (runpod_llama, runpod_embed, …)
+  # rather than trying to make one base_url serve both.
+  runpod:
+    enabled: true
+    type: openai
+    base_url: "https://api.runpod.ai/v2/${RUNPOD_ENDPOINT_ID}/openai/v1"
+    api_key_env: "RUNPOD_API_KEY"
+    passthrough: true
+
   dahl:
     enabled: true
     type: openai
@@ -1190,6 +1250,30 @@ models:
       provider: gamma
       model: "gamma-social"
 
+  # Replicate-backed chat alias. Several rungs from the same provider — which is
+  # normally a fallback that buys nothing, since one key means one quota and one
+  # outage — because Replicate's failure mode is per-model: a cold model can
+  # time out booting while the next one answers immediately.
+  nabu-replicate:
+    primary:
+      provider: replicate
+      model: "meta/meta-llama-3-70b-instruct"
+    fallback:
+      - provider: replicate
+        model: "meta/meta-llama-3-8b-instruct"
+      # Last rung on a different vendor, so a Replicate-wide outage still has
+      # somewhere to go.
+      - provider: groq
+        model: "llama-3.1-8b-instant"
+
+  # RunPod-backed chat alias. The model is whatever your endpoint has loaded, so
+  # this one is a placeholder to edit per deploy rather than a shipped default.
+  nabu-runpod:
+    primary:
+      provider: runpod
+      model: "meta-llama/Llama-3.1-8B-Instruct"
+
+
 images:
   nabu-image:
     primary:
@@ -1200,6 +1284,19 @@ images:
         model: "gemini-2.5-flash-image"
       - provider: pexels
         model: "search"
+
+
+  # FLUX on Replicate. Its own alias rather than another rung on nabu-image:
+  # nabu-image already ends in Pexels, which practically always succeeds, so a
+  # rung after it would never run and a rung before it would silently change
+  # what every existing caller of nabu-image gets back.
+  nabu-flux:
+    primary:
+      provider: replicate
+      model: "black-forest-labs/flux-schnell"
+    fallback:
+      - provider: replicate
+        model: "black-forest-labs/flux-dev"
 
   # Stock photos only: search Pexels for the prompt (empty prompt → curated).
   nabu-photo:
@@ -1239,7 +1336,13 @@ live:
   nabu-live:
     primary:
       provider: openai
-      model: "gpt-live-1"
+      model: "gpt-4o-realtime-preview"
+    fallback:
+      - provider: openai
+        model: "gpt-4o-mini-realtime-preview"
+      - provider: openrouter
+        model: "openai/gpt-4o-realtime-preview"
+
 
 audio:
   nabu-voice:
@@ -1681,6 +1784,9 @@ flows_dir: "/app/flows"
 
 pricing:
   # Per minute of session, billed per second — a live model has no tokens.
+  "openai/gpt-4o-realtime-preview": { per_minute: 0.15 }
+  "openai/gpt-4o-mini-realtime-preview": { per_minute: 0.06 }
+  "openrouter/openai/gpt-4o-realtime-preview": { per_minute: 0.15 }
   "openai/gpt-live-1": { per_minute: 0.05 }
   "openai/gpt-4o": { input: 2.5, output: 10 }
   "openai/gpt-4o-mini": { input: 0.15, output: 0.6 }

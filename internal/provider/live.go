@@ -69,7 +69,7 @@ func (a *OpenAIAdapter) CreateLiveSession(ctx context.Context, req LiveSessionRe
 	// a second one and nothing ever closes the first, so the retries every
 	// other endpoint gets would be billed here. The browser retries the whole
 	// call instead, with a fresh offer.
-	status, raw, err := postJSONOnce(ctx, a.baseURL+"/live/sessions", a.headers(), body)
+	status, raw, err := postJSONOnce(ctx, a.baseURL+"/realtime/sessions", a.headers(), body)
 	if err != nil {
 		return LiveSessionResponse{}, fmt.Errorf("live session request failed: %w", err)
 	}

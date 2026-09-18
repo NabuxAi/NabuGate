@@ -71,3 +71,40 @@ func TestSnapshotIsACopy(t *testing.T) {
 		t.Fatalf("tracker requests = %d after mutating snapshot, want 1", got)
 	}
 }
+
+// A passthrough router's whole point is that a caller may name any model in a
+// catalogue of hundreds that changes weekly, so no config file can list them
+// all. Without a per-provider default every one of those calls priced at zero
+// and a user could spend the gateway's credential all day without their
+// balance moving — which is the bug this wildcard exists to close.
+func TestAProviderDefaultPricesTheModelsNobodyListed(t *testing.T) {
+	tr := New(map[string]Price{
+		"9router/*":              {Input: 1, Output: 2, PerMinute: 3},
+		"9router/gemini-2.5-pro": {Input: 10, Output: 20},
+		"9router/gpt-live":       {PerMinute: 6},
+	})
+
+	u := provider.Usage{PromptTokens: 1_000_000, CompletionTokens: 1_000_000}
+
+	// An unlisted model falls back to the provider's default instead of free.
+	if got := tr.Cost("9router", "some-model-shipped-last-tuesday", u); math.Abs(got-3) > 1e-9 {
+		t.Fatalf("unlisted model cost = %v, want 3", got)
+	}
+	// An exact entry still wins: the default is a floor for the long tail, not
+	// a replacement for a price anyone bothered to write down.
+	if got := tr.Cost("9router", "gemini-2.5-pro", u); math.Abs(got-30) > 1e-9 {
+		t.Fatalf("listed model cost = %v, want 30", got)
+	}
+	// A provider with no default keeps behaving exactly as it did before the
+	// wildcard existed, so adding this cannot start billing for anything.
+	if got := tr.Cost("openai", "gpt-4o", u); got != 0 {
+		t.Fatalf("unpriced provider cost = %v, want 0", got)
+	}
+	// Per-minute pricing reads the same table, so a live model is covered too.
+	if got := tr.SecondsCost("9router", "unlisted-live", 60); math.Abs(got-3) > 1e-9 {
+		t.Fatalf("wildcard per-minute cost = %v, want 3", got)
+	}
+	if got := tr.SecondsCost("9router", "gpt-live", 60); math.Abs(got-6) > 1e-9 {
+		t.Fatalf("listed per-minute cost = %v, want 6", got)
+	}
+}

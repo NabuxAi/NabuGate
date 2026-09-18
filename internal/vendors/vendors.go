@@ -221,6 +221,20 @@ var catalogue = map[string]Vendor{
 		Site:         "https://tokenrouter.io", Color: "#0891B2",
 		Icon: "M2 11h6.4V6.5L15 12l-6.6 5.5V13H2v-2Zm14 0h6v2h-6v-2Z",
 	},
+	"replicate": {
+		Label: "Replicate", Blurb: "بازارِ هزاران مدلِ متن‌باز — تصویر، ویدیو و LLM. دروازه چت و تصویرش را می‌گیرد.",
+		Capabilities: []string{CapChat, CapImage},
+		Site:         "https://replicate.com", KeysURL: "https://replicate.com/account/api-tokens",
+		Color: "#000000",
+		Icon:  "M21 3v2.7H8.9V21H6.2V3H21Zm0 4.3V10H11.6v11H8.9V7.3H21Zm0 4.3V14h-6.7v7h-2.7v-9.4H21Z",
+	},
+	"runpod": {
+		Label: "RunPod", Blurb: "GPUی سرورلس با اندپوینتِ سازگارِ OpenAI؛ مدلِ خودت را بالا می‌آوری.",
+		Capabilities: []string{CapChat, CapEmbed},
+		Site:         "https://runpod.io", KeysURL: "https://console.runpod.io/user/settings",
+		Color: "#673AB7",
+		Icon:  "M12 1.6 3.4 6.5v11L12 22.4l8.6-4.9v-11L12 1.6Zm0 2.6 6.3 3.6-6.3 3.6-6.3-3.6L12 4.2ZM5.1 9.3l6 3.5v7l-6-3.5v-7Zm13.8 0v7l-6 3.5v-7l6-3.5Z",
+	},
 	"siliconflow": {
 		Label: "SiliconFlow", Blurb: "مدل‌های بازِ چینی، ارزان و سریع.",
 		Capabilities: []string{CapChat, CapEmbed, CapImage},
@@ -279,13 +293,6 @@ var catalogue = map[string]Vendor{
 		Site:         "https://fal.ai", KeysURL: "https://fal.ai/dashboard/keys",
 		Color: "#EC4899",
 		Icon:  "M4 4h6v3.4H7.4v3.2H10V14H7.4v6H4V4Zm14.6 0H22v16h-3.4V4Zm-6.4 6.6h3.3V20h-3.3v-9.4Zm1.6-6.8a1.9 1.9 0 1 1 0 3.8 1.9 1.9 0 0 1 0-3.8Z",
-	},
-	"replicate": {
-		Label: "Replicate", Blurb: "هر مدلِ متن‌بازی که کسی منتشر کرده. هنوز وصل نشده.",
-		Capabilities: []string{CapImage, CapVideo, CapChat},
-		Site:         "https://replicate.com", KeysURL: "https://replicate.com/account/api-tokens",
-		Color: "#000000",
-		Icon:  "M21 3v2.7H8.9V21H6.2V3H21Zm0 4.3V10H11.6v11H8.9V7.3H21Zm0 4.3V14h-6.7v7h-2.7v-9.4H21Z",
 	},
 	"stability": {
 		Label: "Stability AI", Blurb: "Stable Diffusion از خودِ سازنده. هنوز وصل نشده.",

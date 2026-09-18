@@ -1,5 +1,6 @@
 // Package usage tracks token consumption and cost per project and per model.
-// Prices come from the config (USD per 1M tokens, keyed by "provider/model").
+// Prices come from the config (USD per 1M tokens, keyed by "provider/model",
+// or "provider/*" as that provider's default for models not listed).
 package usage
 
 import (
@@ -52,9 +53,29 @@ func New(prices map[string]Price) *Tracker {
 	}
 }
 
-// Cost returns the USD cost for a model's token usage (0 if the model is unpriced).
+// price looks up a model's rate: the exact "provider/model" entry first, and
+// failing that the provider's "provider/*" default.
+//
+// The wildcard exists for the passthrough routers — 9Router, OpenRouter,
+// TokenRouter, Parspack, Replicate. The whole point of those providers is that
+// a caller may name *any* model in a catalogue of hundreds that changes
+// weekly, which means no config file can ever list them all. Without a
+// per-provider default every one of those calls priced at zero, so a user
+// could spend the gateway's credential all day and their balance never moved.
+// A default that is roughly right bills something; an exact entry for a model
+// anyone cares about still overrides it.
+func (t *Tracker) price(providerName, model string) (Price, bool) {
+	if p, ok := t.prices[providerName+"/"+model]; ok {
+		return p, true
+	}
+	p, ok := t.prices[providerName+"/*"]
+	return p, ok
+}
+
+// Cost returns the USD cost for a model's token usage (0 if the model is
+// unpriced and its provider has no default).
 func (t *Tracker) Cost(providerName, model string, u provider.Usage) float64 {
-	p, ok := t.prices[providerName+"/"+model]
+	p, ok := t.price(providerName, model)
 	if !ok {
 		return 0
 	}
@@ -64,7 +85,7 @@ func (t *Tracker) Cost(providerName, model string, u provider.Usage) float64 {
 // SecondsCost returns the USD cost of a live session's duration, 0 for a model
 // with no per-minute price. Seconds are charged pro rata, as the vendor does.
 func (t *Tracker) SecondsCost(providerName, model string, seconds int64) float64 {
-	p, ok := t.prices[providerName+"/"+model]
+	p, ok := t.price(providerName, model)
 	if !ok || seconds <= 0 {
 		return 0
 	}
