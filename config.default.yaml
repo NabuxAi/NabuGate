@@ -312,6 +312,20 @@ providers:
       - "gemini-3.1-pro-preview"
       - "deepseek-v4-pro"
 
+  # chatgpt2api (gpt.account30t.com) — self-hosted ChatGPT accounts pool to OpenAI API gateway
+  chatgpt2api:
+    enabled: true
+    type: openai
+    base_url: "https://gpt.account30t.com/v1"
+    api_key_env: "CHATGPT2API_KEY"
+    passthrough: true
+    models:
+      - "gpt-4o"
+      - "gpt-4.5"
+      - "gpt-5-5"
+      - "o1"
+      - "o3-mini"
+
   # ArvanCloud AIaaS (arvancloud.ir) — private per-model endpoint on Iranian
   # infra. OpenAI-wire chat body, but auth is "apikey <key>" not "Bearer", hence
   # auth_scheme. Set ARVAN_AIAAS_ENDPOINT to your endpoint URL and ARVAN_API_KEY
@@ -730,11 +744,18 @@ model_registry:
 
   gpt-4o:
     serves:
+      - provider: chatgpt2api
+        model: "gpt-4o"
       - provider: parspack
         model: "openai/gpt-4o-2024-11-20"
       - provider: avalai
         model: "gpt-4o"
       - provider: openai
+        model: "gpt-4o"
+
+  chatgpt:
+    serves:
+      - provider: chatgpt2api
         model: "gpt-4o"
 
   gpt-4.1-mini:
