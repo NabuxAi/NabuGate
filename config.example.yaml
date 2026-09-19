@@ -636,7 +636,11 @@ pricing:
   "typesafe/jev-latest": { input: 0.042, output: 0 }
   "typesafe/jev-1.13.0": { input: 0.042, output: 0 }
   "openrouter/typesafe/jev-latest": { input: 0.042, output: 0 }
-  "openrouter/typesafe/jev-1.13": { input: 0.042, output: 0 }
+  "openrouter/typesafe/jev-1.13.0": { input: 0.042, output: 0 }
+  # Every Jev version at the same price, because the provider is passthrough:
+  # a caller may name a version released after this file was written, and an
+  # unpriced call is billed at nothing rather than refused.
+  "typesafe/*": { input: 0.042, output: 0 }
 
   # --- Requested Fictional Models ---
   claude-3-5-haiku-latest:
