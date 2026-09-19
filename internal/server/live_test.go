@@ -25,7 +25,7 @@ func liveUpstream(t *testing.T) (*httptest.Server, *[]byte) {
 	t.Helper()
 	var got []byte
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/live/sessions" || r.Method != http.MethodPost {
+		if (r.URL.Path != "/realtime/sessions" && r.URL.Path != "/live/sessions") || r.Method != http.MethodPost {
 			http.NotFound(w, r)
 			return
 		}
