@@ -397,10 +397,12 @@ func (c *Config) BuildAdapters() (map[string]provider.Adapter, []string) {
 			// Keyless provider (e.g. a self-hosted Ollama endpoint): it declares
 			// no api_key_env, so it is enabled purely by having a base_url. The
 			// OpenAI-wire adapter still sends a placeholder bearer token, which
-			// such local endpoints ignore. Only OpenAI-wire providers may be
-			// keyless — Anthropic/Gemini always need a real key, so a missing
-			// api_key_env there is a misconfiguration, not a local endpoint.
-			if p.Type != "openai" {
+			// such local endpoints ignore. Only providers that can actually be
+			// self-hosted may be keyless — Anthropic/Gemini always need a real
+			// key, so a missing api_key_env there is a misconfiguration rather
+			// than a local endpoint. parsigo is self-hosted by definition and
+			// has no authentication of its own.
+			if p.Type != "openai" && p.Type != "parsigo" {
 				warnings = append(warnings, fmt.Sprintf("provider %q disabled: %q providers require an api_key_env", name, p.Type))
 				continue
 			}
@@ -489,6 +491,10 @@ func newAdapter(name string, p ProviderConfig, apiKey string) (provider.Adapter,
 		// adapter rather than an image one because what comes back is a hosted
 		// URL. See the adapter.
 		return provider.NewGammaAdapter(name, p.BaseURL, apiKey), ""
+	case "parsigo":
+		// پارسی‌گو (github.com/nimaone/persian_tts) — Persian text to speech,
+		// self-hosted and keyless, so the base_url is the whole address of it.
+		return provider.NewParsigoAdapter(name, p.BaseURL), ""
 	case "typesafe":
 		// TypeSafe AI (typesafe.ai) — System One structured decision models (Jev).
 		// Primitives: Noul (yes/no probability), Choice, Score.
