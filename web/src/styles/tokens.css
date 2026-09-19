@@ -57,7 +57,13 @@
   /* Shape */
   --ng-radius-sm: 6px;
   --ng-radius: 12px;
+  /* Panels want a softer corner than the controls sitting inside them; sharing
+     one radius with the buttons made the cards read as oversized buttons. */
+  --ng-radius-lg: 16px;
   --ng-radius-pill: 999px;
+
+  /* How wide the reading column is allowed to get, however wide the monitor. */
+  --ng-content-max: 1400px;
 
   /* Elevation */
   --ng-shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.3);

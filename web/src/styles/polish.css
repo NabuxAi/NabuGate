@@ -247,6 +247,73 @@
 .main.scrolled .topbar { box-shadow: 0 1px 0 var(--ng-border); }
 .sidebar { backdrop-filter: blur(18px) saturate(160%); -webkit-backdrop-filter: blur(18px) saturate(160%); }
 
+/* ════════════════ Console shell: measure, depth and the active rail ═════════ */
+
+/* The console took whatever width the monitor gave it, so a two-column row on a
+   wide screen threw its cards against opposite edges with dead space between
+   them. Capping through padding rather than max-width keeps the topbar's edge
+   and the sidebar full-bleed while the reading column stays legible. Guarded by
+   the breakpoint so the phone padding set below still wins. */
+@media (min-width: 721px) {
+  .topbar,
+  .content {
+    padding-inline: max(24px, (100% - var(--ng-content-max)) / 2);
+  }
+}
+
+/* Cards carried a button's 12px radius and 16px of padding, which reads as
+   cramped around their own 26px KPI numbers. */
+.card {
+  border-radius: var(--ng-radius-lg);
+  padding: 20px 22px;
+}
+.card-head { margin-bottom: 14px; }
+.stat {
+  border-radius: var(--ng-radius-lg);
+  padding: 16px 18px;
+}
+
+/* The current section was a tint and nothing else. A rail on the reading edge
+   of the item holds the eye where the tint is too quiet to. */
+.nav-item { position: relative; }
+.nav-item.active::before {
+  content: '';
+  position: absolute;
+  inset-block: 7px;
+  inset-inline-start: 0;
+  width: 3px;
+  border-radius: var(--ng-radius-pill);
+  background: var(--ng-accent);
+}
+
+/* Rows were separated by a hairline and nothing more, on tables that are almost
+   entirely numbers — nothing held the row the pointer was on. */
+.tbl thead th {
+  padding: 10px;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ng-subtle);
+}
+.tbl tbody td { padding: 11px 10px; }
+.tbl tbody tr { transition: background var(--ng-dur) var(--ng-ease); }
+.tbl tbody tr:hover { background: var(--ng-faint); }
+
+/* An address is one unbreakable token, and the KPI tile it sits in is only
+   220px wide at its narrowest — it used to run straight out of the card. */
+.kpi .kpi-value { overflow-wrap: anywhere; min-width: 0; }
+
+/* The amount, its unit and the button belong on one line, with the button
+   taking whatever is left rather than being stranded beside a 110px field. */
+.pay-form {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.pay-form .input { width: 110px; flex: 0 0 auto; }
+.pay-form .btn-primary { flex: 1 1 auto; min-width: 140px; }
+
 /* ---- Topbar: mobile menu button ---- */
 .menu-btn {
   display: none; width: 38px; height: 38px; border-radius: 10px; border: 1px solid var(--ng-border-card);
