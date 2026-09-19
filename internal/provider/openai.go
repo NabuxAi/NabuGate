@@ -230,6 +230,7 @@ func (a *OpenAIAdapter) ChatStream(ctx context.Context, req ChatRequest, onDelta
 	defer resp.Body.Close()
 
 	var usage Usage
+	var outputBytes int
 	err = readSSE(resp.Body, func(data []byte) (bool, error) {
 		var chunk struct {
 			Choices []struct {
@@ -248,6 +249,7 @@ func (a *OpenAIAdapter) ChatStream(ctx context.Context, req ChatRequest, onDelta
 		}
 		for _, c := range chunk.Choices {
 			if c.Delta.Content != "" {
+				outputBytes += len(c.Delta.Content)
 				if err := onDelta(c.Delta.Content); err != nil {
 					return true, err
 				}
@@ -262,6 +264,26 @@ func (a *OpenAIAdapter) ChatStream(ctx context.Context, req ChatRequest, onDelta
 		}
 		return false, nil
 	})
+
+	if usage.TotalTokens == 0 {
+		var promptBytes int
+		for _, m := range req.Messages {
+			promptBytes += len(m.Content) + len(m.Role) + 4
+		}
+		pTok := (promptBytes + 3) / 4
+		if pTok < 1 && promptBytes > 0 {
+			pTok = 1
+		}
+		cTok := (outputBytes + 3) / 4
+		if cTok < 1 && outputBytes > 0 {
+			cTok = 1
+		}
+		usage = Usage{
+			PromptTokens:     pTok,
+			CompletionTokens: cTok,
+			TotalTokens:      pTok + cTok,
+		}
+	}
 	return usage, err
 }
 
