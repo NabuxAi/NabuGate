@@ -549,6 +549,20 @@ providers:
       - "deepseek-chat"
       - "deepseek-reasoner"
 
+  # TypeSafe AI (typesafe.ai) — System One structured decision models (Jev).
+  # Primitives: Noul (calibrated yes/no probability), Choice (categorical selection),
+  # and Score (rubric position). Input $0.042 / 1M tokens, free output tokens.
+  # Skipped automatically when TYPESAFE_API_KEY is unset.
+  typesafe:
+    enabled: true
+    type: typesafe
+    base_url: "https://api.typesafe.ai/v1"
+    api_key_env: "TYPESAFE_API_KEY"
+    passthrough: true
+    models:
+      - "jev-latest"
+      - "jev-1.13.0"
+
   # Perplexity — answers grounded in a live search, with citations. Sonar has no
   # /v1/models, so its catalogue is a static list the way Cloudflare's is.
   perplexity:
@@ -1793,6 +1807,17 @@ embeddings:
       provider: gemini
       model: "gemini-embedding-2-preview"
 
+# Structured decision aliases (TypeSafe / System One / Decisions).
+# Evaluated via POST /v1/systemone or POST /v1/decisions.
+decisions:
+  nabu-decision:
+    primary:
+      provider: typesafe
+      model: "jev-latest"
+    fallback:
+      - provider: openrouter
+        model: "typesafe/jev-latest"
+
 # Sub-agents (system prompt + defaults over an alias, addressable as a "model").
 # The Cinematic Scrollytelling squad ships as one YAML file per agent under
 # /app/agents in the image (./agents in the repo). Add your own inline under an
@@ -1820,6 +1845,11 @@ pricing:
   # Tiered billing applies — longer contexts cost more (see DashScope docs).
   "dashscope/qwen3-coder-plus": { input: 0.55, output: 2.20 }
   "dashscope/qwen3-coder-next": { input: 0.15, output: 0.55 }
+  # TypeSafe Jev (System One): $0.042 per 1M input tokens, free output tokens.
+  "typesafe/jev-latest": { input: 0.042, output: 0 }
+  "typesafe/jev-1.13.0": { input: 0.042, output: 0 }
+  "openrouter/typesafe/jev-latest": { input: 0.042, output: 0 }
+  "openrouter/typesafe/jev-1.13": { input: 0.042, output: 0 }
 
 # Subscriptions: buying the right to spend *this gateway's* vendor keys.
 #
