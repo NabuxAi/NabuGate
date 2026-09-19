@@ -51,11 +51,18 @@ const (
 	CapVideo      = "video"
 	CapDocs       = "documents"
 	CapPhotos     = "photos"
+	CapDecisions  = "decisions"
 )
 
 // catalogue is keyed by the config's provider name. Icon paths are the vendors'
 // own marks, drawn on a 24x24 viewBox.
 var catalogue = map[string]Vendor{
+	"typesafe": {
+		Label: "TypeSafe AI", Blurb: "مدل‌های System 1 (Jev) — ارزیابی سریع، قطعی و ساختاریافته برای گاردریل‌ها و تصمیم‌گیری اتوماسیون.",
+		Capabilities: []string{CapChat, CapDecisions},
+		Site:         "https://typesafe.ai", KeysURL: "https://typesafe.ai",
+		Color: "#059669",
+	},
 	"openai": {
 		Label: "OpenAI", Blurb: "GPT، Whisper و DALL·E — مرجعِ همان wire format که این دروازه صحبت می‌کند.",
 		Capabilities: []string{CapChat, CapImage, CapSpeech, CapTranscribe, CapEmbed},

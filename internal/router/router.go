@@ -56,6 +56,7 @@ type Router struct {
 	transcription map[string]config.ModelRoute
 	embeddings    map[string]config.ModelRoute
 	live          map[string]config.ModelRoute
+	decisions     map[string]config.ModelRoute
 	log           *slog.Logger
 
 	// liveProblems are live aliases refused on purpose (SetLiveProblems);
@@ -224,6 +225,13 @@ func (r *Router) expand(t config.Target) []config.Target {
 // and a bare registry model name resolves to every provider serving it.
 func (r *Router) resolveChatTargets(model string) ([]config.Target, bool) {
 	if route, ok := r.models[model]; ok {
+		var out []config.Target
+		for _, t := range append([]config.Target{route.Primary}, route.Fallback...) {
+			out = append(out, r.expand(t)...)
+		}
+		return out, len(out) > 0
+	}
+	if route, ok := r.decisions[model]; ok {
 		var out []config.Target
 		for _, t := range append([]config.Target{route.Primary}, route.Fallback...) {
 			out = append(out, r.expand(t)...)
@@ -656,6 +664,7 @@ func (r *Router) AliasInfos() []AliasInfo {
 	add(r.images)
 	add(r.audio)
 	add(r.embeddings)
+	add(r.decisions)
 	// Live aliases list like the rest — a caller deciding whether it can place
 	// a voice call reads this — except one refused for want of a price, which
 	// would be offered and then answer 503 every time.
