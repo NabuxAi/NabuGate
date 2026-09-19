@@ -184,6 +184,78 @@ func (a *OpenAIAdapter) Embed(ctx context.Context, req EmbeddingRequest) (Embedd
 	}, nil
 }
 
+// Decide implements DecisionAdapter for OpenAI-wire providers that support
+// structured decision models (e.g. OpenRouter /alpha/decisions for Jev).
+func (a *OpenAIAdapter) Decide(ctx context.Context, req DecisionRequest) (DecisionResponse, error) {
+	bodyMap := map[string]any{
+		"model":     req.Model,
+		"state":     req.State,
+		"questions": req.Questions,
+	}
+	body, err := json.Marshal(bodyMap)
+	if err != nil {
+		return DecisionResponse{}, err
+	}
+
+	url := a.baseURL + "/alpha/decisions"
+	if strings.HasSuffix(a.baseURL, "/v1") {
+		url = strings.TrimSuffix(a.baseURL, "/v1") + "/alpha/decisions"
+	}
+
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))
+	if err != nil {
+		return DecisionResponse{}, err
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+	httpReq.Header.Set("Authorization", "Bearer "+a.apiKey)
+	for k, v := range a.extraHeaders {
+		httpReq.Header.Set(k, v)
+	}
+	resp, err := sharedHTTPClient.Do(httpReq)
+	if err != nil {
+		return DecisionResponse{}, fmt.Errorf("%s: decisions request failed: %w", a.name, err)
+	}
+	defer resp.Body.Close()
+	raw, _ := io.ReadAll(resp.Body)
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return DecisionResponse{}, fmt.Errorf("%s: upstream decisions error (status %d): %s", a.name, resp.StatusCode, string(raw))
+	}
+
+	var parsed struct {
+		Model   string          `json:"model"`
+		Answers json.RawMessage `json:"answers"`
+		Usage   struct {
+			InputTokens      int `json:"input_tokens"`
+			OutputTokens     int `json:"output_tokens"`
+			PromptTokens     int `json:"prompt_tokens"`
+			CompletionTokens int `json:"completion_tokens"`
+		} `json:"usage"`
+	}
+	if err := json.Unmarshal(raw, &parsed); err != nil {
+		return DecisionResponse{}, fmt.Errorf("%s: invalid decisions response: %w", a.name, err)
+	}
+
+	inp := parsed.Usage.InputTokens
+	if inp == 0 {
+		inp = parsed.Usage.PromptTokens
+	}
+	out := parsed.Usage.OutputTokens
+	if out == 0 {
+		out = parsed.Usage.CompletionTokens
+	}
+
+	return DecisionResponse{
+		Model:   parsed.Model,
+		Answers: parsed.Answers,
+		Usage: Usage{
+			PromptTokens:     inp,
+			CompletionTokens: out,
+			TotalTokens:      inp + out,
+		},
+	}, nil
+}
+
 // postJSON is a small helper for JSON POSTs that return JSON, used by media
 // endpoints. It returns the raw body and HTTP status.
 func (a *OpenAIAdapter) postJSON(ctx context.Context, path string, payload any) ([]byte, int, error) {

@@ -37,6 +37,8 @@ type Config struct {
 	// with different upstream models, and one alias cannot serve both.
 	Transcription map[string]ModelRoute `yaml:"transcription"`
 	Embeddings    map[string]ModelRoute `yaml:"embeddings"` // text-embedding aliases
+	// Decisions are structured decision aliases (TypeSafe / System One / Decisions).
+	Decisions map[string]ModelRoute `yaml:"decisions"`
 	// Live is realtime full-duplex voice (GPT-Live): the browser speaks to the
 	// vendor over WebRTC and the gateway does the signalling. Billed per
 	// minute (usage.Price.PerMinute), not per token.
@@ -487,6 +489,14 @@ func newAdapter(name string, p ProviderConfig, apiKey string) (provider.Adapter,
 		// adapter rather than an image one because what comes back is a hosted
 		// URL. See the adapter.
 		return provider.NewGammaAdapter(name, p.BaseURL, apiKey), ""
+	case "typesafe":
+		// TypeSafe AI (typesafe.ai) — System One structured decision models (Jev).
+		// Primitives: Noul (yes/no probability), Choice, Score.
+		baseURL := p.BaseURL
+		if strings.TrimSpace(baseURL) == "" {
+			baseURL = "https://api.typesafe.ai/v1"
+		}
+		return provider.NewTypeSafeAdapter(name, baseURL, apiKey), ""
 	default:
 		return nil, fmt.Sprintf("provider %q has unknown type %q", name, p.Type)
 	}

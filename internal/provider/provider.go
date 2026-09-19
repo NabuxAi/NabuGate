@@ -178,6 +178,25 @@ type EmbeddingAdapter interface {
 	Embed(ctx context.Context, req EmbeddingRequest) (EmbeddingResponse, error)
 }
 
+// DecisionRequest is a provider-agnostic structured decision request (TypeSafe / System One / Decisions).
+type DecisionRequest struct {
+	Model     string          `json:"model"`
+	State     json.RawMessage `json:"state"`
+	Questions json.RawMessage `json:"questions"`
+}
+
+// DecisionResponse is the normalized structured decision response.
+type DecisionResponse struct {
+	Model   string          `json:"model"`
+	Answers json.RawMessage `json:"answers"`
+	Usage   Usage           `json:"usage"`
+}
+
+// DecisionAdapter is implemented by providers that can evaluate structured decisions.
+type DecisionAdapter interface {
+	Decide(ctx context.Context, req DecisionRequest) (DecisionResponse, error)
+}
+
 // ModelLister is implemented by providers that can enumerate their available
 // models (the OpenAI-wire GET /v1/models endpoint). Aggregator providers such
 // as Parspack, OpenRouter, Groq and Dahl expose dozens of models this way, so

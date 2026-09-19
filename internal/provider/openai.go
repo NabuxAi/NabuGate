@@ -147,6 +147,15 @@ func (a *OpenAIAdapter) headers() map[string]string {
 }
 
 func (a *OpenAIAdapter) Chat(ctx context.Context, req ChatRequest) (ChatResponse, error) {
+	if strings.Contains(req.Model, "typesafe/jev") || strings.HasPrefix(req.Model, "typesafe/") {
+		decReq, originalPrompt := buildDecisionRequestFromChat(req.Model, req)
+		decResp, err := a.Decide(ctx, decReq)
+		if err != nil {
+			return ChatResponse{}, err
+		}
+		return formatDecisionChatResponse(decResp, originalPrompt), nil
+	}
+
 	body, err := a.buildBody(req, false)
 	if err != nil {
 		return ChatResponse{}, err
@@ -189,6 +198,17 @@ func (a *OpenAIAdapter) Chat(ctx context.Context, req ChatRequest) (ChatResponse
 // request body is forwarded (so tools/response_format/etc. still apply); only
 // content deltas are surfaced through onDelta.
 func (a *OpenAIAdapter) ChatStream(ctx context.Context, req ChatRequest, onDelta DeltaFunc) (Usage, error) {
+	if strings.Contains(req.Model, "typesafe/jev") || strings.HasPrefix(req.Model, "typesafe/") {
+		resp, err := a.Chat(ctx, req)
+		if err != nil {
+			return Usage{}, err
+		}
+		if err := streamTextChunks(resp.Content, onDelta); err != nil {
+			return resp.Usage, err
+		}
+		return resp.Usage, nil
+	}
+
 	body, err := a.buildBody(req, true)
 	if err != nil {
 		return Usage{}, err

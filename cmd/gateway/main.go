@@ -77,6 +77,7 @@ func main() {
 	r.SetCallerAdapter(cfg.CallerAdapter)
 	r.SetRegistry(cfg.Registry)
 	r.SetLive(cfg.Live)
+	r.SetDecisions(cfg.Decisions)
 	// Checked before the first call, because no call would ever report it: a
 	// live alias with no per-minute price connects fine and bills nothing. The
 	// alias is refused alone; everything else keeps serving.
