@@ -502,6 +502,19 @@ providers:
   # ElevenLabs — text to speech only. Authenticates with xi-api-key and puts the
   # voice id in the URL, so it needs its own adapter rather than the openai one.
   # The key already exists in BIKO's environment; set the same value here.
+  # پارسی‌گو (github.com/nimaone/persian_tts) — Persian text to speech, run on
+  # this deployment's own machine. No key and no vendor: the base_url is the
+  # whole address of it, so it belongs on a private network, never on a public
+  # one. Skipped automatically when PARSIGO_BASE_URL is unset.
+  #
+  # It answers WAV only, and takes a reference recording as the "voice"
+  # ("female_narration", "male_hello", "male_news", or "upload:<name>.wav" for
+  # one cloned through its own web UI).
+  parsigo:
+    enabled: true
+    type: parsigo
+    base_url: "${PARSIGO_BASE_URL}"
+
   elevenlabs:
     enabled: true
     type: elevenlabs
@@ -1388,6 +1401,16 @@ audio:
       - provider: gemini
         model: "gemini-2.5-flash-preview-tts"
 
+  # Persian, spoken on our own machine. Nothing about the text leaves the
+  # network it is hosted on and no minute of it is billed abroad — which is the
+  # reason to prefer it for Persian over a vendor that charges per character.
+  # No fallback: a rung at a vendor would quietly send the text off-network,
+  # and a caller who chose this alias chose that it must not.
+  nabu-voice-fa-local:
+    primary:
+      provider: parsigo
+      model: "pocket-tts-farsi-v2"
+
   # Narration voice. ElevenLabs first because it is the one that sounds like a
   # person reading rather than a model speaking, which is the whole point for a
   # lesson someone listens to for two minutes. Falls back across two other
@@ -1849,7 +1872,11 @@ pricing:
   "typesafe/jev-latest": { input: 0.042, output: 0 }
   "typesafe/jev-1.13.0": { input: 0.042, output: 0 }
   "openrouter/typesafe/jev-latest": { input: 0.042, output: 0 }
-  "openrouter/typesafe/jev-1.13": { input: 0.042, output: 0 }
+  "openrouter/typesafe/jev-1.13.0": { input: 0.042, output: 0 }
+  # Every Jev version at the same price, because the provider is passthrough:
+  # a caller may name a version released after this file was written, and an
+  # unpriced call is billed at nothing rather than refused.
+  "typesafe/*": { input: 0.042, output: 0 }
 
 # Subscriptions: buying the right to spend *this gateway's* vendor keys.
 #

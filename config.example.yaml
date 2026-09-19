@@ -275,6 +275,19 @@ providers:
     base_url: "${LLAMACPP_BASE_URL}"
     passthrough: true
 
+  # پارسی‌گو (github.com/nimaone/persian_tts) — Persian text to speech, run on
+  # this deployment's own machine. No key and no vendor: the base_url is the
+  # whole address of it, so it belongs on a private network, never on a public
+  # one. Skipped automatically when PARSIGO_BASE_URL is unset.
+  #
+  # It answers WAV only, and takes a reference recording as the "voice"
+  # ("female_narration", "male_hello", "male_news", or "upload:<name>.wav" for
+  # one cloned through its own web UI).
+  parsigo:
+    enabled: true
+    type: parsigo
+    base_url: "${PARSIGO_BASE_URL}"
+
   # TypeSafe AI (typesafe.ai) — System One structured decision models (Jev).
   # Primitives: Noul (calibrated yes/no probability), Choice (categorical selection),
   # and Score (rubric position). Input $0.042 / 1M tokens, free output tokens.
@@ -532,6 +545,15 @@ audio:
       - provider: gemini
         model: "gemini-2.5-flash-preview-tts"
 
+  # Persian, spoken on our own machine. Nothing about the text leaves the
+  # network it is hosted on and no minute of it is billed abroad. No fallback:
+  # a rung at a vendor would quietly send the text off-network, and a caller
+  # who chose this alias chose that it must not.
+  nabu-voice-fa-local:
+    primary:
+      provider: parsigo
+      model: "pocket-tts-farsi-v2"
+
 # Embedding aliases.
 #
 # The OpenAI-wire "dimensions" parameter is forwarded to the provider: OpenAI
@@ -636,7 +658,11 @@ pricing:
   "typesafe/jev-latest": { input: 0.042, output: 0 }
   "typesafe/jev-1.13.0": { input: 0.042, output: 0 }
   "openrouter/typesafe/jev-latest": { input: 0.042, output: 0 }
-  "openrouter/typesafe/jev-1.13": { input: 0.042, output: 0 }
+  "openrouter/typesafe/jev-1.13.0": { input: 0.042, output: 0 }
+  # Every Jev version at the same price, because the provider is passthrough:
+  # a caller may name a version released after this file was written, and an
+  # unpriced call is billed at nothing rather than refused.
+  "typesafe/*": { input: 0.042, output: 0 }
 
   # --- Requested Fictional Models ---
   claude-3-5-haiku-latest:

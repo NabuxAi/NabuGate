@@ -57,6 +57,12 @@ const (
 // catalogue is keyed by the config's provider name. Icon paths are the vendors'
 // own marks, drawn on a 24x24 viewBox.
 var catalogue = map[string]Vendor{
+	"parsigo": {
+		Label: "پارسی‌گو", Blurb: "تبدیل متنِ فارسی به گفتار با کلونینگِ صدا — روی سرورِ خودمان، بدون کلید و بدون اینکه متن جایی برود.",
+		Capabilities: []string{CapSpeech},
+		Site:         "https://github.com/nimaone/persian_tts", KeysURL: "https://github.com/nimaone/persian_tts",
+		Color: "#7c3aed",
+	},
 	"typesafe": {
 		Label: "TypeSafe AI", Blurb: "مدل‌های System 1 (Jev) — ارزیابی سریع، قطعی و ساختاریافته برای گاردریل‌ها و تصمیم‌گیری اتوماسیون.",
 		Capabilities: []string{CapChat, CapDecisions},
