@@ -128,8 +128,8 @@ export default function Account() {
               <button key={a} type="button" className={'chip' + (Number(amount) === a ? ' active' : '')} onClick={() => setAmount(a)} dir="ltr">{usd(a)}</button>
             ))}
           </div>
-          <form onSubmit={(e) => { e.preventDefault(); payment.pay(amount); }} style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-            <input type="number" className="input" value={amount} onChange={(e) => setAmount(e.target.value)} min="1" max="5000" step="1" style={{ width: 110 }} dir="ltr" />
+          <form className="pay-form" onSubmit={(e) => { e.preventDefault(); payment.pay(amount); }}>
+            <input type="number" className="input" value={amount} onChange={(e) => setAmount(e.target.value)} min="1" max="5000" step="1" dir="ltr" />
             <span className="muted" style={{ fontSize: 13 }}>دلار</span>
             <button className="btn btn-primary" disabled={payment.busy || Number(amount) < 1}>
               {payment.busy ? 'در حال انتقال به درگاه…' : 'پرداخت'}

@@ -30,7 +30,7 @@ button { font-family: inherit; }
 /* ---- App shell ---- */
 .app {
   display: flex;
-  min-height: 100vh;
+  min-height: 100dvh;
   background: var(--ng-bg-veil), var(--ng-bg);
 }
 
@@ -39,14 +39,18 @@ button { font-family: inherit; }
   width: var(--ng-sidebar-w);
   flex: 0 0 auto;
   background: var(--ng-surface);
-  border-inline-start: 1px solid var(--ng-border);
+  /* The sidebar is the first flex child, so the content column always sits on
+     its inline-end side — that is the edge the rule has to be drawn on. On
+     inline-start it was painted against the outer edge of the window, where
+     there is nothing to divide, and the console showed no seam at all. */
+  border-inline-end: 1px solid var(--ng-border);
   display: flex;
   flex-direction: column;
   padding: 18px 14px;
   gap: 16px;
   position: sticky;
   top: 0;
-  height: 100vh;
+  height: 100dvh;
 }
 
 .brand {
