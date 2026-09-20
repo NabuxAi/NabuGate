@@ -32,6 +32,11 @@ type openAITranscription struct {
 		End   float64 `json:"end"`
 		Text  string  `json:"text"`
 	} `json:"segments"`
+	Words []struct {
+		Word  string  `json:"word"`
+		Start float64 `json:"start"`
+		End   float64 `json:"end"`
+	} `json:"words"`
 	Usage struct {
 		InputTokens  int `json:"input_tokens"`
 		OutputTokens int `json:"output_tokens"`
@@ -160,11 +165,20 @@ func (a *OpenAIAdapter) Transcribe(ctx context.Context, req TranscriptionRequest
 			ID: s.ID, Start: s.Start, End: s.End, Text: strings.TrimSpace(s.Text),
 		})
 	}
+	// Word timings arrive only when the caller asked for them, and they are not
+	// derivable from segments, so carry them through rather than flattening.
+	for _, w := range parsed.Words {
+		word := strings.TrimSpace(w.Word)
+		if word == "" {
+			continue
+		}
+		out.Words = append(out.Words, TranscriptionWord{Word: word, Start: w.Start, End: w.End})
+	}
 
 	// An empty transcript is a failure, not a silent file. Treating it as
 	// success lets a broken upstream quietly erase a caller's archive one item
 	// at a time, and the router can only fail over if this says so.
-	if out.Text == "" && len(out.Segments) == 0 {
+	if out.Text == "" && len(out.Segments) == 0 && len(out.Words) == 0 {
 		return TranscriptionResponse{}, fmt.Errorf("%s: empty transcription", a.name)
 	}
 	return out, nil

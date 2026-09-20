@@ -121,6 +121,9 @@ func (a *ElevenLabsAdapter) Transcribe(ctx context.Context, req TranscriptionReq
 		if w.Type != "word" {
 			continue
 		}
+		if text := strings.TrimSpace(w.Text); text != "" {
+			out.Words = append(out.Words, TranscriptionWord{Word: text, Start: w.Start, End: w.End})
+		}
 		if cur == nil || w.SpeakerID != speaker {
 			out.Segments = append(out.Segments, TranscriptionSegment{
 				ID: len(out.Segments), Start: w.Start, End: w.End, Text: w.Text,

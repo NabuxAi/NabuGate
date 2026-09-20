@@ -142,6 +142,13 @@ func (a *AssemblyAIAdapter) Transcribe(ctx context.Context, req TranscriptionReq
 			})
 		}
 	}
+	for _, w := range final.Words {
+		word := strings.TrimSpace(w.Text)
+		if word == "" {
+			continue
+		}
+		out.Words = append(out.Words, TranscriptionWord{Word: word, Start: msToSeconds(w.Start), End: msToSeconds(w.End)})
+	}
 
 	if out.Text == "" && len(out.Segments) == 0 {
 		return TranscriptionResponse{}, fmt.Errorf("%s: empty transcription", a.name)

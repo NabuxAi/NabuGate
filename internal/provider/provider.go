@@ -141,13 +141,26 @@ type TranscriptionSegment struct {
 	Text  string  `json:"text"`
 }
 
-// TranscriptionResponse is the normalized result. Duration and Segments are
-// zero when the upstream returned a plain-text format.
+// TranscriptionWord is one timed word. Several providers already return these
+// and they are not interchangeable with segments: a caller checking that a
+// specific word was spoken at a specific moment - a spoken challenge, a
+// pronunciation drill, a caption aligned to a syllable - needs the word's own
+// boundaries, and the sentence it sits in cannot supply them.
+type TranscriptionWord struct {
+	Word  string  `json:"word"`
+	Start float64 `json:"start"` // seconds
+	End   float64 `json:"end"`   // seconds
+}
+
+// TranscriptionResponse is the normalized result. Duration, Segments and Words
+// are zero when the upstream returned a plain-text format. Words is populated
+// only when the caller asked for word granularity and the upstream honoured it.
 type TranscriptionResponse struct {
 	Text     string
 	Language string
 	Duration float64
 	Segments []TranscriptionSegment
+	Words    []TranscriptionWord
 	Usage    Usage
 }
 

@@ -126,5 +126,20 @@ func (s *Server) handleTranscription(w http.ResponseWriter, r *http.Request) {
 		}
 		out["segments"] = segments
 	}
+	// A word-level caller cannot rebuild these from segments, so emit them
+	// whenever the upstream supplied them, in OpenAI's own shape.
+	if len(result.Words) > 0 {
+		words := make([]map[string]any, 0, len(result.Words))
+		for _, word := range result.Words {
+			words = append(words, map[string]any{
+				"word": word.Word, "start": word.Start, "end": word.End,
+			})
+		}
+		out["words"] = words
+		if _, ok := out["language"]; !ok {
+			out["language"] = result.Language
+			out["duration"] = result.Duration
+		}
+	}
 	writeJSON(w, http.StatusOK, out)
 }

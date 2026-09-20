@@ -843,6 +843,7 @@ type TranscribeResult struct {
 	Language string
 	Duration float64
 	Segments []provider.TranscriptionSegment
+	Words    []provider.TranscriptionWord
 	Usage    provider.Usage
 }
 
@@ -886,11 +887,11 @@ func (r *Router) Transcribe(ctx context.Context, alias string, req provider.Tran
 			continue
 		}
 		recordKeySource(ctx, t.caller)
-		r.log.Info("upstream ok", append(attrs, "chars", len(resp.Text), "segments", len(resp.Segments), "audio_seconds", resp.Duration)...)
+		r.log.Info("upstream ok", append(attrs, "chars", len(resp.Text), "segments", len(resp.Segments), "words", len(resp.Words), "audio_seconds", resp.Duration)...)
 		return TranscribeResult{
 			Alias: alias, Provider: t.Provider, Model: t.Model,
 			Text: resp.Text, Language: resp.Language, Duration: resp.Duration,
-			Segments: resp.Segments, Usage: resp.Usage,
+			Segments: resp.Segments, Words: resp.Words, Usage: resp.Usage,
 		}, nil
 	}
 	return TranscribeResult{}, failures.err("transcription", alias)

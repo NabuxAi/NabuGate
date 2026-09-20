@@ -164,6 +164,9 @@ func (a *DeepgramAdapter) Transcribe(ctx context.Context, req TranscriptionReque
 		if text == "" {
 			text = w.Word
 		}
+		if text != "" {
+			out.Words = append(out.Words, TranscriptionWord{Word: text, Start: w.Start, End: w.End})
+		}
 		who := -1
 		if w.Speaker != nil {
 			who = *w.Speaker
