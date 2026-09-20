@@ -6,9 +6,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"mime/multipart"
 	"net/http"
 	"regexp"
 	"strings"
+	"time"
 )
 
 // LiveSessionRequest is the body of a realtime voice session creation, carried
@@ -57,19 +59,96 @@ func (e *LiveUpstreamError) Error() string {
 // is a few kilobytes; anything near this is not one.
 const maxLiveAnswerBytes = 1 << 20
 
-// CreateLiveSession implements LiveAdapter over OpenAI's POST /live/sessions.
+// CreateLiveSession implements LiveAdapter over OpenAI's realtime calls API.
 func (a *OpenAIAdapter) CreateLiveSession(ctx context.Context, req LiveSessionRequest) (LiveSessionResponse, error) {
+	var incoming struct {
+		Model     string          `json:"model"`
+		Session   json.RawMessage `json:"session"`
+		Transport struct {
+			Type string `json:"type"`
+			SDP  string `json:"sdp"`
+		} `json:"transport"`
+		SDP string `json:"sdp"`
+	}
+	_ = json.Unmarshal(req.Body, &incoming)
+
+	sdp := incoming.Transport.SDP
+	if sdp == "" {
+		sdp = incoming.SDP
+	}
+
+	sessionMap := make(map[string]any)
+	if len(incoming.Session) > 0 {
+		_ = json.Unmarshal(incoming.Session, &sessionMap)
+	}
+	sessionMap["model"] = req.Model
+	sessionJSON, _ := json.Marshal(sessionMap)
+
+	// If an SDP offer is present, try OpenAI's GA WebRTC endpoint: POST /realtime/calls with multipart/form-data
+	if sdp != "" {
+		var formBody bytes.Buffer
+		mw := multipart.NewWriter(&formBody)
+		_ = mw.WriteField("sdp", sdp)
+		_ = mw.WriteField("session", string(sessionJSON))
+		_ = mw.Close()
+
+		headers := a.headers()
+		headers["Content-Type"] = mw.FormDataContentType()
+
+		status, respHeader, raw, err := postRequestOnce(ctx, a.baseURL+"/realtime/calls", headers, formBody.Bytes())
+		if err == nil && status >= 200 && status < 300 {
+			callID := extractCallID(respHeader.Get("Location"), raw)
+			sdpAnswer := string(raw)
+
+			if bytes.HasPrefix(bytes.TrimSpace(raw), []byte("{")) {
+				var parsed struct {
+					ID        string `json:"id"`
+					SDP       string `json:"sdp"`
+					Session   struct {
+						ID string `json:"id"`
+					} `json:"session"`
+					Transport struct {
+						SDP string `json:"sdp"`
+					} `json:"transport"`
+				}
+				if json.Unmarshal(raw, &parsed) == nil {
+					if parsed.ID != "" {
+						callID = parsed.ID
+					} else if parsed.Session.ID != "" {
+						callID = parsed.Session.ID
+					}
+					if parsed.Transport.SDP != "" {
+						sdpAnswer = parsed.Transport.SDP
+					} else if parsed.SDP != "" {
+						sdpAnswer = parsed.SDP
+					}
+				}
+			}
+
+			respJSON, _ := json.Marshal(map[string]any{
+				"id": callID,
+				"session": map[string]any{
+					"id": callID,
+				},
+				"transport": map[string]any{
+					"type": "webrtc",
+					"sdp":  sdpAnswer,
+				},
+			})
+			return LiveSessionResponse{ID: callID, Body: respJSON}, nil
+		}
+
+		if err == nil && status != http.StatusNotFound && status != http.StatusMethodNotAllowed {
+			return LiveSessionResponse{}, &LiveUpstreamError{Status: status, Message: vendorErrorMessage(raw)}
+		}
+	}
+
+	// Fallback path: legacy JSON POST to /realtime/sessions (used by test mocks or older proxies)
 	body, err := rewriteLiveModel(req.Body, req.Model)
 	if err != nil {
 		return LiveSessionResponse{}, err
 	}
-	// Exactly one attempt. A create whose answer was lost — a 5xx after the
-	// vendor had already opened the session, a connection cut mid-response —
-	// leaves a session running on the vendor's clock. Replaying the offer opens
-	// a second one and nothing ever closes the first, so the retries every
-	// other endpoint gets would be billed here. The browser retries the whole
-	// call instead, with a fresh offer.
-	status, raw, err := postJSONOnce(ctx, a.baseURL+"/realtime/sessions", a.headers(), body)
+	status, _, raw, err := postRequestOnce(ctx, a.baseURL+"/realtime/sessions", a.headers(), body)
 	if err != nil {
 		return LiveSessionResponse{}, fmt.Errorf("live session request failed: %w", err)
 	}
@@ -93,26 +172,59 @@ func (a *OpenAIAdapter) CreateLiveSession(ctx context.Context, req LiveSessionRe
 	return LiveSessionResponse{ID: id, Body: raw}, nil
 }
 
-// postJSONOnce is postJSON without the retries, for the one call whose replay
-// is not safe: opening something the vendor bills by the second.
-func postJSONOnce(ctx context.Context, url string, headers map[string]string, body []byte) (int, []byte, error) {
+func extractCallID(location string, raw []byte) string {
+	if location != "" {
+		parts := strings.Split(strings.Trim(location, "/"), "/")
+		if len(parts) > 0 && parts[len(parts)-1] != "" {
+			return parts[len(parts)-1]
+		}
+	}
+	var parsed struct {
+		ID      string `json:"id"`
+		CallID  string `json:"call_id"`
+		Session struct {
+			ID string `json:"id"`
+		} `json:"session"`
+	}
+	if json.Unmarshal(raw, &parsed) == nil {
+		if parsed.CallID != "" {
+			return parsed.CallID
+		}
+		if parsed.Session.ID != "" {
+			return parsed.Session.ID
+		}
+		if parsed.ID != "" {
+			return parsed.ID
+		}
+	}
+	return fmt.Sprintf("call_%d", time.Now().UnixNano())
+}
+
+// postRequestOnce is an HTTP POST without retries, returning status, headers and body.
+func postRequestOnce(ctx context.Context, url string, headers map[string]string, body []byte) (int, http.Header, []byte, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))
 	if err != nil {
-		return 0, nil, err
+		return 0, nil, nil, err
 	}
 	for k, v := range headers {
 		req.Header.Set(k, v)
 	}
 	resp, err := sharedHTTPClient.Do(req)
 	if err != nil {
-		return 0, nil, err
+		return 0, nil, nil, err
 	}
 	defer resp.Body.Close()
 	raw, err := io.ReadAll(io.LimitReader(resp.Body, maxLiveAnswerBytes))
 	if err != nil {
-		return resp.StatusCode, nil, err
+		return resp.StatusCode, resp.Header, nil, err
 	}
-	return resp.StatusCode, raw, nil
+	return resp.StatusCode, resp.Header, raw, nil
+}
+
+// postJSONOnce is postJSON without the retries, for callers expecting (int, []byte, error).
+func postJSONOnce(ctx context.Context, url string, headers map[string]string, body []byte) (int, []byte, error) {
+	status, _, raw, err := postRequestOnce(ctx, url, headers, body)
+	return status, raw, err
 }
 
 // credentialShaped matches what in an error body could be a secret: an

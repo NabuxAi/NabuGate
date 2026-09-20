@@ -3,6 +3,7 @@ package provider
 import (
 	"encoding/json"
 	"fmt"
+	"sort"
 	"strings"
 )
 
@@ -107,7 +108,14 @@ func formatDecisionChatResponse(decResp DecisionResponse, originalPrompt string)
 		sb.WriteString("| شناسه پرسش | نوع | مقدار منتخب / ارزیابی | ضریب اطمینان (Confidence) |\n")
 		sb.WriteString("| :--- | :--- | :--- | :--- |\n")
 
-		for k, a := range answers {
+		keys := make([]string, 0, len(answers))
+		for k := range answers {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+
+		for _, k := range keys {
+			a := answers[k]
 			switch a.Type {
 			case "noul":
 				val := 0.0

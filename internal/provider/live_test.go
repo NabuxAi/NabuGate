@@ -67,8 +67,46 @@ func TestCreateLiveSessionReturnsTheVendorsAnswer(t *testing.T) {
 	if resp.ID != "live_9" || !strings.Contains(string(resp.Body), "v=0 answer") {
 		t.Fatalf("answer not passed through: %+v", resp)
 	}
-	if auth != "Bearer k" || path != "/realtime/sessions" {
+	if auth != "Bearer k" || (path != "/realtime/calls" && path != "/realtime/sessions") {
 		t.Fatalf("auth %q path %q", auth, path)
+	}
+}
+
+func TestCreateLiveSessionOpenAIGaWithLocationHeader(t *testing.T) {
+	var auth, path, ctype string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		auth, path = r.Header.Get("Authorization"), r.URL.Path
+		ctype = r.Header.Get("Content-Type")
+		w.Header().Set("Location", "/v1/realtime/calls/call_ga_123")
+		w.WriteHeader(http.StatusCreated)
+		_, _ = w.Write([]byte("v=0\r\no=- 999 2 IN IP4 127.0.0.1\r\ns=-\r\n"))
+	}))
+	defer srv.Close()
+
+	resp, err := NewOpenAIAdapter("openai", srv.URL, "k", nil).CreateLiveSession(context.Background(),
+		LiveSessionRequest{Model: "gpt-4o-realtime-preview", Body: json.RawMessage(`{"transport":{"type":"webrtc","sdp":"v=0\r\no=offer"}}`)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.ID != "call_ga_123" {
+		t.Fatalf("expected ID call_ga_123, got %q", resp.ID)
+	}
+	if auth != "Bearer k" || path != "/realtime/calls" {
+		t.Fatalf("auth %q path %q", auth, path)
+	}
+	if !strings.HasPrefix(ctype, "multipart/form-data;") {
+		t.Fatalf("expected multipart content-type, got %q", ctype)
+	}
+	var parsed struct {
+		ID        string `json:"id"`
+		Session   struct { ID string `json:"id"` } `json:"session"`
+		Transport struct { SDP string `json:"sdp"` } `json:"transport"`
+	}
+	if err := json.Unmarshal(resp.Body, &parsed); err != nil {
+		t.Fatalf("invalid json body: %v, raw: %s", err, resp.Body)
+	}
+	if parsed.Session.ID != "call_ga_123" || !strings.Contains(parsed.Transport.SDP, "IN IP4 127.0.0.1") {
+		t.Fatalf("unexpected normalized body: %+v", parsed)
 	}
 }
 

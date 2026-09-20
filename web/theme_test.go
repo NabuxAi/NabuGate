@@ -13,7 +13,7 @@ var (
 	declRe    = regexp.MustCompile(`(--ng-[a-z0-9-]+)\s*:`)
 
 	// Tokens that carry no colour: overriding them per theme would be noise.
-	themeNeutral = regexp.MustCompile(`dur|ease|font|mono|radius|sidebar|topbar`)
+	themeNeutral = regexp.MustCompile(`content|dur|ease|font|mono|radius|sidebar|topbar`)
 )
 
 type cssBlock struct {

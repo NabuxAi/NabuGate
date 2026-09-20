@@ -290,9 +290,8 @@
    entirely numbers — nothing held the row the pointer was on. */
 .tbl thead th {
   padding: 10px;
-  font-size: 11px;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+  font-size: 11.5px;
+  font-weight: 800;
   color: var(--ng-subtle);
 }
 .tbl tbody td { padding: 11px 10px; }
@@ -313,6 +312,25 @@
 }
 .pay-form .input { width: 110px; flex: 0 0 auto; }
 .pay-form .btn-primary { flex: 1 1 auto; min-width: 140px; }
+
+/* The toggle used to carry its own 24px of inline padding inside a sidebar
+   padded to 14px, which left it visibly inset from the nav items above and the
+   health row below. It lines up with them now. */
+.sidebar-theme { display: flex; margin-top: 4px; }
+.sidebar-theme .btn {
+  flex: 1;
+  justify-content: center;
+  background: var(--ng-surface-soft);
+  border: 1px solid var(--ng-border);
+}
+.sidebar-theme .btn:hover { background: var(--ng-bg-hover); }
+
+/* A section label read as a dimmed nav item rather than as a heading. Weight
+   carries it instead of tracking, which a joined script cannot take. */
+.nav-group-title {
+  font-weight: 800;
+  color: var(--ng-muted);
+}
 
 /* ---- Topbar: mobile menu button ---- */
 .menu-btn {

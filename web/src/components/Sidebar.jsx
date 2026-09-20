@@ -48,8 +48,8 @@ export default function Sidebar({ current, onNavigate, effectivelyAdmin, isPanel
         })}
       </nav>
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '0 24px 16px', color: 'var(--ng-muted)' }}>
-        <button onClick={toggleTheme} className="btn" style={{ flex: 1, justifyContent: 'center', background: 'var(--ng-bg-hover)', border: '1px solid var(--ng-border)' }}>
+      <div className="sidebar-theme">
+        <button onClick={toggleTheme} className="btn">
           {theme === 'dark' ? '☀️ روز' : '🌙 شب'}
         </button>
       </div>
