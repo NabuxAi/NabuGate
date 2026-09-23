@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
-import { useTheme } from "./useTheme.js";
-
+import { useTheme } from './useTheme.js';
+import { stripLangPrefix, useI18n, useT } from './i18n/index.jsx';
+import { NAV_T } from './nav.js';
 
 import * as api from './api.js';
 import SignIn from './views/SignIn.jsx';
@@ -28,8 +29,8 @@ import { BootShell } from './components/Skeleton.jsx';
 import ErrorBoundary from './components/ErrorBoundary.jsx';
 
 const VIEWS = {
-  landing: () => <Landing lang={window.location.pathname.startsWith('/fa') ? 'fa' : 'en'} />,
-  docs: () => <Docs />,
+  landing: () => <Landing />,
+  docs: () => <Docs embedded />,
 
   dashboard: () => <Dashboard />,
   providers: () => <Providers />,
@@ -51,7 +52,8 @@ const VIEWS = {
 };
 
 function viewFromPath() {
-  let path = window.location.pathname;
+  // /en and /fa are language prefixes on the public pages, not views.
+  let path = stripLangPrefix(window.location.pathname);
   if (path.startsWith('/admin/')) path = path.replace('/admin/', '');
   else if (path.startsWith('/panel/')) path = path.replace('/panel/', '');
   else if (path === '/admin') path = '';
@@ -67,6 +69,10 @@ function viewFromPath() {
 
 export default function App() {
   useTheme();
+  // Reading the language here re-renders the whole tree on a switch, which is
+  // what the module-level formatters (fmtInt, usd …) rely on.
+  const { lang } = useI18n();
+  const tNav = useT(NAV_T);
 
   const [view, setView] = useState(viewFromPath);
   const [session, setSession] = useState(null);
@@ -104,10 +110,18 @@ export default function App() {
     window.dispatchEvent(new PopStateEvent('popstate'));
   };
 
+  useEffect(() => {
+    const brand = 'NabuGate';
+    if (view === 'landing') document.title = lang === 'fa' ? 'نبوگیت — دروازهٔ یکپارچهٔ هوش مصنوعی' : 'NabuGate — one API for every AI model';
+    else if (view === 'docs') document.title = `${lang === 'fa' ? 'مستندات' : 'Docs'} · ${brand}`;
+    else document.title = `${tNav(view)} · ${brand}`;
+  }, [view, lang, tNav]);
+
   if (session === null) return <BootShell />;
-  if (!session.authenticated && (view === 'landing' || view === 'docs') && !isPanel && !isAdminPath) {
-    const View = VIEWS[view];
-    return <View />;
+  if ((view === 'landing' || view === 'docs') && !isPanel && !isAdminPath) {
+    // The public pages look the same signed in or out; only the header's
+    // call to action changes.
+    return view === 'docs' ? <Docs signedIn={!!session.authenticated} /> : <Landing signedIn={!!session.authenticated} />;
   }
   if (!session.authenticated) {
     return <SignIn needsSetup={session.needs_setup} onAuthenticated={refresh} />;
@@ -126,7 +140,9 @@ export default function App() {
 
   const effectivelyAdmin = isAdminPath && session.is_admin;
   if (effectivelyAdmin) {
-    allowed = Object.keys(VIEWS);
+    // The landing page is a public page, not a console view: /admin/ with no
+    // view used to render it inside the sidebar layout.
+    allowed = Object.keys(VIEWS).filter((v) => v !== 'landing');
   }
 
   const safeView = allowed.includes(view) ? view : 'dashboard';

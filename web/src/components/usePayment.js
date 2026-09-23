@@ -1,5 +1,11 @@
 import { useEffect, useState } from 'react';
 import * as api from '../api.js';
+import { useT } from '../i18n/index.jsx';
+
+const T = {
+  fa: { noCheckout: 'درگاه پرداخت آدرسی برای ادامه نداد.' },
+  en: { noCheckout: 'The payment gateway did not return a checkout URL.' },
+};
 
 /**
  * Starting a payment and finishing one, shared by the two screens that offer
@@ -12,6 +18,7 @@ import * as api from '../api.js';
  * so settling is safe to repeat and credits once.
  */
 export function usePayment(onSettled) {
+  const t = useT(T);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
   const [settled, setSettled] = useState(null);
@@ -62,7 +69,7 @@ export function usePayment(onSettled) {
     try {
       const res = await api.rechargeMe(amount, gateway);
       if (!res?.checkout_url) {
-        throw new Error('درگاه پرداخت آدرسی برای ادامه نداد.');
+        throw new Error(t('noCheckout'));
       }
       // The gateway's own page. Leaving the panel here is the point: the card
       // details are entered at the bank, never in this app.

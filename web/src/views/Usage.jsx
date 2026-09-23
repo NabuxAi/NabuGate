@@ -1,9 +1,62 @@
 import { useEffect, useState } from 'react';
 import Layout from '../components/Layout.jsx';
 import * as api from '../api.js';
-import { faInt, faDigits, usd } from '../data/mock.js';
+import { fmtInt, fmtDigits, usd, useT } from '../i18n/index.jsx';
+import Icon from '../components/Icon.jsx';
+
+const T = {
+  fa: {
+    title: 'مصرف',
+    subtitle: 'تحلیل مصرف توکن، درخواست‌ها و هزینه‌ها در بازه‌ی انتخابی.',
+    last30: '۳۰ روز اخیر',
+    lastWeek: 'هفته اخیر',
+    today: 'امروز',
+    outTokens: 'توکن خروجی',
+    inTokens: 'توکن ورودی',
+    totalTokens: 'کل توکن',
+    providerCost: 'هزینه ارائه‌دهنده',
+    estCost: 'هزینه تخمینی',
+    requests: 'درخواست‌ها',
+    byProvider: 'مصرف به تفکیک ارائه دهنده',
+    byModel: 'مصرف به تفکیک مدل',
+    byKey: 'مصرف به تفکیک کلید API',
+    notFound: 'موردی یافت نشد',
+    provider: 'پروایدر',
+    model: 'مدل',
+    tokensTotal: 'توکن کل',
+    cost: 'هزینه',
+    key: 'کلید',
+    emptyKeys: 'مصرفی برای کلیدها ثبت نشده است',
+    emptyKeysHint: 'پس از اولین استفاده از کلیدها، آمار مصرف اینجا نمایش داده می‌شود.',
+  },
+  en: {
+    title: 'Usage',
+    subtitle: 'Token, request and cost analytics for the selected period.',
+    last30: 'Last 30 days',
+    lastWeek: 'Last week',
+    today: 'Today',
+    outTokens: 'Output tokens',
+    inTokens: 'Input tokens',
+    totalTokens: 'Total tokens',
+    providerCost: 'Provider cost',
+    estCost: 'Estimated cost',
+    requests: 'Requests',
+    byProvider: 'Usage by provider',
+    byModel: 'Usage by model',
+    byKey: 'Usage by API key',
+    notFound: 'Nothing found',
+    provider: 'Provider',
+    model: 'Model',
+    tokensTotal: 'Total tokens',
+    cost: 'Cost',
+    key: 'Key',
+    emptyKeys: 'No key usage recorded yet',
+    emptyKeysHint: 'Usage stats appear here after your keys are first used.',
+  },
+};
 
 export default function Usage() {
+  const t = useT(T);
   const [byProject, setByProject] = useState({});
   const [byModel, setByModel] = useState({});
   const [byProvider, setByProvider] = useState({});
@@ -39,13 +92,13 @@ export default function Usage() {
 
   return (
     <Layout
-      title="مصرف"
-      subtitle="تحلیل مصرف توکن، درخواست‌ها و هزینه‌ها در بازه‌ی انتخابی."
+      title={t('title')}
+      subtitle={t('subtitle')}
       actions={
         <select style={{ background: 'var(--ng-surface)', color: 'var(--ng-heading)', border: '1px solid var(--ng-border)', padding: '6px 12px', borderRadius: '6px', fontSize: 13, outline: 'none' }}>
-          <option>۳۰ روز اخیر</option>
-          <option>هفته اخیر</option>
-          <option>امروز</option>
+          <option>{t('last30')}</option>
+          <option>{t('lastWeek')}</option>
+          <option>{t('today')}</option>
         </select>
       }
     >
@@ -57,24 +110,24 @@ export default function Usage() {
         {/* Row 1 */}
         <div className="card" style={{ padding: '20px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
-            <div style={{ color: 'var(--ng-muted)', fontSize: 13, marginBottom: 8 }}>توکن خروجی</div>
-            <div style={{ fontSize: 18, fontWeight: 700 }}>{faInt(total.completion_tokens)}</div>
+            <div style={{ color: 'var(--ng-muted)', fontSize: 13, marginBottom: 8 }}>{t('outTokens')}</div>
+            <div style={{ fontSize: 18, fontWeight: 700 }}>{fmtInt(total.completion_tokens)}</div>
           </div>
           <div style={{ background: 'rgba(16, 185, 129, 0.1)', color: '#10b981', padding: 12, borderRadius: 8, fontSize: 20 }}>↑</div>
         </div>
 
         <div className="card" style={{ padding: '20px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
-            <div style={{ color: 'var(--ng-muted)', fontSize: 13, marginBottom: 8 }}>توکن ورودی</div>
-            <div style={{ fontSize: 18, fontWeight: 700 }}>{faInt(total.prompt_tokens)}</div>
+            <div style={{ color: 'var(--ng-muted)', fontSize: 13, marginBottom: 8 }}>{t('inTokens')}</div>
+            <div style={{ fontSize: 18, fontWeight: 700 }}>{fmtInt(total.prompt_tokens)}</div>
           </div>
           <div style={{ background: 'rgba(59, 130, 246, 0.1)', color: '#3b82f6', padding: 12, borderRadius: 8, fontSize: 20 }}>↓</div>
         </div>
 
         <div className="card" style={{ padding: '20px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
-            <div style={{ color: 'var(--ng-muted)', fontSize: 13, marginBottom: 8 }}>کل توکن</div>
-            <div style={{ fontSize: 18, fontWeight: 700 }}>{faInt(totalTokens)}</div>
+            <div style={{ color: 'var(--ng-muted)', fontSize: 13, marginBottom: 8 }}>{t('totalTokens')}</div>
+            <div style={{ fontSize: 18, fontWeight: 700 }}>{fmtInt(totalTokens)}</div>
           </div>
           <div style={{ background: 'rgba(99, 102, 241, 0.1)', color: '#6366f1', padding: 12, borderRadius: 8, fontSize: 20 }}>⊚</div>
         </div>
@@ -82,15 +135,15 @@ export default function Usage() {
         {/* Row 2 */}
         <div className="card" style={{ padding: '20px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
-            <div style={{ color: 'var(--ng-muted)', fontSize: 13, marginBottom: 8 }}>هزینه ارائه‌دهنده</div>
-            <div style={{ fontSize: 18, fontWeight: 700 }} dir="ltr">$ {faDigits(total.cost.toFixed(3))}</div>
+            <div style={{ color: 'var(--ng-muted)', fontSize: 13, marginBottom: 8 }}>{t('providerCost')}</div>
+            <div style={{ fontSize: 18, fontWeight: 700 }} dir="ltr">$ {fmtDigits(total.cost.toFixed(3))}</div>
           </div>
           <div style={{ background: 'rgba(59, 130, 246, 0.1)', color: '#3b82f6', padding: 12, borderRadius: 8, fontSize: 20 }}>$</div>
         </div>
 
         <div className="card" style={{ padding: '20px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
-            <div style={{ color: 'var(--ng-muted)', fontSize: 13, marginBottom: 8 }}>هزینه تخمینی</div>
+            <div style={{ color: 'var(--ng-muted)', fontSize: 13, marginBottom: 8 }}>{t('estCost')}</div>
             {/* This multiplied the dollar figure by a rate written into the
                 source as "dummy exchange rate for UI". A made-up number
                 rendered in تومان beside real ones reads as a real one. */}
@@ -101,8 +154,8 @@ export default function Usage() {
 
         <div className="card" style={{ padding: '20px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
-            <div style={{ color: 'var(--ng-muted)', fontSize: 13, marginBottom: 8 }}>درخواست‌ها</div>
-            <div style={{ fontSize: 18, fontWeight: 700 }}>{faInt(total.requests)}</div>
+            <div style={{ color: 'var(--ng-muted)', fontSize: 13, marginBottom: 8 }}>{t('requests')}</div>
+            <div style={{ fontSize: 18, fontWeight: 700 }}>{fmtInt(total.requests)}</div>
           </div>
           <div style={{ background: 'rgba(99, 102, 241, 0.1)', color: '#6366f1', padding: 12, borderRadius: 8, fontSize: 20 }}>⚡</div>
         </div>
@@ -113,22 +166,22 @@ export default function Usage() {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 24, marginBottom: 24 }}>
         <div className="card" style={{ padding: 0, display: 'flex', flexDirection: 'column' }}>
           <div style={{ padding: 24, borderBottom: '1px solid var(--ng-border)' }}>
-            <h3 style={{ fontSize: 14, margin: 0 }}>مصرف به تفکیک ارائه دهنده</h3>
+            <h3 style={{ fontSize: 14, margin: 0 }}>{t('byProvider')}</h3>
           </div>
           {provRows.length === 0 ? (
             <div style={{ flex: 1, padding: 32, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-              <div style={{ fontSize: 32, marginBottom: 12, color: 'var(--ng-border)' }}>📭</div>
-              <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 8 }}>موردی یافت نشد</div>
+              <div style={{ fontSize: 32, marginBottom: 12, color: 'var(--ng-border)' }}><Icon name="inbox" size={32} /></div>
+              <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 8 }}>{t('notFound')}</div>
             </div>
           ) : (
             <table className="tbl" style={{ border: 'none', margin: 0 }}>
-              <thead><tr><th>پروایدر</th><th>توکن کل</th><th>هزینه</th></tr></thead>
+              <thead><tr><th>{t('provider')}</th><th>{t('tokensTotal')}</th><th>{t('cost')}</th></tr></thead>
               <tbody>
                 {provRows.map(([name, v]) => (
                   <tr key={name}>
                     <td style={{ fontWeight: 700, color: 'var(--ng-heading)' }} dir="ltr">{name}</td>
-                    <td className="mono">{faInt((v.prompt_tokens || 0) + (v.completion_tokens || 0))}</td>
-                    <td className="mono ltr">{faDigits('$' + (v.cost_usd || 0).toFixed(4))}</td>
+                    <td className="mono">{fmtInt((v.prompt_tokens || 0) + (v.completion_tokens || 0))}</td>
+                    <td className="mono ltr">{fmtDigits('$' + (v.cost_usd || 0).toFixed(4))}</td>
                   </tr>
                 ))}
               </tbody>
@@ -138,22 +191,22 @@ export default function Usage() {
 
         <div className="card" style={{ padding: 0, display: 'flex', flexDirection: 'column' }}>
           <div style={{ padding: 24, borderBottom: '1px solid var(--ng-border)' }}>
-            <h3 style={{ fontSize: 14, margin: 0 }}>مصرف به تفکیک مدل</h3>
+            <h3 style={{ fontSize: 14, margin: 0 }}>{t('byModel')}</h3>
           </div>
           {modelRows.length === 0 ? (
             <div style={{ flex: 1, padding: 32, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-              <div style={{ fontSize: 32, marginBottom: 12, color: 'var(--ng-border)' }}>📭</div>
-              <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 8 }}>موردی یافت نشد</div>
+              <div style={{ fontSize: 32, marginBottom: 12, color: 'var(--ng-border)' }}><Icon name="inbox" size={32} /></div>
+              <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 8 }}>{t('notFound')}</div>
             </div>
           ) : (
             <table className="tbl" style={{ border: 'none', margin: 0 }}>
-              <thead><tr><th>مدل</th><th>توکن کل</th><th>هزینه</th></tr></thead>
+              <thead><tr><th>{t('model')}</th><th>{t('tokensTotal')}</th><th>{t('cost')}</th></tr></thead>
               <tbody>
                 {modelRows.map(([name, v]) => (
                   <tr key={name}>
                     <td style={{ fontWeight: 700, color: 'var(--ng-heading)' }} dir="ltr">{name}</td>
-                    <td className="mono">{faInt((v.prompt_tokens || 0) + (v.completion_tokens || 0))}</td>
-                    <td className="mono ltr">{faDigits('$' + (v.cost_usd || 0).toFixed(4))}</td>
+                    <td className="mono">{fmtInt((v.prompt_tokens || 0) + (v.completion_tokens || 0))}</td>
+                    <td className="mono ltr">{fmtDigits('$' + (v.cost_usd || 0).toFixed(4))}</td>
                   </tr>
                 ))}
               </tbody>
@@ -165,35 +218,35 @@ export default function Usage() {
       {/* API Key Usage Table */}
       <div className="card" style={{ padding: 0 }}>
         <div style={{ padding: 24, borderBottom: '1px solid var(--ng-border)' }}>
-          <h3 style={{ fontSize: 14, margin: 0 }}>مصرف به تفکیک کلید API</h3>
+          <h3 style={{ fontSize: 14, margin: 0 }}>{t('byKey')}</h3>
         </div>
         <table className="tbl" style={{ border: 'none' }}>
           <thead>
             <tr>
-              <th>کلید</th>
-              <th>توکن خروجی</th>
-              <th>توکن ورودی</th>
-              <th>درخواست‌ها</th>
-              <th>هزینه ارائه‌دهنده</th>
+              <th>{t('key')}</th>
+              <th>{t('outTokens')}</th>
+              <th>{t('inTokens')}</th>
+              <th>{t('requests')}</th>
+              <th>{t('providerCost')}</th>
             </tr>
           </thead>
           <tbody>
             {rows.length === 0 && (
               <tr>
                 <td colSpan={5} style={{ padding: '60px 24px', textAlign: 'center' }}>
-                  <div style={{ fontSize: 32, marginBottom: 12, color: 'var(--ng-border)' }}>📭</div>
-                  <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 8 }}>مصرفی برای کلیدها ثبت نشده است</div>
-                  <p style={{ color: 'var(--ng-muted)', fontSize: 12 }}>پس از اولین استفاده از کلیدها، آمار مصرف اینجا نمایش داده می‌شود.</p>
+                  <div style={{ fontSize: 32, marginBottom: 12, color: 'var(--ng-border)' }}><Icon name="inbox" size={32} /></div>
+                  <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 8 }}>{t('emptyKeys')}</div>
+                  <p style={{ color: 'var(--ng-muted)', fontSize: 12 }}>{t('emptyKeysHint')}</p>
                 </td>
               </tr>
             )}
             {rows.map(([name, v]) => (
               <tr key={name}>
                 <td style={{ fontWeight: 700, color: 'var(--ng-heading)' }}>{name}</td>
-                <td className="mono">{faInt(v.completion_tokens || 0)}</td>
-                <td className="mono">{faInt(v.prompt_tokens || 0)}</td>
-                <td className="mono">{faInt(v.requests || 0)}</td>
-                <td className="mono ltr">{faDigits('$' + (v.cost_usd || 0).toFixed(4))}</td>
+                <td className="mono">{fmtInt(v.completion_tokens || 0)}</td>
+                <td className="mono">{fmtInt(v.prompt_tokens || 0)}</td>
+                <td className="mono">{fmtInt(v.requests || 0)}</td>
+                <td className="mono ltr">{fmtDigits('$' + (v.cost_usd || 0).toFixed(4))}</td>
               </tr>
             ))}
           </tbody>

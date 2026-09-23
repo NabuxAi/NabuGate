@@ -1,8 +1,128 @@
 import { useEffect, useState } from 'react';
 import Layout from '../components/Layout.jsx';
 import * as api from '../api.js';
+import { fmtInt, useT } from '../i18n/index.jsx';
+import Icon from '../components/Icon.jsx';
+
+const T = {
+  fa: {
+    title: 'استودیو ایجنت‌ها و فلوها',
+    subtitle: 'مدیریت، ویرایش زنده، ساخت تیم‌های چند ایجنتی و تست تعاملی',
+    savedAgent: 'ساب‌اجنت «{name}» با موفقیت ذخیره شد.',
+    confirmDeleteAgent: 'آیا از حذف ساب‌اجنت «{name}» اطمینان دارید؟',
+    deletedAgent: 'ساب‌اجنت «{name}» حذف شد.',
+    savedFlow: 'خط‌لوله «{name}» با موفقیت ذخیره شد.',
+    confirmDeleteFlow: 'آیا از حذف خط‌لوله «{name}» اطمینان دارید؟',
+    deletedFlow: 'خط‌لوله «{name}» حذف شد.',
+    newFlow: 'ساخت خط‌لوله (Flow)',
+    newAgent: 'ساخت ساب‌اجنت',
+    defFlowDesc: 'توضیح خط‌لوله',
+    defStep1: 'تحلیل اولیه',
+    defStep2: 'بازبینی',
+    defSystem: 'دستورات سیستمی ایجنت را اینجا وارد کنید.',
+    tabAgents: 'ساب‌اجنت‌ها ({n})',
+    tabFlows: 'خط‌لوله‌ها / Flows ({n})',
+    tabPlayground: 'پلی‌گراند و تست زنده',
+    searchAgents: 'جستجو در ساب‌اجنت‌ها...',
+    all: 'همه',
+    noDesc: 'بدون توضیح',
+    edit: 'ویرایش',
+    test: 'تست',
+    delete: 'حذف',
+    steps: 'مراحل (Steps):',
+    runFlow: 'اجرای فلو',
+    pgTitle: 'پلی‌گراند اجرای زنده',
+    pgSub: 'اجرای سریع ایجنت‌ها و خط‌لوله‌ها برای تست پرامپت و خروجی.',
+    targetType: 'نوع هدف (Target Type)',
+    optFlow: 'خط‌لوله (Flow)',
+    optAgent: 'ساب‌اجنت تکی (Sub-Agent)',
+    targetName: 'نام ایجنت / خط‌لوله',
+    inputLabel: 'ورودی / متن مقاله / پرامپت (Input)',
+    inputPh: 'متن خود را برای ارسال به ایجنت یا فلو وارد کنید...',
+    running: 'در حال اجرا و پردازش...',
+    run: 'ارسال و اجرای آنی',
+    response: 'پاسخ دریافتی:',
+    copy: 'کپی متن',
+    editAgentTitle: 'ویرایش ساب‌اجنت {name}',
+    newAgentTitle: 'ساخت ساب‌اجنت جدید',
+    agentSlug: 'نام ایجنت (Slug)',
+    description: 'توضیحات',
+    modelAlias: 'مدل پایه (Model Alias)',
+    temperature: 'Temperature (دقت/خلاقیت)',
+    systemPrompt: 'دستورات سیستمی (System Prompt)',
+    cancel: 'انصراف',
+    saveAgent: 'ذخیره ساب‌اجنت',
+    editFlowTitle: 'ویرایش خط‌لوله {name}',
+    newFlowTitle: 'ساخت خط‌لوله جدید',
+    flowName: 'نام خط‌لوله (Flow Name)',
+    flowSteps: 'گام‌های خط‌لوله (Steps)',
+    stepTitlePh: 'عنوان گام',
+    stepN: 'گام {n}',
+    removeStep: 'حذف گام',
+    addStep: 'افزودن گام جدید',
+    saveFlow: 'ذخیره خط‌لوله',
+  },
+  en: {
+    title: 'Agents & Flows Studio',
+    subtitle: 'Manage and live-edit agents, build multi-agent teams and test them interactively',
+    savedAgent: 'Sub-agent “{name}” saved.',
+    confirmDeleteAgent: 'Delete sub-agent “{name}”?',
+    deletedAgent: 'Sub-agent “{name}” deleted.',
+    savedFlow: 'Flow “{name}” saved.',
+    confirmDeleteFlow: 'Delete flow “{name}”?',
+    deletedFlow: 'Flow “{name}” deleted.',
+    newFlow: 'New flow',
+    newAgent: 'New sub-agent',
+    defFlowDesc: 'Flow description',
+    defStep1: 'Initial analysis',
+    defStep2: 'Review',
+    defSystem: 'Enter the agent’s system instructions here.',
+    tabAgents: 'Sub-agents ({n})',
+    tabFlows: 'Flows ({n})',
+    tabPlayground: 'Playground & live test',
+    searchAgents: 'Search sub-agents...',
+    all: 'All',
+    noDesc: 'No description',
+    edit: 'Edit',
+    test: 'Test',
+    delete: 'Delete',
+    steps: 'Steps:',
+    runFlow: 'Run flow',
+    pgTitle: 'Live playground',
+    pgSub: 'Run agents and flows on the spot to test prompts and output.',
+    targetType: 'Target type',
+    optFlow: 'Flow',
+    optAgent: 'Single sub-agent',
+    targetName: 'Agent / flow name',
+    inputLabel: 'Input (article text / prompt)',
+    inputPh: 'Enter the text to send to the agent or flow...',
+    running: 'Running...',
+    run: 'Send and run',
+    response: 'Response:',
+    copy: 'Copy',
+    editAgentTitle: 'Edit sub-agent {name}',
+    newAgentTitle: 'New sub-agent',
+    agentSlug: 'Agent name (slug)',
+    description: 'Description',
+    modelAlias: 'Base model (alias)',
+    temperature: 'Temperature (precision/creativity)',
+    systemPrompt: 'System prompt',
+    cancel: 'Cancel',
+    saveAgent: 'Save sub-agent',
+    editFlowTitle: 'Edit flow {name}',
+    newFlowTitle: 'New flow',
+    flowName: 'Flow name',
+    flowSteps: 'Flow steps',
+    stepTitlePh: 'Step title',
+    stepN: 'Step {n}',
+    removeStep: 'Remove step',
+    addStep: 'Add step',
+    saveFlow: 'Save flow',
+  },
+};
 
 export default function Agents() {
+  const t = useT(T);
   const [tab, setTab] = useState('agents'); // 'agents' | 'flows' | 'playground' | 'builder'
   const [agents, setAgents] = useState([]);
   const [flows, setFlows] = useState([]);
@@ -40,7 +160,7 @@ export default function Agents() {
     try {
       await api.saveAgent(editingAgent);
       setEditingAgent(null);
-      setSuccess(`ساب‌اجنت «${editingAgent.name}» با موفقیت ذخیره شد.`);
+      setSuccess(t('savedAgent', { name: editingAgent.name }));
       loadData();
       setTimeout(() => setSuccess(null), 3000);
     } catch (err) {
@@ -50,10 +170,10 @@ export default function Agents() {
 
   // Delete Agent
   async function handleDeleteAgent(name) {
-    if (!confirm(`آیا از حذف ساب‌اجنت «${name}» اطمینان دارید؟`)) return;
+    if (!confirm(t('confirmDeleteAgent', { name }))) return;
     try {
       await api.deleteAgent(name);
-      setSuccess(`ساب‌اجنت «${name}» حذف شد.`);
+      setSuccess(t('deletedAgent', { name }));
       loadData();
       setTimeout(() => setSuccess(null), 3000);
     } catch (err) {
@@ -67,7 +187,7 @@ export default function Agents() {
     try {
       await api.saveFlow(editingFlow);
       setEditingFlow(null);
-      setSuccess(`خط‌لوله «${editingFlow.name}» با موفقیت ذخیره شد.`);
+      setSuccess(t('savedFlow', { name: editingFlow.name }));
       loadData();
       setTimeout(() => setSuccess(null), 3000);
     } catch (err) {
@@ -77,10 +197,10 @@ export default function Agents() {
 
   // Delete Flow
   async function handleDeleteFlow(name) {
-    if (!confirm(`آیا از حذف خط‌لوله «${name}» اطمینان دارید؟`)) return;
+    if (!confirm(t('confirmDeleteFlow', { name }))) return;
     try {
       await api.deleteFlow(name);
-      setSuccess(`خط‌لوله «${name}» حذف شد.`);
+      setSuccess(t('deletedFlow', { name }));
       loadData();
       setTimeout(() => setSuccess(null), 3000);
     } catch (err) {
@@ -127,8 +247,8 @@ export default function Agents() {
 
   return (
     <Layout
-      title="استودیو ایجنت‌ها و فلوها"
-      subtitle="مدیریت، ویرایش زنده، ساخت تیم‌های چند ایجنتی و تست تعاملی"
+      title={t('title')}
+      subtitle={t('subtitle')}
       actions={
         <div style={{ display: 'flex', gap: '8px' }}>
           <button
@@ -136,15 +256,15 @@ export default function Agents() {
             onClick={() =>
               setEditingFlow({
                 name: 'new-flow',
-                description: 'توضیح خط‌لوله',
+                description: t('defFlowDesc'),
                 steps: [
-                  { agent: 'seo-content-auditor', label: 'تحلیل اولیه' },
-                  { agent: 'seo-strategist-reviewer', label: 'بازبینی' },
+                  { agent: 'seo-content-auditor', label: t('defStep1') },
+                  { agent: 'seo-strategist-reviewer', label: t('defStep2') },
                 ],
               })
             }
           >
-            + ساخت خط‌لوله (Flow)
+            <Icon name="plus" size={16} />{t('newFlow')}
           </button>
           <button
             className="btn btn-primary"
@@ -155,11 +275,11 @@ export default function Agents() {
                 model: 'nabu-smart',
                 temperature: 0.3,
                 max_tokens: 4096,
-                system: 'دستورات سیستمی ایجنت را اینجا وارد کنید.',
+                system: t('defSystem'),
               })
             }
           >
-            + ساخت ساب‌اجنت
+            <Icon name="plus" size={16} />{t('newAgent')}
           </button>
         </div>
       }
@@ -172,19 +292,19 @@ export default function Agents() {
           className={`tab-item ${tab === 'agents' ? 'active' : ''}`}
           onClick={() => setTab('agents')}
         >
-          <span>🤖</span> ساب‌اجنت‌ها ({agents.length})
+          <Icon name="bot" size={16} /> {t('tabAgents', { n: fmtInt(agents.length) })}
         </div>
         <div
           className={`tab-item ${tab === 'flows' ? 'active' : ''}`}
           onClick={() => setTab('flows')}
         >
-          <span>🔄</span> خط‌لوله‌ها / Flows ({flows.length})
+          <Icon name="flow" size={16} /> {t('tabFlows', { n: fmtInt(flows.length) })}
         </div>
         <div
           className={`tab-item ${tab === 'playground' ? 'active' : ''}`}
           onClick={() => setTab('playground')}
         >
-          <span>⚡</span> پلی‌گراند و تست زنده
+          <Icon name="zap" size={16} /> {t('tabPlayground')}
         </div>
       </div>
 
@@ -194,7 +314,7 @@ export default function Agents() {
           <div style={{ display: 'flex', gap: '12px', marginBottom: '24px', flexWrap: 'wrap', alignItems: 'center' }}>
             <input
               type="text"
-              placeholder="جستجو در ساب‌اجنت‌ها..."
+              placeholder={t('searchAgents')}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="input"
@@ -208,7 +328,7 @@ export default function Agents() {
                   style={{ borderRadius: '20px', padding: '6px 14px' }}
                   onClick={() => setSquadFilter(sq)}
                 >
-                  {sq === 'all' ? 'همه' : sq.toUpperCase()}
+                  {sq === 'all' ? t('all') : sq.toUpperCase()}
                 </button>
               ))}
             </div>
@@ -223,7 +343,7 @@ export default function Agents() {
                     <span className="pill pill-plain">{a.model || 'nabu-smart'}</span>
                   </div>
                   <p className="card-sub" style={{ minHeight: '40px', lineHeight: '1.5' }}>
-                    {a.description || 'بدون توضیح'}
+                    {a.description || t('noDesc')}
                   </p>
                   {a.system && (
                     <div style={{ background: 'var(--ng-surface-soft)', border: '1px solid var(--ng-border-faint)', padding: '10px 14px', borderRadius: '8px', fontSize: '12px', color: 'var(--ng-muted)', maxHeight: '70px', overflow: 'hidden', margin: '12px 0', lineHeight: '1.6' }}>
@@ -237,7 +357,7 @@ export default function Agents() {
                     style={{ flex: 1, justifyContent: 'center' }}
                     onClick={() => setEditingAgent({ ...a })}
                   >
-                    ✏️ ویرایش
+                    ✏️ {t('edit')}
                   </button>
                   <button
                     className="btn btn-ghost"
@@ -248,13 +368,13 @@ export default function Agents() {
                       setTab('playground');
                     }}
                   >
-                    ⚡ تست
+                    <Icon name="zap" size={15} />{t('test')}
                   </button>
                   <button
                     className="btn btn-ghost"
                     style={{ color: 'var(--ng-danger)', borderColor: 'transparent' }}
                     onClick={() => handleDeleteAgent(a.name)}
-                    title="حذف"
+                    title={t('delete')}
                   >
                     🗑️
                   </button>
@@ -275,13 +395,13 @@ export default function Agents() {
                   <span className="mono" style={{ fontWeight: '800', color: 'var(--ng-heading)', fontSize: '14px' }}>{f.name}</span>
                 </div>
                 <p className="card-sub" style={{ lineHeight: '1.5' }}>
-                  {f.description || 'بدون توضیح'}
+                  {f.description || t('noDesc')}
                 </p>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '16px', background: 'var(--ng-surface-soft)', padding: '12px', borderRadius: '8px' }}>
-                  <strong style={{ fontSize: '11.5px', color: 'var(--ng-slate-700)' }}>مراحل (Steps):</strong>
+                  <strong style={{ fontSize: '11.5px', color: 'var(--ng-slate-700)' }}>{t('steps')}</strong>
                   {f.steps?.map((st, i) => (
                     <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12.5px' }}>
-                      <span style={{ width: '20px', height: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--ng-accent)', color: 'white', borderRadius: '50%', fontSize: '11px', fontWeight: 'bold' }}>{i + 1}</span>
+                      <span style={{ width: '20px', height: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--ng-accent)', color: 'white', borderRadius: '50%', fontSize: '11px', fontWeight: 'bold' }}>{fmtInt(i + 1)}</span>
                       <span className="mono" style={{ color: 'var(--ng-heading)', fontWeight: '600' }}>{st.agent}</span>
                       {st.label && <span style={{ color: 'var(--ng-muted)', fontSize: '11px' }}>({st.label})</span>}
                     </div>
@@ -294,7 +414,7 @@ export default function Agents() {
                   style={{ flex: 1, justifyContent: 'center' }}
                   onClick={() => setEditingFlow({ ...f })}
                 >
-                  ✏️ ویرایش
+                  ✏️ {t('edit')}
                 </button>
                 <button
                   className="btn btn-ghost"
@@ -305,12 +425,13 @@ export default function Agents() {
                     setTab('playground');
                   }}
                 >
-                  ⚡ اجرای فلو
+                  <Icon name="zap" size={15} />{t('runFlow')}
                 </button>
                 <button
                   className="btn btn-ghost"
                   style={{ color: 'var(--ng-danger)', borderColor: 'transparent' }}
                   onClick={() => handleDeleteFlow(f.name)}
+                  title={t('delete')}
                 >
                   🗑️
                 </button>
@@ -325,18 +446,18 @@ export default function Agents() {
         <div className="playground-card">
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '24px' }}>
             <div style={{ background: 'var(--ng-accent)', color: 'white', padding: '10px', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              ⚡
+              <Icon name="zap" size={20} />
             </div>
             <div>
-              <h3 style={{ margin: 0, fontSize: '18px', color: 'var(--ng-heading)' }}>پلی‌گراند اجرای زنده</h3>
-              <p style={{ margin: '4px 0 0 0', fontSize: '12.5px', color: 'var(--ng-muted)' }}>اجرای سریع ایجنت‌ها و خط‌لوله‌ها برای تست پرامپت و خروجی.</p>
+              <h3 style={{ margin: 0, fontSize: '18px', color: 'var(--ng-heading)' }}>{t('pgTitle')}</h3>
+              <p style={{ margin: '4px 0 0 0', fontSize: '12.5px', color: 'var(--ng-muted)' }}>{t('pgSub')}</p>
             </div>
           </div>
 
           <form onSubmit={handleRunTest}>
             <div style={{ display: 'flex', gap: '16px', marginBottom: '20px' }}>
               <div style={{ flex: 1 }}>
-                <label className="label">نوع هدف (Target Type)</label>
+                <label className="label">{t('targetType')}</label>
                 <select
                   className="input"
                   value={testType}
@@ -345,12 +466,12 @@ export default function Agents() {
                     setTestTarget(e.target.value === 'flow' ? (flows[0]?.name || 'seo-audit-team') : (agents[0]?.name || 'seo-content-auditor'));
                   }}
                 >
-                  <option value="flow">خط‌لوله (Flow)</option>
-                  <option value="agent">ساب‌اجنت تکی (Sub-Agent)</option>
+                  <option value="flow">{t('optFlow')}</option>
+                  <option value="agent">{t('optAgent')}</option>
                 </select>
               </div>
               <div style={{ flex: 2 }}>
-                <label className="label">نام ایجنت / خط‌لوله</label>
+                <label className="label">{t('targetName')}</label>
                 <select
                   className="input mono"
                   value={testTarget}
@@ -364,11 +485,11 @@ export default function Agents() {
             </div>
 
             <div style={{ marginBottom: '24px' }}>
-              <label className="label">ورودی / متن مقاله / پرامپت (Input)</label>
+              <label className="label">{t('inputLabel')}</label>
               <textarea
                 className="input"
                 rows={6}
-                placeholder="متن خود را برای ارسال به ایجنت یا فلو وارد کنید..."
+                placeholder={t('inputPh')}
                 value={testPrompt}
                 onChange={(e) => setTestPrompt(e.target.value)}
                 required
@@ -376,7 +497,7 @@ export default function Agents() {
             </div>
 
             <button type="submit" className="btn btn-primary animated-btn" disabled={testRunning} style={{ width: '100%', fontSize: '14px', padding: '14px' }}>
-              {testRunning ? '⏳ در حال اجرا و پردازش...' : '🚀 ارسال و اجرای آنی'}
+              {testRunning ? <><Icon name="refresh" size={16} />{t('running')}</> : <><Icon name="zap" size={16} />{t('run')}</>}
             </button>
           </form>
 
@@ -384,13 +505,13 @@ export default function Agents() {
             <div style={{ marginTop: '32px', borderTop: '1px solid var(--ng-border-faint)', paddingTop: '24px', animation: 'fadeIn 0.4s ease-out' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
                 <h4 style={{ margin: 0, color: 'var(--ng-heading)', fontSize: '15px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span style={{ color: 'var(--ng-success-text)' }}>●</span> پاسخ دریافتی:
+                  <span style={{ color: 'var(--ng-success-text)' }}>●</span> {t('response')}
                 </h4>
                 <button
                   className="btn btn-ghost"
                   onClick={() => navigator.clipboard.writeText(testResponse)}
                 >
-                  📋 کپی متن
+                  <Icon name="copy" size={15} />{t('copy')}
                 </button>
               </div>
               <pre className="response-box">
@@ -406,11 +527,11 @@ export default function Agents() {
         <div className="modal-backdrop">
           <div className="card modal glass-card" style={{ maxWidth: '680px' }}>
             <h3 style={{ borderBottom: '1px solid var(--ng-border-faint)', paddingBottom: '16px', marginBottom: '20px' }}>
-              {editingAgent.name ? `ویرایش ساب‌اجنت ${editingAgent.name}` : 'ساخت ساب‌اجنت جدید'}
+              {editingAgent.name ? t('editAgentTitle', { name: editingAgent.name }) : t('newAgentTitle')}
             </h3>
             <form onSubmit={handleSaveAgent}>
               <div style={{ marginBottom: '16px' }}>
-                <label className="label">نام ایجنت (Slug)</label>
+                <label className="label">{t('agentSlug')}</label>
                 <input
                   type="text"
                   className="input mono"
@@ -420,7 +541,7 @@ export default function Agents() {
                 />
               </div>
               <div style={{ marginBottom: '16px' }}>
-                <label className="label">توضیحات</label>
+                <label className="label">{t('description')}</label>
                 <input
                   type="text"
                   className="input"
@@ -430,7 +551,7 @@ export default function Agents() {
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: '16px', marginBottom: '20px' }}>
                 <div>
-                  <label className="label">مدل پایه (Model Alias)</label>
+                  <label className="label">{t('modelAlias')}</label>
                   <select
                     className="input mono"
                     value={editingAgent.model || 'nabu-smart'}
@@ -442,7 +563,7 @@ export default function Agents() {
                   </select>
                 </div>
                 <div>
-                  <label className="label">Temperature (دقت/خلاقیت)</label>
+                  <label className="label">{t('temperature')}</label>
                   <input
                     type="number"
                     step="0.1"
@@ -455,7 +576,7 @@ export default function Agents() {
                 </div>
               </div>
               <div style={{ marginBottom: '16px' }}>
-                <label className="label">دستورات سیستمی (System Prompt)</label>
+                <label className="label">{t('systemPrompt')}</label>
                 <textarea
                   className="input"
                   rows={8}
@@ -466,10 +587,10 @@ export default function Agents() {
               </div>
               <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
                 <button type="button" className="btn btn-secondary" onClick={() => setEditingAgent(null)}>
-                  انصراف
+                  {t('cancel')}
                 </button>
                 <button type="submit" className="btn btn-primary">
-                  💾 ذخیره ساب‌اجنت
+                  <Icon name="check" size={15} />{t('saveAgent')}
                 </button>
               </div>
             </form>
@@ -482,11 +603,11 @@ export default function Agents() {
         <div className="modal-backdrop">
           <div className="card modal glass-card" style={{ maxWidth: '680px' }}>
             <h3 style={{ borderBottom: '1px solid var(--ng-border-faint)', paddingBottom: '16px', marginBottom: '20px' }}>
-              {editingFlow.name ? `ویرایش خط‌لوله ${editingFlow.name}` : 'ساخت خط‌لوله جدید'}
+              {editingFlow.name ? t('editFlowTitle', { name: editingFlow.name }) : t('newFlowTitle')}
             </h3>
             <form onSubmit={handleSaveFlow}>
               <div style={{ marginBottom: '16px' }}>
-                <label className="label">نام خط‌لوله (Flow Name)</label>
+                <label className="label">{t('flowName')}</label>
                 <input
                   type="text"
                   className="input mono"
@@ -496,7 +617,7 @@ export default function Agents() {
                 />
               </div>
               <div style={{ marginBottom: '16px' }}>
-                <label className="label">توضیحات</label>
+                <label className="label">{t('description')}</label>
                 <input
                   type="text"
                   className="input"
@@ -506,12 +627,12 @@ export default function Agents() {
               </div>
 
               <div style={{ marginBottom: '24px' }}>
-                <label className="label" style={{ marginBottom: '12px' }}>گام‌های خط‌لوله (Steps)</label>
+                <label className="label" style={{ marginBottom: '12px' }}>{t('flowSteps')}</label>
                 <div style={{ background: 'var(--ng-surface-soft)', padding: '16px', borderRadius: '12px', border: '1px solid var(--ng-border-faint)' }}>
                   {editingFlow.steps?.map((st, i) => (
                     <div key={i} style={{ display: 'flex', gap: '12px', alignItems: 'center', marginBottom: '12px' }}>
                       <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '24px', height: '24px', background: 'var(--ng-surface)', borderRadius: '50%', color: 'var(--ng-muted)', fontSize: '11px', fontWeight: 'bold', border: '1px solid var(--ng-border-faint)' }}>
-                        {i + 1}
+                        {fmtInt(i + 1)}
                       </span>
                       <select
                         className="input mono"
@@ -529,7 +650,7 @@ export default function Agents() {
                       </select>
                       <input
                         type="text"
-                        placeholder="عنوان گام"
+                        placeholder={t('stepTitlePh')}
                         className="input"
                         style={{ flex: 2, padding: '8px 12px' }}
                         value={st.label || ''}
@@ -543,6 +664,8 @@ export default function Agents() {
                         type="button"
                         className="btn btn-ghost"
                         style={{ padding: '8px', color: 'var(--ng-danger)' }}
+                        title={t('removeStep')}
+                        aria-label={t('removeStep')}
                         onClick={() => {
                           const newSteps = editingFlow.steps.filter((_, idx) => idx !== i);
                           setEditingFlow({ ...editingFlow, steps: newSteps });
@@ -559,21 +682,21 @@ export default function Agents() {
                     onClick={() =>
                       setEditingFlow({
                         ...editingFlow,
-                        steps: [...(editingFlow.steps || []), { agent: agents[0]?.name || 'seo-content-auditor', label: `گام ${(editingFlow.steps?.length || 0) + 1}` }],
+                        steps: [...(editingFlow.steps || []), { agent: agents[0]?.name || 'seo-content-auditor', label: t('stepN', { n: (editingFlow.steps?.length || 0) + 1 }) }],
                       })
                     }
                   >
-                    + افزودن گام جدید
+                    <Icon name="plus" size={15} />{t('addStep')}
                   </button>
                 </div>
               </div>
 
               <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
                 <button type="button" className="btn btn-secondary" onClick={() => setEditingFlow(null)}>
-                  انصراف
+                  {t('cancel')}
                 </button>
                 <button type="submit" className="btn btn-primary">
-                  💾 ذخیره خط‌لوله
+                  <Icon name="check" size={15} />{t('saveFlow')}
                 </button>
               </div>
             </form>

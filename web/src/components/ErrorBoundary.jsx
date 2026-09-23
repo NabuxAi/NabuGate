@@ -1,4 +1,10 @@
 import { Component } from 'react';
+import { getLang, translate } from '../i18n/index.jsx';
+
+const T = {
+  fa: { failed: 'این صفحه نتوانست رسم شود.', reload: 'بارگذاری دوباره' },
+  en: { failed: 'This page failed to render.', reload: 'Reload' },
+};
 
 /*
  * A page that throws while rendering must not take the sidebar with it. The
@@ -22,15 +28,17 @@ export default class ErrorBoundary extends Component {
 
   render() {
     if (!this.state.error) return this.props.children;
+    // A class component cannot use hooks; the language is read directly.
+    const t = (k) => translate(T, getLang(), k);
     return (
       <div className="main">
         <div className="content">
           <div className="callout danger fade-in" role="alert">
             <span className="ci">⚠️</span>
             <div>
-              <strong>این صفحه نتوانست رسم شود.</strong>
+              <strong>{t('failed')}</strong>
               <div className="mono" dir="ltr" style={{ fontSize: 12, marginTop: 6, whiteSpace: 'pre-wrap' }}>{String(this.state.error?.message || this.state.error)}</div>
-              <button type="button" className="btn btn-outline btn-sm" style={{ marginTop: 10 }} onClick={() => window.location.reload()}>بارگذاری دوباره</button>
+              <button type="button" className="btn btn-outline btn-sm" style={{ marginTop: 10 }} onClick={() => window.location.reload()}>{t('reload')}</button>
             </div>
           </div>
         </div>

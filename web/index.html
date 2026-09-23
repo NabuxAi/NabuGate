@@ -1,14 +1,43 @@
 <!doctype html>
-<html lang="fa" dir="rtl">
+<html lang="fa" dir="rtl" data-theme="dark">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>کنسول NabuGate — دروازهٔ هوش مصنوعی</title>
-    <meta name="description" content="پنل مدیریت NabuGate: پرووایدرها، آلیاس‌های مدل و روتینگ/فالبک، کلیدهای پروژه و مصرف." />
+    <title>NabuGate</title>
+    <meta name="description" content="NabuGate — یک API سازگار با OpenAI برای همهٔ مدل‌های هوش مصنوعی. One OpenAI-compatible API for every AI model." />
+    <meta name="theme-color" content="#070b16" />
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='40' y2='40' gradientUnits='userSpaceOnUse'%3E%3Cstop stop-color='%234f8cff'/%3E%3Cstop offset='.55' stop-color='%236d5dfc'/%3E%3Cstop offset='1' stop-color='%23a855f7'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect x='1' y='1' width='38' height='38' rx='11' fill='url(%23g)'/%3E%3Ccircle cx='13' cy='13' r='2.6' fill='%23fff'/%3E%3Ccircle cx='13' cy='27' r='2.6' fill='%23fff'/%3E%3Ccircle cx='28' cy='20' r='3.4' fill='%23fff'/%3E%3Cpath d='M15.3 14.1 25.2 18.7M15.3 25.9 25.2 21.3' stroke='%23fff' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E" />
+    <!--
+      Direction, language and theme are decided before the first paint, from the
+      same sources the app reads (URL, then saved choice, then the browser), so a
+      visitor on English never sees the page lay out right-to-left and flip.
+    -->
+    <script>
+      (function () {
+        var d = document.documentElement, l = null, t = null;
+        try {
+          var q = new URLSearchParams(location.search).get('lang');
+          var m = /^\/(fa|en)(?=\/|$)/.exec(location.pathname);
+          l = (q === 'fa' || q === 'en') ? q : (m ? m[1] : localStorage.getItem('nabugate_lang'));
+          t = localStorage.getItem('theme');
+        } catch (e) {}
+        if (l !== 'fa' && l !== 'en') {
+          l = 'fa';
+          var p = navigator.languages || [navigator.language];
+          for (var i = 0; i < p.length; i++) {
+            var b = String(p[i] || '').toLowerCase().split('-')[0];
+            if (b === 'fa' || b === 'en') { l = b; break; }
+          }
+        }
+        d.setAttribute('lang', l);
+        d.setAttribute('dir', l === 'fa' ? 'rtl' : 'ltr');
+        d.setAttribute('data-theme', t === 'light' ? 'light' : 'dark');
+      })();
+    </script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;600;700;800;900&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;600;700;800;900&family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap"
       rel="stylesheet"
     />
   </head>

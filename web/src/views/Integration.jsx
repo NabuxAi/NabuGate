@@ -3,8 +3,63 @@ import { useState, useEffect } from 'react';
 import * as api from '../api.js';
 import CodeBlock from '../components/CodeBlock.jsx';
 import { Skeleton } from '../components/Skeleton.jsx';
+import { useT } from '../i18n/index.jsx';
+
+const T = {
+  fa: {
+    title: 'اتصال به دروازه',
+    subtitle: 'هر ابزار سازگار با OpenAI را در چند گام وصل کنید.',
+    endpoint: 'درگاه سازگار با OpenAI',
+    noKey: 'هنوز کلیدی نساخته‌اید؛ از بخش «کلیدهای API» یکی بسازید.',
+    keyInfo: (v) => (
+      <>
+        کلیدِ «{v.name}» با پیشوندِ <code dir="ltr">{v.prefix}</code>.
+        متنِ کاملِ کلید فقط یک‌بار موقعِ ساخت نمایش داده می‌شود و جایی ذخیره
+        نمی‌شود، پس اینجا قابلِ نمایش نیست — همانی را بگذارید که ذخیره کرده‌اید.
+      </>
+    ),
+    quickStart: 'شروع سریع',
+    hello: 'سلام',
+    names: 'نام‌های در دسترس',
+    namesIntro: () => (
+      <>
+        همین‌ها را در فیلدِ <code dir="ltr">model</code> بگذارید. مستقیم از
+        روترِ در حالِ اجرا خوانده می‌شود.
+      </>
+    ),
+    tools: 'راهنمای ابزارها',
+    toolSdk: () => <><code dir="ltr">OPENAI_BASE_URL</code> و <code dir="ltr">OPENAI_API_KEY</code>.</>,
+    toolCursor: 'بازنویسیِ آدرسِ پایهٔ OpenAI در تنظیمات.',
+    toolVscode: () => <>همان دو متغیر در <code dir="ltr">settings.json</code>.</>,
+  },
+  en: {
+    title: 'Connect to the gateway',
+    subtitle: 'Connect any OpenAI-compatible tool in a few steps.',
+    endpoint: 'OpenAI-compatible endpoint',
+    noKey: 'You haven’t created a key yet — create one under “API keys”.',
+    keyInfo: (v) => (
+      <>
+        Key “{v.name}”, prefix <code dir="ltr">{v.prefix}</code>. The full key is shown only once, when it is
+        created, and is not stored anywhere, so it can’t be shown here — use the one you saved.
+      </>
+    ),
+    quickStart: 'Quick start',
+    hello: 'Hello',
+    names: 'Available names',
+    namesIntro: () => (
+      <>
+        Put any of these in the <code dir="ltr">model</code> field. The list is read live from the running router.
+      </>
+    ),
+    tools: 'Tool setup',
+    toolSdk: () => <><code dir="ltr">OPENAI_BASE_URL</code> and <code dir="ltr">OPENAI_API_KEY</code>.</>,
+    toolCursor: 'Override the OpenAI base URL in Settings.',
+    toolVscode: () => <>The same two variables in <code dir="ltr">settings.json</code>.</>,
+  },
+};
 
 export default function Integration() {
+  const t = useT(T);
   const origin = typeof window !== 'undefined' ? window.location.origin : 'https://gate.nabuxai.com';
   const [tokens, setTokens] = useState([]);
   const [aliases, setAliases] = useState([]);
@@ -29,7 +84,7 @@ export default function Integration() {
 
   const codeBlock = {
     direction: 'ltr',
-    textAlign: 'left',
+    textAlign: 'start',
     background: 'var(--ng-code-bg, var(--ng-surface-soft))',
     color: 'var(--ng-code-text, var(--ng-text))',
     border: '1px solid var(--ng-border)',
@@ -40,28 +95,24 @@ export default function Integration() {
   };
 
   return (
-    <Layout title="اتصال به دروازه" subtitle="هر ابزار سازگار با OpenAI را در چند گام وصل کنید.">
+    <Layout title={t('title')} subtitle={t('subtitle')}>
       <div className="card" style={{ marginBottom: 24, padding: 24 }}>
-        <h3 style={{ marginTop: 0, marginBottom: 16 }}>درگاه سازگار با OpenAI</h3>
+        <h3 style={{ marginTop: 0, marginBottom: 16 }}>{t('endpoint')}</h3>
         <div style={{ ...codeBlock, marginBottom: 12 }}>
           <div style={{ marginBottom: 8 }}><strong>Base URL:</strong> <code>{origin}/v1</code></div>
           <div><strong>API key:</strong> <code>{keyPlaceholder}</code></div>
         </div>
         {tokens.length === 0 ? (
-          <p className="muted" style={{ fontSize: 13, margin: 0 }}>
-            هنوز کلیدی نساخته‌اید؛ از بخش «کلیدهای API» یکی بسازید.
-          </p>
+          <p className="muted" style={{ fontSize: 13, margin: 0 }}>{t('noKey')}</p>
         ) : (
           <p className="muted" style={{ fontSize: 13, margin: 0, lineHeight: 1.7 }}>
-            کلیدِ «{first.name}» با پیشوندِ <code dir="ltr">{first.prefix}</code>.
-            متنِ کاملِ کلید فقط یک‌بار موقعِ ساخت نمایش داده می‌شود و جایی ذخیره
-            نمی‌شود، پس اینجا قابلِ نمایش نیست — همانی را بگذارید که ذخیره کرده‌اید.
+            {t('keyInfo', { name: first.name, prefix: first.prefix })}
           </p>
         )}
       </div>
 
       <div className="card" style={{ marginBottom: 24, padding: 24 }}>
-        <h3 style={{ marginTop: 0, marginBottom: 16 }}>شروع سریع</h3>
+        <h3 style={{ marginTop: 0, marginBottom: 16 }}>{t('quickStart')}</h3>
 
         <h4 style={{ marginBottom: 8 }}>OpenAI Python SDK</h4>
         <CodeBlock code={`from openai import OpenAI
@@ -69,25 +120,24 @@ export default function Integration() {
 client = OpenAI(base_url="${origin}/v1", api_key="${keyPlaceholder}")
 client.chat.completions.create(
     model="${model}",
-    messages=[{"role": "user", "content": "سلام"}],
+    messages=[{"role": "user", "content": "${t('hello')}"}],
 )`} />
 
         <h4 style={{ marginTop: 24, marginBottom: 8 }}>cURL</h4>
         <CodeBlock code={`curl ${origin}/v1/chat/completions \\
   -H "Authorization: Bearer ${keyPlaceholder}" \\
   -H "Content-Type: application/json" \\
-  -d '{"model":"${model}","messages":[{"role":"user","content":"سلام"}]}'`} />
+  -d '{"model":"${model}","messages":[{"role":"user","content":"${t('hello')}"}]}'`} />
       </div>
 
       <div className="card" style={{ marginBottom: 24, padding: 24 }}>
-        <h3 style={{ marginTop: 0, marginBottom: 8 }}>نام‌های در دسترس</h3>
+        <h3 style={{ marginTop: 0, marginBottom: 8 }}>{t('names')}</h3>
         <p className="muted" style={{ fontSize: 13, marginBottom: 16 }}>
           {/* Read from the running router, not a list written by hand. A
               hard-coded catalogue describes whatever gateway existed the day
               somebody typed it — this one used to name ten models, none of
               which is an alias this deployment routes. */}
-          همین‌ها را در فیلدِ <code dir="ltr">model</code> بگذارید. مستقیم از
-          روترِ در حالِ اجرا خوانده می‌شود.
+          {t('namesIntro')}
         </p>
         {aliases.length === 0 ? (
           <div className="chips"><Skeleton w={110} h={40} /><Skeleton w={130} h={40} /><Skeleton w={100} h={40} /></div>
@@ -106,11 +156,11 @@ client.chat.completions.create(
       </div>
 
       <div className="card" style={{ padding: 24 }}>
-        <h3 style={{ marginTop: 0, marginBottom: 16 }}>راهنمای ابزارها</h3>
-        <ul style={{ paddingRight: 20, fontSize: 14, lineHeight: '1.8' }}>
-          <li><strong>Codex / OpenAI SDK:</strong> <code dir="ltr">OPENAI_BASE_URL</code> و <code dir="ltr">OPENAI_API_KEY</code>.</li>
-          <li><strong>Cursor:</strong> بازنویسیِ آدرسِ پایهٔ OpenAI در تنظیمات.</li>
-          <li><strong>VS Code:</strong> همان دو متغیر در <code dir="ltr">settings.json</code>.</li>
+        <h3 style={{ marginTop: 0, marginBottom: 16 }}>{t('tools')}</h3>
+        <ul style={{ paddingInlineStart: 20, fontSize: 14, lineHeight: '1.8' }}>
+          <li><strong>Codex / OpenAI SDK:</strong> {t('toolSdk')}</li>
+          <li><strong>Cursor:</strong> {t('toolCursor')}</li>
+          <li><strong>VS Code:</strong> {t('toolVscode')}</li>
         </ul>
       </div>
     </Layout>

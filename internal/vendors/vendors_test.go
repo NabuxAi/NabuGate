@@ -3,6 +3,7 @@ package vendors
 import (
 	"strings"
 	"testing"
+	"unicode"
 )
 
 // Every row on the catalogue screen must render as something deliberate. A
@@ -55,4 +56,34 @@ func TestGetInventsAnEntryForTheUncatalogued(t *testing.T) {
 	if got := Get("Gemini").Name; got != "Gemini" {
 		t.Errorf("Get(%q).Name = %q", "Gemini", got)
 	}
+}
+
+// The console switches to LabelEn and BlurbEn on its English screens and falls
+// back to the Persian pair when they are empty. So a missing translation does
+// not fail anywhere a person would notice: it puts a Persian sentence, or a
+// name in a script the reader cannot even sound out, on a screen that is
+// otherwise English. Caught here rather than by someone switching the language.
+func TestEveryVendorReadsInEnglish(t *testing.T) {
+	for _, v := range Known() {
+		if v.Blurb != "" && strings.TrimSpace(v.BlurbEn) == "" {
+			t.Errorf("%s: has a Blurb but no BlurbEn", v.Name)
+		}
+		if hasArabicScript(v.Label) && strings.TrimSpace(v.LabelEn) == "" {
+			t.Errorf("%s: label %q is in Persian script but has no LabelEn", v.Name, v.Label)
+		}
+		// The likeliest slip is pasting the Persian into the English field,
+		// which passes both checks above.
+		if hasArabicScript(v.LabelEn) || hasArabicScript(v.BlurbEn) {
+			t.Errorf("%s: the English label or blurb is not in English", v.Name)
+		}
+	}
+}
+
+func hasArabicScript(s string) bool {
+	for _, r := range s {
+		if unicode.Is(unicode.Arabic, r) {
+			return true
+		}
+	}
+	return false
 }
