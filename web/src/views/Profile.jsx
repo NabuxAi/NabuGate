@@ -76,7 +76,7 @@ export default function Profile() {
     <Layout title={t('title')} subtitle={t('subtitle')}>
       {error && <div className="card banner-error">{error}</div>}
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 24, paddingBottom: 32 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(320px, 100%), 1fr))', gap: 24, paddingBottom: 32 }}>
         
         {/* Account Info */}
         <div className="card">

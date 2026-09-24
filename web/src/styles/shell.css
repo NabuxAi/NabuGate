@@ -417,14 +417,108 @@ html[lang="en"] .tbl thead th { text-transform: uppercase; letter-spacing: 0.05e
 /* ---- Boot shell ------------------------------------------------------------ */
 .boot-shell .boot-side { border-inline-start: 0; border-inline-end: 1px solid var(--ng-border); }
 
+/* Six usage totals: three to a row on a wide screen, not four and a
+   straggling two (the phone rule below takes them to two). */
+@media (min-width: 1000px) {
+  .kpi-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
 /* ---- Mobile ---------------------------------------------------------------- */
 @media (max-width: 720px) {
   .sidebar .sb-close { display: inline-grid; }
-  .app .sidebar { width: min(86vw, 300px); background: var(--ng-surface); }
+  /* A closed drawer is only moved off-canvas, so without visibility its links
+     stay in the tab order and a swipe can drag it into view. The visibility
+     flip waits for the slide-out to finish, then is instant on the way in. */
+  .app .sidebar {
+    width: min(86vw, 300px); background: var(--ng-surface);
+    visibility: hidden;
+    transition: transform var(--ng-response) var(--ng-spring), visibility 0s linear var(--ng-response);
+  }
+  .app.nav-open .sidebar { visibility: visible; transition: transform 380ms var(--ng-spring-soft), visibility 0s; }
+  html:has(.app.nav-open) { overflow: hidden; }
+
+  /* The topbar wraps instead of squeezing: two actions beside a title left it
+     a word wide, one word per line. The title keeps ~180px or the actions
+     drop to a row of their own. */
+  .topbar { flex-wrap: wrap; row-gap: 10px; padding-block: 10px; }
+  .topbar-title { flex: 1 1 180px; }
+  .topbar-actions { flex: 0 1 auto; flex-wrap: wrap; gap: 8px; }
+  .topbar-actions .btn { padding-inline: 12px; gap: 6px; }
+  .topbar-actions .btn, .card-head .btn { white-space: nowrap; }
+  /* Two or more actions get a row of their own and share it, instead of one
+     running off the edge of the screen. */
+  .topbar-actions:has(> :nth-child(2)) { flex: 1 1 100%; flex-wrap: nowrap; }
+  .topbar-actions:has(> :nth-child(2)) > * { flex: 1 1 auto; min-width: 0; white-space: normal; line-height: 1.3; }
   .topbar h2 { font-size: 17px; }
+  .topbar .sub { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  .card { padding: 16px; }
+  .card-head { flex-wrap: wrap; }
   .welcome { padding: 20px; }
   .welcome h1 { font-size: 20px; }
-  .kpi .kpi-value { font-size: 24px; }
+  .welcome-actions .btn { flex: 1 1 auto; }
+
+  /* KPI tiles two to a row: one per row made the dashboard four screens of
+     mostly empty cards before the first chart. */
+  .grid-auto { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .grid-auto > .kpi { padding: 14px; gap: 6px; }
+  .kpi .kpi-label { font-size: 12px; gap: 7px; }
+  .kpi-icon { width: 30px; height: 30px; border-radius: 9px; }
+  .kpi .kpi-value { font-size: 20px; overflow-wrap: anywhere; }
+  .kpi .kpi-sub { font-size: 11px; line-height: 1.7; }
+
+  /* Tables scroll sideways rather than crushing every column to its longest
+     word; the column cut at the edge is the cue that there is more. (Scroll
+     shadows drawn with background-attachment:local land on the wrong edge in
+     a right-to-left scroller, so they are deliberately not used.) */
+  .tbl { display: block; overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: thin; }
+  .tbl th, .tbl td { white-space: nowrap; }
+  .tbl td.cell-wrap { white-space: normal; min-width: 180px; }
+
+  /* Tabs scroll as one row. The underline moves onto an inset shadow because
+     a scroll container clips the -2px overlap it used to hang from. */
+  .tabs-container {
+    overflow-x: auto; scrollbar-width: none; gap: 4px; margin-bottom: 18px;
+    border-bottom: 0; box-shadow: inset 0 -2px 0 var(--ng-border-faint);
+  }
+  .tabs-container::-webkit-scrollbar { display: none; }
+  .tab-item { flex: 0 0 auto; white-space: nowrap; margin-bottom: 0; padding: 12px; }
+
+  /* iOS zooms into any focused field under 16px and does not zoom back out. */
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]),
+  select, textarea, select.input, textarea.input { font-size: 16px; }
+
+  /* Dialogs become bottom sheets: in thumb reach, full width, and a long form
+     scrolls instead of running off the top (auto margin, not align-items:end,
+     which would push an overflowing sheet's head out of reach). */
+  .modal-backdrop { align-items: start; padding: 24px 0 0; }
+  .modal-backdrop > .modal, .modal-backdrop > .onboard {
+    margin-top: auto; width: 100%; max-width: 100%;
+    border-end-start-radius: 0; border-end-end-radius: 0;
+    animation-name: ng-sheet;
+  }
+  .modal-backdrop > .modal { padding: 22px 16px 20px; }
+  .modal-actions { flex-wrap: wrap; }
+  .modal-actions .btn { flex: 1 1 auto; }
+  .onboard-body { padding: 28px 20px 12px; }
+  .onboard-foot { padding: 12px 20px 22px; }
+}
+@keyframes ng-sheet { from { opacity: 0; transform: translateY(32px); } to { opacity: 1; transform: none; } }
+
+/* Touch: fingers, not cursors. 36px is the floor for anything tappable, and
+   nothing may hide behind :hover, which a phone never has. */
+@media (pointer: coarse) {
+  .seg-btn, .seg-sm .seg-btn { height: 36px; min-width: 44px; }
+  .icon-btn { width: 40px; height: 40px; }
+  .code-wrap .copy { min-height: 32px; padding: 5px 12px; font-size: 12px; }
+  .linklike { padding-block: 6px; margin-block: -6px; }
+  .auth-top .auth-home { min-height: 40px; }
+}
+@media (hover: none) {
+  /* Always shown, so it gets a strip of its own above the first line instead
+     of sitting on top of it. */
+  .code-wrap .copy { opacity: 1; top: 8px; right: 8px; }
+  .code-box .code { padding-top: 48px; }
 }
 
 @media (prefers-reduced-motion: reduce) {

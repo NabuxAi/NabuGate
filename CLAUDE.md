@@ -195,6 +195,12 @@ config.example.yaml        # نمونهٔ پیکربندی (alias‌ها، provi
   می‌شود؛ زبانی که فایل ندارد فارسی می‌بیند). بخشِ تازه را در هر دو فایل و در `docs/toc.js` بگذار.
 - کاتالوگِ `internal/vendors` برای هر provider `BlurbEn` (و برای برچسبِ فارسی `LabelEn`) لازم دارد؛
   `TestEveryVendorReadsInEnglish` این را اجبار می‌کند.
+- **موبایل:** لایهٔ موبایل در `web/src/styles/shell.css` است (`max-width: 720px`، `pointer: coarse`،
+  `hover: none`). فیلدها زیرِ ۱۶px نروند (iOS روی فوکوس زوم می‌کند و برنمی‌گردد)؛ هدفِ لمسی کمتر
+  از ۳۶px نباشد؛ هیچ کنترلی فقط با `:hover` پیدا نشود (دکمهٔ کپی روی لمسی همیشه دیده می‌شود).
+  جدول‌ها روی موبایل افقی اسکرول می‌شوند نه اینکه ستون‌ها له شوند؛ ستونِ متنِ آزاد را `cell-wrap`
+  بگذار. گریدِ inline با `minmax(min(Npx, 100%), 1fr)` بنویس تا روی ۳۲۰px بیرون نزند. دیالوگ‌ها
+  روی موبایل bottom sheet‌اند و دراورِ سایدبار بسته `visibility: hidden` است.
 - بعد از هر تغییر در `web/src`، `cd web && npm run build` و `web/dist` + `web/src.sha256` را با هم
   کامیت کن (`web/freshness_test.go` چک می‌کند).
 

@@ -142,7 +142,7 @@ client.chat.completions.create(
         {aliases.length === 0 ? (
           <div className="chips"><Skeleton w={110} h={40} /><Skeleton w={130} h={40} /><Skeleton w={100} h={40} /></div>
         ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 12 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(200px, 100%), 1fr))', gap: 12 }}>
             {aliases.map((a) => (
               <div key={a.id} style={{ padding: 12, border: '1px solid var(--ng-border)', borderRadius: 8 }}>
                 <div className="mono" dir="ltr" style={{ fontWeight: 700, marginBottom: 4 }}>{a.id}</div>

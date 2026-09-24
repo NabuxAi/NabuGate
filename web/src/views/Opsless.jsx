@@ -50,7 +50,8 @@ export default function Opsless() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <label>
             <div className="label">{t('botToken')}</div>
-            <input 
+            <input
+              className="input"
               disabled 
               type="password" 
               value="********" 
@@ -64,7 +65,8 @@ export default function Opsless() {
           
           <label>
             <div className="label">{t('chatId')}</div>
-            <input 
+            <input
+              className="input"
               disabled 
               value="********" 
               dir="ltr" 

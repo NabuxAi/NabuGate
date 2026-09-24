@@ -75,7 +75,7 @@ export default function Models() {
         <h3 style={{ fontSize: 18, marginBottom: 8, color: 'var(--ng-heading)' }}>{t('aliasesTitle')}</h3>
         <p style={{ color: 'var(--ng-muted)', fontSize: 13, marginBottom: 20 }}>{t('aliasesIntro')}</p>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 16 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(280px, 100%), 1fr))', gap: 16 }}>
           {data === null && <div style={{ gridColumn: '1 / -1' }}><SkeletonCards n={6} h={110} /></div>}
           {data !== null && aliases.length === 0 && <div className="card" style={{ padding: 24, textAlign: 'center', color: 'var(--ng-muted)', gridColumn: '1 / -1' }}>{t('noAliases')}</div>}
           {aliases.map((a) => {
@@ -121,7 +121,7 @@ export default function Models() {
         <h3 style={{ fontSize: 18, marginBottom: 8, color: 'var(--ng-heading)' }}>{t('agentsTitle')}</h3>
         <p style={{ color: 'var(--ng-muted)', fontSize: 13, marginBottom: 20 }}>{t('agentsIntro')}</p>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 16 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(280px, 100%), 1fr))', gap: 16 }}>
           {agents.length === 0 && <div className="card" style={{ padding: 24, textAlign: 'center', color: 'var(--ng-muted)' }}>{t('noAgents')}</div>}
           {agents.map((a) => (
             <div key={a} className="card" style={{ padding: 20, border: '1px solid var(--ng-border)' }}>

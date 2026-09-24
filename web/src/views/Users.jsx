@@ -94,7 +94,7 @@ export default function Users() {
       {error && <div className="card banner-error">{error}</div>}
       {ok && <div className="card" style={{ background: 'var(--ng-ok-soft)', color: 'var(--ng-ok-text)', border: '1px solid var(--ng-ok)', padding: 16 }}>{ok}</div>}
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 24, marginBottom: 24 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(300px, 100%), 1fr))', gap: 24, marginBottom: 24 }}>
         <div className="card">
           <div className="card-head">{t('usersList')}</div>
           <table className="tbl">
@@ -127,7 +127,7 @@ export default function Users() {
             <label style={{ fontSize: 13 }}>
               {t('userEmail')}
               <input
-                className="signin-field"
+                className="input"
                 placeholder="user@example.com"
                 value={selectedUser}
                 onChange={(e) => setSelectedUser(e.target.value)}
@@ -139,7 +139,7 @@ export default function Users() {
             <label style={{ fontSize: 13 }}>
               {t('amount')}
               <input
-                className="signin-field"
+                className="input"
                 type="number"
                 placeholder="50"
                 value={amount}

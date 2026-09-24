@@ -22,12 +22,21 @@ function read() {
   return 'dark';
 }
 
+// The phone's browser bar takes this colour; left at the dark default it drew
+// a black band above the light theme. Same values as --ng-bg in tokens.css.
+const CHROME = { dark: '#070b16', light: '#f5f7fc' };
+
+function apply(next) {
+  document.documentElement.setAttribute('data-theme', next);
+  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', CHROME[next]);
+}
+
 let theme = read();
-document.documentElement.setAttribute('data-theme', theme);
+apply(theme);
 
 function set(next) {
   theme = next;
-  document.documentElement.setAttribute('data-theme', next);
+  apply(next);
   try { localStorage.setItem(KEY, next); } catch { /* storage blocked */ }
   listeners.forEach((l) => l());
 }

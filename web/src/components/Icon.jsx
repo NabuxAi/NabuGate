@@ -33,6 +33,8 @@ const P = {
   chevronDown: <path d="m6 9 6 6 6-6" />,
   arrow: <path d="M5 12h14M13 5l7 7-7 7" />,
   arrowUpRight: <path d="M7 17 17 7M8 7h9v9" />,
+  arrowUp: <path d="M12 19V5M5 12l7-7 7 7" />,
+  arrowDown: <path d="M12 5v14M19 12l-7 7-7-7" />,
   copy: <><rect x="9" y="9" width="12" height="12" rx="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></>,
   check: <path d="M20 6 9 17l-5-5" />,
   logout: <><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><path d="m16 17 5-5-5-5M21 12H9" /></>,
