@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -275,4 +276,48 @@ func truncateForTest(s string) string {
 		return s[:200] + "…"
 	}
 	return s
+}
+
+// TestChatReportsTheCostOfTheRequest: a product billing its own tenants per
+// request needs the figure the gateway charged, on the response, not a guess
+// from the token counts at a price list of its own.
+func TestChatReportsTheCostOfTheRequest(t *testing.T) {
+	up := fakeUpstream(t)
+	defer up.Close()
+	adapters := map[string]provider.Adapter{"parspack": provider.NewOpenAIAdapter("parspack", up.URL, "k", nil)}
+	r := router.New(adapters, map[string]config.ModelRoute{}, nil, nil, nil, nil, map[string][]string{"parspack": nil}, discardLogger())
+	// One dollar per million prompt tokens, two per million completion
+	// tokens; the fake upstream answers three total tokens and no split, so
+	// the charge is the completion price on three tokens or nothing at all —
+	// either way a number, formatted, on the header and in the body.
+	tracker := usage.New(map[string]usage.Price{"parspack/openai/gpt-5.5": {Input: 1, Output: 2}})
+	srv := New(r, policy.New(nil, nil), tracker, nil, discardLogger())
+	ts := httptest.NewServer(srv.Handler())
+	defer ts.Close()
+
+	body := `{"model":"parspack/openai/gpt-5.5","messages":[{"role":"user","content":"hi"}]}`
+	resp, err := http.Post(ts.URL+"/v1/chat/completions", "application/json", strings.NewReader(body))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("status = %d", resp.StatusCode)
+	}
+	header := resp.Header.Get("X-Nabu-Cost-USD")
+	if _, err := strconv.ParseFloat(header, 64); err != nil {
+		t.Fatalf("X-Nabu-Cost-USD = %q: %v", header, err)
+	}
+	var out struct {
+		Usage struct {
+			CostUSD *float64 `json:"cost_usd"`
+		} `json:"usage"`
+	}
+	_ = json.NewDecoder(resp.Body).Decode(&out)
+	if out.Usage.CostUSD == nil {
+		t.Fatalf("usage.cost_usd missing from the body")
+	}
+	if got := strconv.FormatFloat(*out.Usage.CostUSD, 'f', 6, 64); got != header {
+		t.Fatalf("body cost %s disagrees with header %s", got, header)
+	}
 }

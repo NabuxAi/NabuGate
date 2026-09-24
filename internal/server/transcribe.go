@@ -100,10 +100,11 @@ func (s *Server) handleTranscription(w http.ResponseWriter, r *http.Request) {
 	if usage.TotalTokens == 0 && result.Duration > 0 {
 		usage.TotalTokens = int(result.Duration)
 	}
-	s.record(r, result.Provider, result.Model, usage)
+	cost := s.record(r, result.Provider, result.Model, usage)
 
 	w.Header().Set("X-Nabu-Provider", result.Provider)
 	w.Header().Set("X-Nabu-Model", result.Model)
+	w.Header().Set(costHeader, formatCost(cost))
 
 	format := strings.TrimSpace(r.FormValue("response_format"))
 	if format == "text" {

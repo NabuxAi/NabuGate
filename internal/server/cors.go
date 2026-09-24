@@ -45,7 +45,7 @@ func (s *Server) allowedRequestHeaders() string {
 // corsExposed are the response headers a browser may read. Without this the
 // balance headers exist on the wire and are invisible to the page that needs
 // them.
-const corsExposed = "X-Nabu-Balance-USD, X-Nabu-Balance-Warning, Retry-After"
+const corsExposed = "X-Nabu-Balance-USD, X-Nabu-Balance-Warning, X-Nabu-Cost-USD, Retry-After"
 
 // cors wraps a handler with cross-origin support for the configured origins.
 // With no origins configured it is a no-op, and the handler behaves exactly as
