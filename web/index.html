@@ -32,6 +32,8 @@
         d.setAttribute('lang', l);
         d.setAttribute('dir', l === 'fa' ? 'rtl' : 'ltr');
         d.setAttribute('data-theme', t === 'light' ? 'light' : 'dark');
+        var c = document.querySelector('meta[name="theme-color"]');
+        if (c) c.setAttribute('content', t === 'light' ? '#f5f7fc' : '#070b16');
       })();
     </script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />

@@ -59,6 +59,14 @@ export default function Sidebar({ current, onNavigate, effectivelyAdmin }) {
 
   const closeDrawer = () => document.querySelector('.app')?.classList.remove('nav-open');
 
+  // On a phone the sidebar is a drawer, and a drawer closes on Escape like
+  // every other overlay (a keyboard on a tablet, or a narrow desktop window).
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === 'Escape') closeDrawer(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
   async function logout() {
     try { await api.logout(); } catch { /* the session may already be gone */ }
     window.location.reload();

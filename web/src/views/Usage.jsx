@@ -95,7 +95,7 @@ export default function Usage() {
       title={t('title')}
       subtitle={t('subtitle')}
       actions={
-        <select style={{ background: 'var(--ng-surface)', color: 'var(--ng-heading)', border: '1px solid var(--ng-border)', padding: '6px 12px', borderRadius: '6px', fontSize: 13, outline: 'none' }}>
+        <select className="input" style={{ width: 'auto' }} aria-label={t('title')}>
           <option>{t('last30')}</option>
           <option>{t('lastWeek')}</option>
           <option>{t('today')}</option>
@@ -104,66 +104,32 @@ export default function Usage() {
     >
       {error && <div className="card banner-error">{error}</div>}
 
-      {/* 6 Stat Cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: 16, marginBottom: 24 }}>
-        
-        {/* Row 1 */}
-        <div className="card" style={{ padding: '20px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div>
-            <div style={{ color: 'var(--ng-muted)', fontSize: 13, marginBottom: 8 }}>{t('outTokens')}</div>
-            <div style={{ fontSize: 18, fontWeight: 700 }}>{fmtInt(total.completion_tokens)}</div>
+      {/* Six totals, as the same KPI tiles the dashboard uses so the two
+          screens read as one console, and two to a row on a phone. */}
+      <div className="grid-auto kpi-grid stagger">
+        {[
+          { label: t('outTokens'), value: fmtInt(total.completion_tokens), icon: 'arrowUp', tone: 'ok' },
+          { label: t('inTokens'), value: fmtInt(total.prompt_tokens), icon: 'arrowDown' },
+          { label: t('totalTokens'), value: fmtInt(totalTokens), icon: 'layers', tone: 'pass' },
+          { label: t('providerCost'), value: '$ ' + fmtDigits(total.cost.toFixed(3)), icon: 'receipt', ltr: true },
+          // This multiplied the dollar figure by a rate written into the
+          // source as "dummy exchange rate for UI". A made-up number rendered
+          // in تومان beside real ones reads as a real one.
+          { label: t('estCost'), value: usd(total.cost), icon: 'card', tone: 'warn', ltr: true },
+          { label: t('requests'), value: fmtInt(total.requests), icon: 'zap' },
+        ].map((k) => (
+          <div key={k.icon} className="card kpi">
+            <div className="kpi-label">
+              <span className={'kpi-icon' + (k.tone ? ' ' + k.tone : '')}><Icon name={k.icon} size={18} /></span>
+              {k.label}
+            </div>
+            <div className={'kpi-value' + (k.ltr ? ' ltr' : '')}>{k.value}</div>
           </div>
-          <div style={{ background: 'rgba(16, 185, 129, 0.1)', color: '#10b981', padding: 12, borderRadius: 8, fontSize: 20 }}>↑</div>
-        </div>
-
-        <div className="card" style={{ padding: '20px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div>
-            <div style={{ color: 'var(--ng-muted)', fontSize: 13, marginBottom: 8 }}>{t('inTokens')}</div>
-            <div style={{ fontSize: 18, fontWeight: 700 }}>{fmtInt(total.prompt_tokens)}</div>
-          </div>
-          <div style={{ background: 'rgba(59, 130, 246, 0.1)', color: '#3b82f6', padding: 12, borderRadius: 8, fontSize: 20 }}>↓</div>
-        </div>
-
-        <div className="card" style={{ padding: '20px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div>
-            <div style={{ color: 'var(--ng-muted)', fontSize: 13, marginBottom: 8 }}>{t('totalTokens')}</div>
-            <div style={{ fontSize: 18, fontWeight: 700 }}>{fmtInt(totalTokens)}</div>
-          </div>
-          <div style={{ background: 'rgba(99, 102, 241, 0.1)', color: '#6366f1', padding: 12, borderRadius: 8, fontSize: 20 }}>⊚</div>
-        </div>
-
-        {/* Row 2 */}
-        <div className="card" style={{ padding: '20px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div>
-            <div style={{ color: 'var(--ng-muted)', fontSize: 13, marginBottom: 8 }}>{t('providerCost')}</div>
-            <div style={{ fontSize: 18, fontWeight: 700 }} dir="ltr">$ {fmtDigits(total.cost.toFixed(3))}</div>
-          </div>
-          <div style={{ background: 'rgba(59, 130, 246, 0.1)', color: '#3b82f6', padding: 12, borderRadius: 8, fontSize: 20 }}>$</div>
-        </div>
-
-        <div className="card" style={{ padding: '20px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div>
-            <div style={{ color: 'var(--ng-muted)', fontSize: 13, marginBottom: 8 }}>{t('estCost')}</div>
-            {/* This multiplied the dollar figure by a rate written into the
-                source as "dummy exchange rate for UI". A made-up number
-                rendered in تومان beside real ones reads as a real one. */}
-            <div style={{ fontSize: 18, fontWeight: 700 }} dir="ltr">{usd(total.cost)}</div>
-          </div>
-          <div style={{ background: 'rgba(245, 158, 11, 0.1)', color: '#f59e0b', padding: 12, borderRadius: 8, fontSize: 20 }}>💳</div>
-        </div>
-
-        <div className="card" style={{ padding: '20px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div>
-            <div style={{ color: 'var(--ng-muted)', fontSize: 13, marginBottom: 8 }}>{t('requests')}</div>
-            <div style={{ fontSize: 18, fontWeight: 700 }}>{fmtInt(total.requests)}</div>
-          </div>
-          <div style={{ background: 'rgba(99, 102, 241, 0.1)', color: '#6366f1', padding: 12, borderRadius: 8, fontSize: 20 }}>⚡</div>
-        </div>
-
+        ))}
       </div>
 
       {/* Model & Provider Stats */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 24, marginBottom: 24 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(300px, 100%), 1fr))', gap: 24, marginBottom: 24 }}>
         <div className="card" style={{ padding: 0, display: 'flex', flexDirection: 'column' }}>
           <div style={{ padding: 24, borderBottom: '1px solid var(--ng-border)' }}>
             <h3 style={{ fontSize: 14, margin: 0 }}>{t('byProvider')}</h3>

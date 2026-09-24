@@ -14,8 +14,8 @@ const T = {
     savedFlow: 'خط‌لوله «{name}» با موفقیت ذخیره شد.',
     confirmDeleteFlow: 'آیا از حذف خط‌لوله «{name}» اطمینان دارید؟',
     deletedFlow: 'خط‌لوله «{name}» حذف شد.',
-    newFlow: 'ساخت خط‌لوله (Flow)',
-    newAgent: 'ساخت ساب‌اجنت',
+    newFlow: 'خط‌لولهٔ جدید',
+    newAgent: 'ساب‌اجنت جدید',
     defFlowDesc: 'توضیح خط‌لوله',
     defStep1: 'تحلیل اولیه',
     defStep2: 'بازبینی',
@@ -250,7 +250,7 @@ export default function Agents() {
       title={t('title')}
       subtitle={t('subtitle')}
       actions={
-        <div style={{ display: 'flex', gap: '8px' }}>
+        <>
           <button
             className="btn btn-secondary"
             onClick={() =>
@@ -281,7 +281,7 @@ export default function Agents() {
           >
             <Icon name="plus" size={16} />{t('newAgent')}
           </button>
-        </div>
+        </>
       }
     >
       {error && <div className="banner-error" style={{ marginBottom: '16px' }}>{error}</div>}
@@ -318,9 +318,9 @@ export default function Agents() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="input"
-              style={{ flex: 1, minWidth: '240px', maxWidth: '300px' }}
+              style={{ flex: 1, minWidth: 'min(240px, 100%)', maxWidth: '300px' }}
             />
-            <div style={{ display: 'flex', gap: '6px' }}>
+            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
               {['all', 'seo', 'cine', 'sales', 'write'].map((sq) => (
                 <button
                   key={sq}

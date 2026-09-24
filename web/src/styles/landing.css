@@ -355,7 +355,7 @@ html[lang="en"] .lp-card p { line-height: 1.65; }
 [data-theme="light"] .lp-dev-more { color: var(--ng-accent); }
 .lp-dev-code { min-width: 0; }
 .lp-dev-code .code { background: var(--lp-code-bg); min-height: 290px; font-size: 13px; }
-.lp-dev-code .code-wrap > div { color: var(--lp-muted) !important; }
+.lp-dev-code .code-label { color: var(--lp-muted) !important; }
 .lp-dev-code .copy { opacity: 1; }
 
 /* Pricing */
@@ -476,6 +476,9 @@ html[lang="en"] .lp-card p { line-height: 1.65; }
   .lp-plans { grid-template-columns: minmax(0, 1fr); max-width: 440px; margin: 0 auto; }
   .lp-steps { grid-template-columns: minmax(0, 1fr); }
   .lp-steps::before { display: none; }
+  /* The code panel kept its desktop height beside a tab column that is now a
+     row above it, leaving a screen of empty editor under four lines of curl. */
+  .lp-dev-code .code { min-height: 0; }
 }
 @media (max-width: 640px) {
   .lp-container { padding: 0 16px; }
@@ -494,6 +497,21 @@ html[lang="en"] .lp-card p { line-height: 1.65; }
   .lp-stats > div { padding: 20px 16px; }
   .lp-stats strong { font-size: 28px; }
   .lp-mobile-menu { padding-inline: 16px; }
+  .lp-section { padding: 56px 0; }
+  .lp-hero-cta { width: 100%; }
+  .lp-hero-cta .lp-btn { flex: 1 1 0; padding-inline: 14px; }
+  .lp-cta-btns { width: 100%; }
+  .lp-cta-btns .lp-btn { flex: 1 1 150px; }
+  /* Steps read as a list on a phone: icon beside the text, not three
+     full-screen cards with a 56px tile each. */
+  .lp-step {
+    display: grid; grid-template-columns: 48px minmax(0, 1fr); column-gap: 14px; row-gap: 4px;
+    align-items: start; text-align: start; padding: 18px;
+  }
+  .lp-step-icon { grid-row: span 2; width: 48px; height: 48px; border-radius: 14px; }
+  .lp-step h3 { margin: 2px 0 0; font-size: 16.5px; padding-inline-end: 36px; }
+  .lp-step p { font-size: 14px; }
+  .lp-step-num { font-size: 32px; top: 12px; inset-inline-end: 14px; }
 }
 @media (prefers-reduced-motion: reduce) {
   .lp-orb, .lp-grad, .lp-marquee-track, .lp-float, .lp-live::after { animation: none !important; }

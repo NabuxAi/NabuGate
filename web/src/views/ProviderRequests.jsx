@@ -115,7 +115,7 @@ export default function ProviderRequests() {
                     </div>
                   </td>
                   <td className="ltr">{r.owner}</td>
-                  <td style={{ color: 'var(--ng-muted)' }}>{r.note || '—'}</td>
+                  <td className="cell-wrap" style={{ color: 'var(--ng-muted)' }}>{r.note || '—'}</td>
                   <td>
                     <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
                       <input
