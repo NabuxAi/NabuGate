@@ -446,6 +446,10 @@ html[lang="en"] .lp-card p { line-height: 1.65; }
 .lp-hero .lp-reveal:nth-child(4) { transition-delay: 180ms; }
 .lp-hero .lp-reveal:nth-child(5) { transition-delay: 240ms; }
 .lp-hero-visual.lp-reveal { transition-delay: 200ms; }
+/* The hero is on screen at load. It still rises into place, but is never
+   invisible: a fade kept the headline and lead "unpainted" for most of a second
+   after they were rendered, which is exactly what LCP measures. */
+.lp-hero .lp-reveal { opacity: 1; }
 
 /* ---- Responsive ---- */
 @media (max-width: 1024px) {

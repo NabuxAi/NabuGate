@@ -1,9 +1,11 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import Layout from '../components/Layout.jsx';
 import Icon from '../components/Icon.jsx';
+import { SkeletonText } from '../components/Skeleton.jsx';
 import { LangSwitch, Logo, ThemeToggle } from '../components/Brand.jsx';
 import { DEFAULT_LANG, useI18n, useT } from '../i18n/index.jsx';
 import { ALL, ALL_IDS, GROUPS } from './docs/toc.js';
+import { CONTENT_LOADERS } from './docs/load.js';
 import '../styles/docs.css';
 
 /*
@@ -15,14 +17,21 @@ import '../styles/docs.css';
  *
  * The prose lives in docs/content.<lang>.jsx, one file per language, picked up
  * by glob: a language whose file does not exist yet falls back to Persian
- * instead of failing the build.
+ * instead of failing the build. Each is its own chunk, loaded when that
+ * language is shown, so a reader downloads one language's prose, not all of
+ * them.
  */
 const CONTENT = Object.fromEntries(
-  Object.entries(import.meta.glob('./docs/content.*.jsx', { eager: true })).map(([path, mod]) => [
-    /content\.(\w+)\.jsx$/.exec(path)[1],
-    mod.default,
-  ]),
+  Object.entries(CONTENT_LOADERS).map(([lang, load]) => [lang, lazy(load)]),
 );
+
+// Runs once its children have mounted: the "on this page" list reads the
+// headings out of the rendered prose, which for a lazily loaded language exists
+// only after the chunk arrives, not when the section first changes.
+function Mounted({ onMount, children }) {
+  useEffect(onMount, []);
+  return children;
+}
 
 const ORIGIN = typeof window !== 'undefined' && window.location.origin.startsWith('http')
   ? window.location.origin
@@ -80,6 +89,7 @@ export default function Docs({ embedded = false, signedIn = false }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [toc, setToc] = useState([]);
   const [current, setCurrent] = useState(null);
+  const [rendered, setRendered] = useState(0);
   const body = useRef(null);
 
   useEffect(() => {
@@ -114,7 +124,7 @@ export default function Docs({ embedded = false, signedIn = false }) {
     );
     hs.forEach((h) => io.observe(h));
     return () => io.disconnect();
-  }, [active, lang]);
+  }, [active, lang, rendered]);
 
   const title = (item) => item[lang] || item[DEFAULT_LANG];
   const q = query.trim().toLowerCase();
@@ -185,7 +195,11 @@ export default function Docs({ embedded = false, signedIn = false }) {
         <span>{title(activeItem)}</span>
       </div>
       <article key={active + lang} ref={body} className="docs-body view-enter">
-        <Content active={active} go={go} BASE={BASE} ORIGIN={ORIGIN} KEY={KEY} />
+        <Suspense fallback={<SkeletonText lines={8} />}>
+          <Mounted onMount={() => setRendered((n) => n + 1)}>
+            <Content active={active} go={go} BASE={BASE} ORIGIN={ORIGIN} KEY={KEY} />
+          </Mounted>
+        </Suspense>
       </article>
       <nav className="docs-pager">
         {prev ? (

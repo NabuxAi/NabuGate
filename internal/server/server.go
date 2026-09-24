@@ -7,7 +7,6 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
-	"io/fs"
 	"log/slog"
 	"math"
 	"net/http"
@@ -212,9 +211,9 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /v1/usage", s.auth(s.handleUsage))
 	mux.HandleFunc("GET /v1/photos/search", s.auth(s.handlePhotoSearch))
 
-	if assets, ok := web.Assets(); ok {
-		fileServer := http.FileServer(http.FS(assets))
-		mux.Handle("GET /", spaFileServer(assets, fileServer))
+	site := s.webSite()
+	if site != nil {
+		mux.Handle("GET /", site)
 	}
 
 	mux.HandleFunc("GET /api/public/models", func(w http.ResponseWriter, r *http.Request) {
@@ -228,7 +227,7 @@ func (s *Server) Handler() http.Handler {
 		writeJSON(w, http.StatusOK, names)
 	})
 
-	s.mountConsole(mux)
+	s.mountConsole(mux, site)
 	s.mountConsoleAPI(mux)
 	s.mountConversationAPI(mux)
 
@@ -272,49 +271,43 @@ func (s *Server) withMCP(mux *http.ServeMux) http.Handler {
 	})
 }
 
-// mountConsole serves the embedded admin console (web/dist) under /admin/ when
-// the bundle is built into the binary.
+// webSite loads the embedded web bundle (web/dist), or returns nil when the
+// binary was built without one so the gateway still starts as a bare API.
+func (s *Server) webSite() *staticSite {
+	assets, ok := web.Assets()
+	if !ok {
+		return nil
+	}
+	site, err := newStaticSite(assets)
+	if err != nil {
+		s.log.Warn("web bundle unreadable; serving the API only", "error", err)
+		return nil
+	}
+	return site
+}
+
+// mountConsole serves the embedded admin console (web/dist) under /admin/ and
+// /panel/ when the bundle is built into the binary. Unknown sub-paths fall back
+// to the app shell (see staticSite), so a refresh on a deep link keeps working.
 //
 // The shell is served without a session because it has to be: it contains the
 // login form. Everything it can actually show comes from /admin/api/*, which
 // requires one. What the shell must never do is carry a gateway key — it used
 // to be described as safe because the data lived behind /v1/*, but that put the
 // admin key in a browser and handed the console to anyone who found the URL.
-func (s *Server) mountConsole(mux *http.ServeMux) {
-	assets, ok := web.Assets()
-	if !ok {
+func (s *Server) mountConsole(mux *http.ServeMux, site *staticSite) {
+	if site == nil {
 		return
 	}
-	fileServer := http.FileServer(http.FS(assets))
-	mux.Handle("GET /admin/", http.StripPrefix("/admin/", spaFileServer(assets, fileServer)))
+	mux.Handle("GET /admin/", http.StripPrefix("/admin/", site))
 	// Bare /admin → /admin/ so the SPA's relative asset URLs resolve correctly.
 	mux.HandleFunc("GET /admin", func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/admin/", http.StatusMovedPermanently)
 	})
 
-	mux.Handle("GET /panel/", http.StripPrefix("/panel/", spaFileServer(assets, fileServer)))
+	mux.Handle("GET /panel/", http.StripPrefix("/panel/", site))
 	mux.HandleFunc("GET /panel", func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/panel/", http.StatusMovedPermanently)
-	})
-}
-
-// spaFileServer serves static files from the console bundle and falls back to
-// index.html for paths that don't map to a file, so client-side navigation
-// (and a refresh on a deep link) keeps working.
-func spaFileServer(assets fs.FS, fileServer http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		p := strings.TrimPrefix(r.URL.Path, "/")
-		if p == "" {
-			fileServer.ServeHTTP(w, r)
-			return
-		}
-		if _, err := fs.Stat(assets, p); err != nil {
-			r = r.Clone(r.Context())
-			r.URL.Path = "/"
-			fileServer.ServeHTTP(w, r)
-			return
-		}
-		fileServer.ServeHTTP(w, r)
 	})
 }
 

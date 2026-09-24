@@ -1,55 +1,30 @@
-import { useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { useTheme } from './useTheme.js';
-import { stripLangPrefix, useI18n, useT } from './i18n/index.jsx';
-import { NAV_T } from './nav.js';
+import { getLang, stripLangPrefix, useI18n, useT } from './i18n/index.jsx';
+import { NAV_T, navGroups } from './nav.js';
 
 import * as api from './api.js';
-import SignIn from './views/SignIn.jsx';
-import Tokens from './views/Tokens.jsx';
-import Sidebar from './components/Sidebar.jsx';
-import Dashboard from './views/Dashboard.jsx';
-import Providers from './views/Providers.jsx';
-import ProviderRequests from './views/ProviderRequests.jsx';
-import Models from './views/Models.jsx';
-import Keys from './views/Keys.jsx';
-import Usage from './views/Usage.jsx';
-import Agents from './views/Agents.jsx';
-import Users from './views/Users.jsx';
-import Opsless from './views/Opsless.jsx';
-import Profile from "./views/Profile.jsx";
-import Payments from "./views/Payments.jsx";
-import Integration from './views/Integration.jsx';
-import Account from './views/Account.jsx';
-import Plans from './views/Plans.jsx';
 import Landing from './views/Landing.jsx';
-import Docs from './views/Docs.jsx';
-import Security from './views/Security.jsx';
-import Requests from './views/Requests.jsx';
 import { BootShell } from './components/Skeleton.jsx';
-import ErrorBoundary from './components/ErrorBoundary.jsx';
+import { CONTENT_LOADERS } from './views/docs/load.js';
 
-const VIEWS = {
-  landing: () => <Landing />,
-  docs: () => <Docs embedded />,
+/*
+ * Only the landing page is in the first download: it is where a new visitor
+ * arrives, so it must not wait on a second round trip. Everything else is its
+ * own chunk, fetched when its route is opened — the docs (whose prose is split
+ * again per language), the sign-in form, and the console with all its views.
+ * Before, all of it was one 400 KB script that a visitor to the home page had
+ * to download and parse before seeing anything.
+ */
+const loadConsole = () => import('./Console.jsx');
+const loadDocs = () => import('./views/Docs.jsx');
+const loadSignIn = () => import('./views/SignIn.jsx');
+const Console = lazy(loadConsole);
+const Docs = lazy(loadDocs);
+const SignIn = lazy(loadSignIn);
 
-  dashboard: () => <Dashboard />,
-  providers: () => <Providers />,
-  'provider-requests': () => <ProviderRequests />,
-  opsless: () => <Opsless />,
-  models: () => <Models />,
-  keys: () => <Keys />,
-  tokens: () => <Tokens />,
-  usage: () => <Usage />,
-  agents: () => <Agents />,
-  users: () => <Users />,
-  integration: () => <Integration />,
-  account: () => <Account />,
-  plans: () => <Plans />,
-  payments: () => <Payments />,
-  profile: () => <Profile />,
-  security: () => <Security />,
-  requests: () => <Requests />,
-};
+// Every console view has a sidebar entry, so navGroups is the list of them.
+const KNOWN_VIEWS = new Set(['landing', ...navGroups.flatMap((g) => g.items.map((i) => i.id))]);
 
 function viewFromPath() {
   // /en and /fa are language prefixes on the public pages, not views.
@@ -64,8 +39,24 @@ function viewFromPath() {
     path = window.location.hash.replace(/^#\/?/, '');
   }
 
-  return path ? (VIEWS[path] ? path : 'dashboard') : 'landing';
+  return path ? (KNOWN_VIEWS.has(path) ? path : 'dashboard') : 'landing';
 }
+
+// Start fetching the chunks this URL needs while React is still booting, all
+// at once, rather than one after another as each render asks for the next: the
+// docs page and its prose; or, on a console URL, the console and the sign-in
+// form (which one shows depends on /api/status, and waiting for it to decide
+// would add its round trip to the chain).
+(function preloadRoute() {
+  const p = window.location.pathname;
+  if (p.startsWith('/admin') || p.startsWith('/panel')) {
+    loadConsole();
+    loadSignIn();
+  } else if (viewFromPath() === 'docs') {
+    loadDocs();
+    CONTENT_LOADERS[getLang()]?.();
+  }
+})();
 
 export default function App() {
   useTheme();
@@ -79,6 +70,7 @@ export default function App() {
 
   const isPanel = window.location.pathname.startsWith('/panel');
   const isAdminPath = window.location.pathname.startsWith('/admin');
+  const isPublic = (view === 'landing' || view === 'docs') && !isPanel && !isAdminPath;
 
   const refresh = () =>
     api
@@ -86,7 +78,8 @@ export default function App() {
       .then(setSession)
       .catch(() => setSession({ authenticated: false, needs_setup: false }));
 
-  useEffect(refresh, []);
+  // Braces: refresh returns a promise, which React would take for a cleanup.
+  useEffect(() => { refresh(); }, []);
 
   useEffect(() => {
     const onPopState = () => setView(viewFromPath());
@@ -117,45 +110,26 @@ export default function App() {
     else document.title = `${tNav(view)} · ${brand}`;
   }, [view, lang, tNav]);
 
+  if (isPublic) {
+    // The public pages look the same signed in or out; only the header's call
+    // to action changes. So they render at once rather than waiting for
+    // /api/status, and the button relabels when it answers.
+    const signedIn = !!session?.authenticated;
+    return view === 'docs'
+      ? <Suspense fallback={null}><Docs signedIn={signedIn} /></Suspense>
+      : <Landing signedIn={signedIn} />;
+  }
   if (session === null) return <BootShell />;
-  if ((view === 'landing' || view === 'docs') && !isPanel && !isAdminPath) {
-    // The public pages look the same signed in or out; only the header's
-    // call to action changes.
-    return view === 'docs' ? <Docs signedIn={!!session.authenticated} /> : <Landing signedIn={!!session.authenticated} />;
-  }
   if (!session.authenticated) {
-    return <SignIn needsSetup={session.needs_setup} onAuthenticated={refresh} />;
+    return (
+      <Suspense fallback={<BootShell />}>
+        <SignIn needsSetup={session.needs_setup} onAuthenticated={refresh} />
+      </Suspense>
+    );
   }
-
-  // Determine allowed views based on whether they are in /panel/ or /admin/
-  // Every id here has a sidebar entry in navGroups, and every navGroups entry
-  // is here. The two lists drifted apart before: eleven views were routable
-  // with nothing linking to them, and the views that had no data behind them
-  // rendered an apology.
-  let allowed = [
-    'dashboard', 'account', 'plans', 'payments',
-    'tokens', 'models', 'providers', 'requests', 'integration', 'docs',
-    'profile', 'security',
-  ];
-
-  const effectivelyAdmin = isAdminPath && session.is_admin;
-  if (effectivelyAdmin) {
-    // The landing page is a public page, not a console view: /admin/ with no
-    // view used to render it inside the sidebar layout.
-    allowed = Object.keys(VIEWS).filter((v) => v !== 'landing');
-  }
-
-  const safeView = allowed.includes(view) ? view : 'dashboard';
-  const render = VIEWS[safeView] || VIEWS.dashboard;
-
   return (
-    <div className="app">
-      <Sidebar current={safeView} onNavigate={navigate} effectivelyAdmin={effectivelyAdmin} isPanel={isPanel} />
-      <div className="nav-backdrop" onClick={(e) => e.currentTarget.parentElement.classList.remove('nav-open')} />
-      {/* Keyed on the view so each page mounts fresh and plays its entrance. */}
-      <div key={safeView} className="view-enter" style={{ flex: 1, minWidth: 0, display: 'flex' }}>
-        <ErrorBoundary resetKey={safeView}>{render()}</ErrorBoundary>
-      </div>
-    </div>
+    <Suspense fallback={<BootShell />}>
+      <Console view={view} session={session} navigate={navigate} isPanel={isPanel} isAdminPath={isAdminPath} />
+    </Suspense>
   );
 }

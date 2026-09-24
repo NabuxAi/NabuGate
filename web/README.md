@@ -31,13 +31,30 @@ direction after loading.
 cd web
 npm install
 npm run dev      # http://localhost:5173
-npm run build    # → dist/  (static bundle; base is relative)
+npm run build    # → dist/  (static bundle + .br/.gz copies)
 npm run preview  # serve the built bundle
 ```
 
-The bundle is static (`base: './'`), so it can be served by the gateway, a
-static host, or Coolify. Fonts (Vazirmatn, Inter, JetBrains Mono) load from Google Fonts, matching the
-design; self-host under `public/` if an offline build is required.
+The bundle is static, so it can be served by the gateway, a static host, or
+Coolify. `npm run build` also writes a Brotli (`.br`) and gzip (`.gz`) copy of
+every text asset (`compress-dist.mjs`), which the gateway serves to clients that
+accept them.
+
+### Load performance
+
+- **Fonts are self-hosted** (`src/styles/fonts.css`, from `@fontsource-variable/*`):
+  one variable file per script, only the subsets the pages use. Do not add a
+  Google Fonts `<link>` back: a stylesheet in `<head>` blocks rendering, and
+  where Google is slow or filtered the page did not render at all. The
+  pre-paint script preloads the current language's text font (the build fills
+  in its hashed name, see `vite.config.js`).
+- **Code splitting:** the landing page and React are the first download; the
+  docs (and each language's prose), the sign-in form and the console (all its
+  views in one chunk, so moving between them is instant) are loaded when their
+  route opens. `App.jsx` starts the current route's chunks at boot, in parallel.
+- **Caching:** files under `assets/` are hashed and served
+  `Cache-Control: immutable` for a year; `index.html` is `no-cache` with an ETag,
+  so a return visit re-checks one small file and downloads nothing else.
 
 ## Served by the gateway (`/admin/`)
 
@@ -68,4 +85,4 @@ framework — styling is plain CSS driven by design tokens in
 `src/styles/tokens.css` (day and night themes), refined by `polish.css` and
 `shell.css`; the landing and docs pages add `landing.css` and `docs.css`. Icons
 are inline SVG (`src/components/Icon.jsx`). Fonts: Vazirmatn for Persian,
-Inter for English, JetBrains Mono for code, from Google Fonts.
+Inter for English, JetBrains Mono for code, self-hosted (see above).

@@ -72,7 +72,10 @@ export default function Usage() {
       })
       .catch((e) => setError(e.message));
 
-  useEffect(load, []);
+  // Braces, not useEffect(load): load returns its promise, and whatever an
+  // effect returns React calls as the cleanup — so leaving this page threw
+  // "is not a function" and took the whole console down with it.
+  useEffect(() => { load(); }, []);
 
   const rows = Object.entries(byProject).sort((a, b) => (b[1].requests || 0) - (a[1].requests || 0));
   const modelRows = Object.entries(byModel).sort((a, b) => (b[1].requests || 0) - (a[1].requests || 0));
