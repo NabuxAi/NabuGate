@@ -85,6 +85,7 @@ func (a *OpenAIAdapter) CreateLiveSession(ctx context.Context, req LiveSessionRe
 	sessionJSON, _ := json.Marshal(sessionMap)
 
 	// If an SDP offer is present, try OpenAI's GA WebRTC endpoint: POST /realtime/calls with multipart/form-data
+	var gaRefusal *LiveUpstreamError
 	if sdp != "" {
 		var formBody bytes.Buffer
 		mw := multipart.NewWriter(&formBody)
@@ -102,9 +103,9 @@ func (a *OpenAIAdapter) CreateLiveSession(ctx context.Context, req LiveSessionRe
 
 			if bytes.HasPrefix(bytes.TrimSpace(raw), []byte("{")) {
 				var parsed struct {
-					ID        string `json:"id"`
-					SDP       string `json:"sdp"`
-					Session   struct {
+					ID      string `json:"id"`
+					SDP     string `json:"sdp"`
+					Session struct {
 						ID string `json:"id"`
 					} `json:"session"`
 					Transport struct {
@@ -141,6 +142,14 @@ func (a *OpenAIAdapter) CreateLiveSession(ctx context.Context, req LiveSessionRe
 		if err == nil && status != http.StatusNotFound && status != http.StatusMethodNotAllowed {
 			return LiveSessionResponse{}, &LiveUpstreamError{Status: status, Message: vendorErrorMessage(raw)}
 		}
+		if err == nil {
+			// A 404 here is not only "no such endpoint": the vendor answers
+			// 404 for a model it does not serve, too. Kept, so that when the
+			// legacy path below fails as well the caller is told what the GA
+			// endpoint said — "model not found" — and not what the retired
+			// endpoint said, which is always "Invalid URL" and explains nothing.
+			gaRefusal = &LiveUpstreamError{Status: status, Message: vendorErrorMessage(raw)}
+		}
 	}
 
 	// Fallback path: legacy JSON POST to /realtime/sessions (used by test mocks or older proxies)
@@ -150,9 +159,15 @@ func (a *OpenAIAdapter) CreateLiveSession(ctx context.Context, req LiveSessionRe
 	}
 	status, _, raw, err := postRequestOnce(ctx, a.baseURL+"/realtime/sessions", a.headers(), body)
 	if err != nil {
+		if gaRefusal != nil {
+			return LiveSessionResponse{}, gaRefusal
+		}
 		return LiveSessionResponse{}, fmt.Errorf("live session request failed: %w", err)
 	}
 	if status < 200 || status >= 300 {
+		if gaRefusal != nil && (status == http.StatusNotFound || status == http.StatusMethodNotAllowed) {
+			return LiveSessionResponse{}, gaRefusal
+		}
 		return LiveSessionResponse{}, &LiveUpstreamError{Status: status, Message: vendorErrorMessage(raw)}
 	}
 	var parsed struct {
