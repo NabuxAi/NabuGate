@@ -98,9 +98,13 @@ func TestCreateLiveSessionOpenAIGaWithLocationHeader(t *testing.T) {
 		t.Fatalf("expected multipart content-type, got %q", ctype)
 	}
 	var parsed struct {
-		ID        string `json:"id"`
-		Session   struct { ID string `json:"id"` } `json:"session"`
-		Transport struct { SDP string `json:"sdp"` } `json:"transport"`
+		ID      string `json:"id"`
+		Session struct {
+			ID string `json:"id"`
+		} `json:"session"`
+		Transport struct {
+			SDP string `json:"sdp"`
+		} `json:"transport"`
 	}
 	if err := json.Unmarshal(resp.Body, &parsed); err != nil {
 		t.Fatalf("invalid json body: %v, raw: %s", err, resp.Body)
@@ -164,5 +168,31 @@ func TestCreateLiveSessionSurfacesTheVendorsMessageWithoutSecrets(t *testing.T) 
 				t.Fatalf("message leaked %q: %q", c.mustNot, refusal.Message)
 			}
 		})
+	}
+}
+
+func TestCreateLiveSessionReportsTheGaRefusalNotTheRetiredEndpoints(t *testing.T) {
+	// OpenAI answers 404 for a model it does not serve, and the retired
+	// /realtime/sessions answers 404 "Invalid URL" for everything. Falling
+	// through to the second and reporting its message hid the real reason
+	// for a fortnight: the alias was pointed at a model that no longer exists.
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+		if r.URL.Path == "/realtime/calls" {
+			_, _ = w.Write([]byte(`{"error":{"message":"The model 'gpt-4o-realtime-preview' does not exist","code":"model_not_found"}}`))
+			return
+		}
+		_, _ = w.Write([]byte(`{"error":{"message":"Invalid URL (POST /v1/realtime/sessions)"}}`))
+	}))
+	defer srv.Close()
+
+	_, err := NewOpenAIAdapter("openai", srv.URL, "k", nil).CreateLiveSession(context.Background(),
+		LiveSessionRequest{Model: "gpt-4o-realtime-preview", Body: json.RawMessage(`{"transport":{"type":"webrtc","sdp":"v=0 offer"}}`)})
+	var refusal *LiveUpstreamError
+	if !errors.As(err, &refusal) || refusal.Status != http.StatusNotFound {
+		t.Fatalf("err = %v", err)
+	}
+	if !strings.Contains(refusal.Message, "does not exist") || strings.Contains(refusal.Message, "Invalid URL") {
+		t.Fatalf("the retired endpoint's message was reported instead of the vendor's: %q", refusal.Message)
 	}
 }
