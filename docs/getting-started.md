@@ -55,7 +55,14 @@ Every metered response carries:
 ```
 X-Nabu-Balance-USD: 4.1837
 X-Nabu-Balance-Warning: low      # only below $1
+X-Nabu-Cost-USD: 0.000412        # what this request cost you
 ```
+
+The cost is also in the body as `usage.cost_usd` on chat completions and
+embeddings, so a product that bills its own tenants per request can pass the
+gateway's figure on instead of pricing tokens itself. Streamed chats carry no
+cost — the headers are gone before the tokens are counted; read `/v1/usage`
+for those.
 
 At zero the key answers `402 Payment Required` until any top-up; no new key is
 needed.

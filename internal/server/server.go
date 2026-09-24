@@ -329,7 +329,11 @@ func (s *Server) lookupConsoleToken(token string) (adminstore.Token, bool) {
 	return s.admin.Lookup(token)
 }
 
-func (s *Server) record(r *http.Request, prov, model string, u provider.Usage) {
+// record meters one call and returns what the caller was charged for it, so
+// the handler can tell them: a product that bills its own tenants per request
+// (NabuCRM's per-business AI credit) needs the figure the gateway settled on,
+// not a guess from the token counts at a price list of its own.
+func (s *Server) record(r *http.Request, prov, model string, u provider.Usage) float64 {
 	project := s.project(r)
 	cost := s.usage.Cost(prov, model, u)
 	if servedByCaller(r.Context()) {
@@ -359,6 +363,15 @@ func (s *Server) record(r *http.Request, prov, model string, u provider.Usage) {
 	})
 	s.log.Info("billed", "project", project, "provider", prov, "model", model,
 		"total_tokens", u.TotalTokens, "cost_usd", cost)
+	return cost
+}
+
+// costHeader is what a metered response says the request cost, in dollars.
+// Six decimals: a short chat on a cheap model is a few millionths.
+const costHeader = "X-Nabu-Cost-USD"
+
+func formatCost(cost float64) string {
+	return strconv.FormatFloat(cost, 'f', 6, 64)
 }
 
 // handleUsage reports accumulated usage. Admin keys (not bound to a project,
@@ -693,11 +706,12 @@ func (s *Server) handleChat(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	s.record(r, result.Provider, result.Model, result.Response.Usage)
+	cost := s.record(r, result.Provider, result.Model, result.Response.Usage)
 	s.saveTurn(r, convID, newTurns, result.Response.Content)
 
 	w.Header().Set("X-Nabu-Provider", result.Provider)
 	w.Header().Set("X-Nabu-Model", result.Model)
+	w.Header().Set(costHeader, formatCost(cost))
 
 	message := map[string]any{"role": "assistant", "content": result.Response.Content}
 	if len(result.Response.ToolCalls) > 0 {
@@ -720,10 +734,11 @@ func (s *Server) handleChat(w http.ResponseWriter, r *http.Request) {
 			"finish_reason": finish,
 			"message":       message,
 		}},
-		"usage": map[string]int{
+		"usage": map[string]any{
 			"prompt_tokens":     result.Response.Usage.PromptTokens,
 			"completion_tokens": result.Response.Usage.CompletionTokens,
 			"total_tokens":      result.Response.Usage.TotalTokens,
+			"cost_usd":          cost,
 		},
 	}
 	writeJSON(w, http.StatusOK, resp)
@@ -1065,10 +1080,11 @@ func (s *Server) handleEmbeddings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	s.record(r, result.Provider, result.Model, result.Usage)
+	cost := s.record(r, result.Provider, result.Model, result.Usage)
 
 	w.Header().Set("X-Nabu-Provider", result.Provider)
 	w.Header().Set("X-Nabu-Model", result.Model)
+	w.Header().Set(costHeader, formatCost(cost))
 
 	data := make([]map[string]any, 0, len(result.Embeddings))
 	for i, vec := range result.Embeddings {
@@ -1084,9 +1100,10 @@ func (s *Server) handleEmbeddings(w http.ResponseWriter, r *http.Request) {
 		"provider":       result.Provider,
 		"upstream_model": result.Model,
 		"data":           data,
-		"usage": map[string]int{
+		"usage": map[string]any{
 			"prompt_tokens": result.Usage.PromptTokens,
 			"total_tokens":  result.Usage.TotalTokens,
+			"cost_usd":      cost,
 		},
 	})
 }
