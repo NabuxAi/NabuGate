@@ -201,6 +201,13 @@ config.example.yaml        # نمونهٔ پیکربندی (alias‌ها، provi
   جدول‌ها روی موبایل افقی اسکرول می‌شوند نه اینکه ستون‌ها له شوند؛ ستونِ متنِ آزاد را `cell-wrap`
   بگذار. گریدِ inline با `minmax(min(Npx, 100%), 1fr)` بنویس تا روی ۳۲۰px بیرون نزند. دیالوگ‌ها
   روی موبایل bottom sheet‌اند و دراورِ سایدبار بسته `visibility: hidden` است.
+- **سرعتِ لود:** فونت‌ها self-host‌اند (`web/src/styles/fonts.css`)؛ لینکِ Google Fonts را برنگردان —
+  stylesheetِ `<head>` رندر را بلاک می‌کند و وقتی گوگل کند/فیلتر است صفحه اصلاً بالا نمی‌آمد. فقط
+  صفحهٔ اصلی و React در دانلودِ اول‌اند؛ مستندات (و متنِ هر زبان)، فرمِ ورود و کنسول chunkِ جدا دارند
+  (`App.jsx`). فایل‌های `assets/` هش‌دار و `immutable` یک‌ساله‌اند، `index.html` با `no-cache` + ETag
+  (`internal/server/static.go`)؛ build نسخهٔ `.br`/`.gz` هم می‌سازد. صفحه‌های عمومی منتظرِ
+  `/api/status` نمی‌مانند. `useEffect(load, [])` ننویس اگر `load` promise برمی‌گرداند — React آن را
+  cleanup می‌گیرد و هنگامِ ترکِ صفحه کلِ کنسول می‌افتد.
 - بعد از هر تغییر در `web/src`، `cd web && npm run build` و `web/dist` + `web/src.sha256` را با هم
   کامیت کن (`web/freshness_test.go` چک می‌کند).
 

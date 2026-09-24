@@ -162,8 +162,13 @@ html[lang="en"] .nav-group-title { text-transform: uppercase; letter-spacing: 0.
   font: inherit; font-size: 12.5px; font-weight: 700; color: var(--ng-muted); background: transparent;
   transition: color var(--ng-dur) var(--ng-ease), background var(--ng-dur) var(--ng-ease), box-shadow var(--ng-dur) var(--ng-ease);
 }
-.seg-btn[lang="fa"] { font-family: 'Vazirmatn', var(--ng-font); }
-.seg-btn[lang="en"] { font-family: 'Inter', var(--ng-font); letter-spacing: 0.02em; }
+/* Each label is in the page's own font where that font can draw it, and the
+   other script's label falls back to the system's: naming Inter for "EN" on a
+   Persian page (or Vazirmatn for «فا» on an English one) downloaded a whole
+   ~47 KB font file for two letters. */
+.seg-btn[lang="fa"] { font-family: system-ui, -apple-system, 'Segoe UI', Tahoma, sans-serif; }
+html[lang="fa"] .seg-btn[lang="fa"] { font-family: var(--ng-font); }
+.seg-btn[lang="en"] { font-family: var(--ng-font); letter-spacing: 0.02em; }
 .seg-btn:hover { color: var(--ng-heading); }
 .seg-btn.active { color: var(--ng-heading); background: var(--ng-surface); box-shadow: var(--ng-shadow-xs), 0 0 0 1px var(--ng-border-card); }
 .seg-sm .seg-btn { height: 28px; }

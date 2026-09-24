@@ -34,16 +34,21 @@
         d.setAttribute('data-theme', t === 'light' ? 'light' : 'dark');
         var c = document.querySelector('meta[name="theme-color"]');
         if (c) c.setAttribute('content', t === 'light' ? '#f5f7fc' : '#070b16');
+        // Start this language's text font now, alongside the scripts, instead
+        // of after the app has rendered the text that needs it. The build
+        // writes the hashed file names in (vite.config.js); left as
+        // placeholders (the dev server), nothing is preloaded.
+        var f = l === 'fa' ? '/assets/vazirmatn-arabic-wght-normal-Cafbb7Zc.woff2' : '/assets/inter-latin-wght-normal-Dx4kXJAl.woff2';
+        if (f.charAt(0) === '/') {
+          var k = document.createElement('link');
+          k.rel = 'preload'; k.as = 'font'; k.type = 'font/woff2'; k.crossOrigin = 'anonymous'; k.href = f;
+          document.head.appendChild(k);
+        }
       })();
     </script>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;600;700;800;900&family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap"
-      rel="stylesheet"
-    />
-    <script type="module" crossorigin src="/assets/index-CZAtBYhJ.js"></script>
-    <link rel="stylesheet" crossorigin href="/assets/index-Cu1OdaDK.css">
+    <script type="module" crossorigin src="/assets/index-BcmHNyv0.js"></script>
+    <link rel="modulepreload" crossorigin href="/assets/react-DhEz86-d.js">
+    <link rel="stylesheet" crossorigin href="/assets/index-Ks4nBQnm.css">
   </head>
   <body>
     <div id="root"></div>
