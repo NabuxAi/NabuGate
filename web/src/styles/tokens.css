@@ -1,65 +1,76 @@
-/* 
- * NabuGate Dark Mode tokens based on Jarvis Console 
+/*
+ * NabuGate design tokens. The night theme is the default; the day theme
+ * overrides every colour-bearing token below it (web/theme_test.go enforces
+ * both that the light block comes last and that nothing colour-bearing is
+ * dark-only).
  */
 :root {
-  /* Brand / accent */
-  --ng-accent: #2563eb;
-  --ng-accent-strong: #3b82f6;
-  --ng-accent-soft: rgba(37, 99, 235, 0.15);
-  --ng-accent-border: rgba(37, 99, 235, 0.3);
-  --ng-brand-grad: linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%);
+  /* Brand / accent — an indigo-blue that leans toward the violet end of the
+     brand gradient, so solid accents and gradient accents read as one family. */
+  --ng-accent: #5b7cff;
+  --ng-accent-strong: #7d97ff;
+  --ng-accent-soft: rgba(91, 124, 255, 0.14);
+  --ng-accent-border: rgba(91, 124, 255, 0.36);
+  --ng-brand-grad: linear-gradient(135deg, #4f8cff 0%, #6d5dfc 55%, #a855f7 100%);
+  --ng-ring: rgba(91, 124, 255, 0.45);
 
   /* Surfaces & lines (Dark) */
-  --ng-bg: #0b1020;
-  --ng-bg-veil: transparent;
-  --ng-surface: #10162a;
-  --ng-surface-soft: #141c33;
-  --ng-surface-softer: #19223e;
-  --ng-border: #1c2742;
-  --ng-border-card: #222f4d;
-  --ng-border-faint: #19223e;
-  --ng-divider: #1c2742;
+  --ng-bg: #070b16;
+  --ng-bg-veil: radial-gradient(1200px 520px at 85% -10%, rgba(91, 124, 255, 0.10), transparent 60%);
+  --ng-surface: #0c1222;
+  --ng-surface-soft: #111a2e;
+  --ng-surface-softer: #17213a;
+  --ng-surface-raised: #0f1729;
+  --ng-border: #1a2440;
+  --ng-border-card: #1e2a48;
+  --ng-border-faint: #151e36;
+  --ng-divider: #1a2440;
+  --ng-chip-bg: rgba(148, 163, 184, 0.10);
+
+  /* Background glows behind the console and the landing page. */
+  --ng-glow-a: rgba(79, 140, 255, 0.16);
+  --ng-glow-b: rgba(168, 85, 247, 0.12);
 
   /* Text (Dark) */
-  --ng-text: #e2e8f0;
-  --ng-heading: #f8fafc;
+  --ng-text: #cdd6e4;
+  --ng-heading: #f4f6fb;
   --ng-heading-ink: #ffffff;
-  --ng-muted: #94a3b8;
-  --ng-subtle: #64748b;
+  --ng-muted: #8b98af;
+  --ng-subtle: #64718b;
   --ng-slate-600: #94a3b8;
   --ng-slate-700: #cbd5e1;
 
   /* Status — success (emerald) */
   --ng-ok: #10b981;
-  --ng-ok-text: #10b981;
+  --ng-ok-text: #34d399;
   --ng-ok-surface: rgba(16, 185, 129, 0.1);
   /* Four views reach for --ng-ok-soft, which was never defined, so their
      badges rendered with no background at all. Defined as an alias rather
      than edited out of the call sites: the name reads correctly and the two
      are meant to be the same colour. */
   --ng-ok-soft: var(--ng-ok-surface);
-  --ng-ok-border: rgba(16, 185, 129, 0.2);
+  --ng-ok-border: rgba(16, 185, 129, 0.24);
   /* Status — warn (amber) */
-  --ng-warn-text: #f59e0b;
+  --ng-warn-text: #fbbf24;
   --ng-warn-surface: rgba(245, 158, 11, 0.1);
-  --ng-warn-border: rgba(245, 158, 11, 0.2);
+  --ng-warn-border: rgba(245, 158, 11, 0.24);
   /* Accent chip (info / primary target) */
-  --ng-info-text: #60a5fa;
-  --ng-info-surface: rgba(59, 130, 246, 0.1);
-  --ng-info-border: rgba(59, 130, 246, 0.2);
+  --ng-info-text: #8aa6ff;
+  --ng-info-surface: rgba(91, 124, 255, 0.1);
+  --ng-info-border: rgba(91, 124, 255, 0.24);
   /* Passthrough (violet) */
-  --ng-pass-text: #a78bfa;
-  --ng-pass-surface: rgba(139, 92, 246, 0.1);
-  --ng-pass-border: rgba(139, 92, 246, 0.2);
+  --ng-pass-text: #c4a5ff;
+  --ng-pass-surface: rgba(168, 85, 247, 0.1);
+  --ng-pass-border: rgba(168, 85, 247, 0.24);
   /* Idle dot */
   --ng-idle: #334155;
 
   /* Shape */
-  --ng-radius-sm: 6px;
+  --ng-radius-sm: 8px;
   --ng-radius: 12px;
   /* Panels want a softer corner than the controls sitting inside them; sharing
      one radius with the buttons made the cards read as oversized buttons. */
-  --ng-radius-lg: 16px;
+  --ng-radius-lg: 18px;
   --ng-radius-pill: 999px;
 
   /* How wide the reading column is allowed to get, however wide the monitor. */
@@ -67,20 +78,20 @@
 
   /* Elevation */
   --ng-shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.3);
-  --ng-shadow-stat: 0 8px 22px rgba(0, 0, 0, 0.4);
-  --ng-shadow-card: 0 10px 28px rgba(0, 0, 0, 0.5);
-  --ng-shadow-brand: 0 12px 28px rgba(37, 99, 235, 0.2);
-  --ng-shadow-btn: 0 12px 24px rgba(37, 99, 235, 0.15);
+  --ng-shadow-stat: 0 1px 0 rgba(255, 255, 255, 0.03) inset, 0 10px 30px -12px rgba(0, 0, 0, 0.6);
+  --ng-shadow-card: 0 1px 0 rgba(255, 255, 255, 0.03) inset, 0 12px 32px -14px rgba(0, 0, 0, 0.7);
+  --ng-shadow-brand: 0 10px 26px -6px rgba(91, 124, 255, 0.45);
+  --ng-shadow-btn: 0 10px 24px -8px rgba(91, 124, 255, 0.55);
 
-  /* Type */
+  /* Type — Persian first; the English face is swapped in by shell.css. */
   --ng-font: 'Vazirmatn', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
-  --ng-mono: ui-monospace, 'SFMono-Regular', 'Menlo', monospace;
+  --ng-mono: 'JetBrains Mono', ui-monospace, 'SFMono-Regular', 'Menlo', monospace;
 
   /* Motion */
   --ng-ease: cubic-bezier(0.16, 1, 0.3, 1);
   --ng-dur: 200ms;
 
-  --ng-sidebar-w: 250px;
+  --ng-sidebar-w: 264px;
 
   /* Four variables were used without ever being defined, so the rules that
      referenced them fell back to nothing: .btn-ghost had no hover state, and
@@ -91,10 +102,10 @@
      decided the winner and the dark values won in both themes. --ng-fg is the
      main text colour: in light mode it resolved to #f8fafc, near-white text on
      a near-white page. Fifteen tokens were overridden this way. */
-  --ng-fg: #f8fafc;
+  --ng-fg: #f4f6fb;
   --ng-muted-dark: #94a3b8;
-  --ng-bg-hover: #1e293b;
-  --ng-bg-active: #334155;
+  --ng-bg-hover: #141d33;
+  --ng-bg-active: #1c2744;
   --ng-shadow: 0 4px 6px -1px rgba(0,0,0,0.5), 0 2px 4px -1px rgba(0,0,0,0.3);
   --ng-shadow-soft: 0 1px 3px 0 rgba(0,0,0,0.5);
 
@@ -110,91 +121,97 @@
   --ng-success-bg: rgba(16, 185, 129, 0.1);
   --ng-success-text: #6ee7b7;
 
-  --ng-faint: rgba(148, 163, 184, 0.12);
+  --ng-faint: rgba(148, 163, 184, 0.08);
   --ng-slate-500: #64748b;
-  --ng-code-bg: #0b1020;
+  --ng-code-bg: #060a14;
   --ng-code-text: #e6ecff;
-  --ng-topbar-h: 64px;
+  --ng-topbar-h: 68px;
 }
 
 [data-theme="light"] {
-  --ng-accent: #2563eb;
-  --ng-accent-strong: #1d4ed8;
-  --ng-accent-soft: rgba(37, 99, 235, 0.1);
-  --ng-accent-border: rgba(37, 99, 235, 0.2);
-  --ng-brand-grad: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+  --ng-accent: #4263eb;
+  --ng-accent-strong: #3451d1;
+  --ng-accent-soft: rgba(66, 99, 235, 0.09);
+  --ng-accent-border: rgba(66, 99, 235, 0.28);
+  --ng-brand-grad: linear-gradient(135deg, #4f8cff 0%, #6d5dfc 55%, #a855f7 100%);
+  --ng-ring: rgba(66, 99, 235, 0.35);
 
-  --ng-bg: #f8fafc;
-  --ng-bg-veil: transparent;
+  --ng-bg: #f5f7fc;
+  --ng-bg-veil: radial-gradient(1200px 520px at 85% -10%, rgba(66, 99, 235, 0.07), transparent 60%);
   --ng-surface: #ffffff;
-  --ng-surface-soft: #f1f5f9;
-  --ng-surface-softer: #e2e8f0;
-  --ng-border: #e2e8f0;
-  --ng-border-card: #cbd5e1;
-  --ng-border-faint: #f1f5f9;
-  --ng-divider: #e2e8f0;
+  --ng-surface-soft: #f3f5fb;
+  --ng-surface-softer: #e8ecf5;
+  --ng-surface-raised: #ffffff;
+  --ng-border: #e3e8f2;
+  --ng-border-card: #e1e6f0;
+  --ng-border-faint: #edf0f6;
+  --ng-divider: #e8ecf3;
+  --ng-chip-bg: rgba(100, 116, 139, 0.09);
+
+  --ng-glow-a: rgba(79, 140, 255, 0.10);
+  --ng-glow-b: rgba(168, 85, 247, 0.07);
 
   --ng-text: #334155;
-  --ng-heading: #0f172a;
-  --ng-fg: #0f172a;
-  --ng-muted: #64748b;
+  --ng-heading: #0b1324;
+  --ng-fg: #0b1324;
+  --ng-muted: #5f6b80;
   --ng-muted-dark: #475569;
 
-  --ng-bg-hover: #f1f5f9;
-  --ng-bg-active: #e2e8f0;
+  --ng-bg-hover: #eef1f8;
+  --ng-bg-active: #e3e8f3;
   --ng-shadow: 0 4px 6px -1px rgba(0,0,0,0.05), 0 2px 4px -1px rgba(0,0,0,0.03);
   --ng-shadow-soft: 0 1px 3px 0 rgba(0,0,0,0.05);
 
-  --ng-danger: #ef4444;
+  --ng-danger: #dc2626;
   --ng-danger-bg: #fee2e2;
   --ng-danger-text: #b91c1c;
 
-  --ng-warning: #f59e0b;
+  --ng-warning: #d97706;
   --ng-warning-bg: #fef3c7;
   --ng-warning-text: #b45309;
 
-  --ng-success: #10b981;
+  --ng-success: #059669;
   --ng-success-bg: #d1fae5;
   --ng-success-text: #047857;
 
-  --ng-faint: rgba(100, 116, 139, 0.08);
+  --ng-faint: rgba(100, 116, 139, 0.07);
   --ng-slate-500: #64748b;
-  --ng-code-bg: #f8fafc;
-  --ng-code-text: #0f172a;
+  --ng-code-bg: #0b1222;
+  --ng-code-text: #e6ecff;
 
   /* These had no light counterpart at all, so the dark values were painted on
      a white page. --ng-slate-700 (#cbd5e1) is used as body text in five rules
      and was all but invisible; the status inks were pastels chosen to glow on
      a dark surface and washed out on a light one. Replacements clear WCAG AA
      against #ffffff. */
-  --ng-heading-ink: #0f172a;
+  --ng-heading-ink: #0b1324;
   --ng-slate-600: #475569;
   --ng-slate-700: #334155;
-  --ng-subtle: #64748b;
+  --ng-subtle: #6b7689;
   --ng-idle: #cbd5e1;
 
   --ng-ok: #059669;
   --ng-ok-text: #047857;
   --ng-ok-border: rgba(5, 150, 105, 0.25);
-  --ng-ok-surface: rgba(16, 185, 129, 0.12);
+  --ng-ok-surface: rgba(16, 185, 129, 0.1);
 
-  --ng-info-text: #1d4ed8;
-  --ng-info-border: rgba(37, 99, 235, 0.25);
-  --ng-info-surface: rgba(59, 130, 246, 0.08);
+  --ng-info-text: #3451d1;
+  --ng-info-border: rgba(66, 99, 235, 0.25);
+  --ng-info-surface: rgba(66, 99, 235, 0.07);
 
   --ng-pass-text: #6d28d9;
   --ng-pass-border: rgba(109, 40, 217, 0.25);
-  --ng-pass-surface: rgba(139, 92, 246, 0.1);
+  --ng-pass-surface: rgba(139, 92, 246, 0.09);
 
   --ng-warn-text: #b45309;
   --ng-warn-border: rgba(180, 83, 9, 0.25);
-  --ng-warn-surface: rgba(245, 158, 11, 0.12);
+  --ng-warn-surface: rgba(245, 158, 11, 0.11);
 
   /* Black at half opacity is a dark-surface shadow. On a light page it reads
      as grime rather than depth. */
-  --ng-shadow-card: 0 10px 28px rgba(15, 23, 42, 0.08);
-  --ng-shadow-stat: 0 8px 22px rgba(15, 23, 42, 0.06);
+  --ng-shadow-card: 0 1px 2px rgba(15, 23, 42, 0.04), 0 8px 24px -12px rgba(15, 23, 42, 0.12);
+  --ng-shadow-stat: 0 1px 2px rgba(15, 23, 42, 0.04), 0 8px 22px -12px rgba(15, 23, 42, 0.10);
   --ng-shadow-xs: 0 1px 2px rgba(15, 23, 42, 0.06);
-  --ng-shadow-brand: 0 12px 28px rgba(37, 99, 235, 0.18);
-  --ng-shadow-btn: 0 12px 24px rgba(37, 99, 235, 0.15);
+  --ng-shadow-brand: 0 10px 24px -8px rgba(66, 99, 235, 0.4);
+  --ng-shadow-btn: 0 10px 22px -10px rgba(66, 99, 235, 0.55);
 }

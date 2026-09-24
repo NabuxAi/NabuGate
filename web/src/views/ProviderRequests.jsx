@@ -5,7 +5,7 @@ import VendorIcon from '../components/VendorIcon.jsx';
 import * as api from '../api.js';
 import { SkeletonTable } from '../components/Skeleton.jsx';
 import EmptyState from '../components/EmptyState.jsx';
-import { usd } from '../data/mock.js';
+import { usd, useT } from '../i18n/index.jsx';
 
 /*
  * The approval queue.
@@ -15,7 +15,55 @@ import { usd } from '../data/mock.js';
  * admin to the users screen afterwards to finish the job they thought they had
  * done.
  */
+const T = {
+  fa: {
+    title: 'درخواست‌های دسترسی',
+    subtitle: 'چه کسی می‌خواهد با کلید ما به کدام سرویس وصل شود',
+    pendingTitle: 'در انتظار تأیید',
+    emptyTitle: 'چیزی در صف نیست',
+    emptyHint: 'درخواست‌های خودکار همان لحظه تأیید می‌شوند و اینجا نمی‌آیند.',
+    service: 'سرویس',
+    user: 'کاربر',
+    note: 'توضیح',
+    decision: 'تصمیم',
+    creditPh: 'اعتبار $',
+    approve: 'تأیید',
+    deny: 'رد',
+    decidedTitle: 'تصمیم‌گرفته‌شده',
+    status: 'وضعیت',
+    credit: 'اعتبار',
+    by: 'توسط',
+    auto: 'خودکار',
+    approved: 'تأیید',
+    denied: 'رد',
+    revoke: 'لغو دسترسی',
+  },
+  en: {
+    title: 'Access requests',
+    subtitle: 'Who wants to reach which service on our key',
+    pendingTitle: 'Awaiting approval',
+    emptyTitle: 'Nothing in the queue',
+    emptyHint: 'Automatic requests are approved instantly and never show up here.',
+    service: 'Service',
+    user: 'User',
+    note: 'Note',
+    decision: 'Decision',
+    creditPh: 'Credit $',
+    approve: 'Approve',
+    deny: 'Deny',
+    decidedTitle: 'Decided',
+    status: 'Status',
+    credit: 'Credit',
+    by: 'By',
+    auto: 'Automatic',
+    approved: 'Approved',
+    denied: 'Denied',
+    revoke: 'Revoke access',
+  },
+};
+
 export default function ProviderRequests() {
+  const t = useT(T);
   const [rows, setRows] = useState(null);
   const [error, setError] = useState(null);
   const [credit, setCredit] = useState({});
@@ -43,19 +91,19 @@ export default function ProviderRequests() {
   const decided = rows?.filter((r) => r.status !== 'pending') || [];
 
   return (
-    <Layout title="درخواست‌های دسترسی" subtitle="چه کسی می‌خواهد با کلید ما به کدام سرویس وصل شود">
+    <Layout title={t('title')} subtitle={t('subtitle')}>
       {error && <div className="card banner-error">{error}</div>}
 
       <div className="card">
-        <div className="card-head"><h3>در انتظار تأیید</h3></div>
+        <div className="card-head"><h3>{t('pendingTitle')}</h3></div>
         {rows === null ? (
           <SkeletonTable rows={3} cols={4} />
         ) : pending.length === 0 ? (
-          <EmptyState title="چیزی در صف نیست" hint="درخواست‌های خودکار همان لحظه تأیید می‌شوند و اینجا نمی‌آیند." />
+          <EmptyState title={t('emptyTitle')} hint={t('emptyHint')} />
         ) : (
           <table className="tbl">
             <thead>
-              <tr><th>سرویس</th><th>کاربر</th><th>توضیح</th><th style={{ width: 260 }}>تصمیم</th></tr>
+              <tr><th>{t('service')}</th><th>{t('user')}</th><th>{t('note')}</th><th style={{ width: 260 }}>{t('decision')}</th></tr>
             </thead>
             <tbody>
               {pending.map((r) => (
@@ -76,12 +124,12 @@ export default function ProviderRequests() {
                         type="number"
                         min="0"
                         step="0.5"
-                        placeholder="اعتبار $"
+                        placeholder={t('creditPh')}
                         value={credit[r.id] ?? ''}
                         onChange={(e) => setCredit({ ...credit, [r.id]: e.target.value })}
                       />
-                      <button className="btn btn-sm" disabled={busy === r.id} onClick={() => decide(r, true)}>تأیید</button>
-                      <button className="btn btn-sm btn-ghost" disabled={busy === r.id} onClick={() => decide(r, false)}>رد</button>
+                      <button className="btn btn-sm" disabled={busy === r.id} onClick={() => decide(r, true)}>{t('approve')}</button>
+                      <button className="btn btn-sm btn-ghost" disabled={busy === r.id} onClick={() => decide(r, false)}>{t('deny')}</button>
                     </div>
                   </td>
                 </tr>
@@ -93,10 +141,10 @@ export default function ProviderRequests() {
 
       {decided.length > 0 && (
         <div className="card">
-          <div className="card-head"><h3>تصمیم‌گرفته‌شده</h3></div>
+          <div className="card-head"><h3>{t('decidedTitle')}</h3></div>
           <table className="tbl">
             <thead>
-              <tr><th>سرویس</th><th>کاربر</th><th>وضعیت</th><th>اعتبار</th><th>توسط</th><th style={{ width: 120 }}></th></tr>
+              <tr><th>{t('service')}</th><th>{t('user')}</th><th>{t('status')}</th><th>{t('credit')}</th><th>{t('by')}</th><th style={{ width: 120 }}></th></tr>
             </thead>
             <tbody>
               {decided.map((r) => (
@@ -105,7 +153,7 @@ export default function ProviderRequests() {
                   <td className="ltr">{r.owner}</td>
                   <td>
                     <span className={r.status === 'approved' ? 'tag tag-ok' : 'tag tag-muted'}>
-                      {r.status === 'approved' ? (r.auto ? 'خودکار' : 'تأیید') : 'رد'}
+                      {r.status === 'approved' ? (r.auto ? t('auto') : t('approved')) : t('denied')}
                     </span>
                   </td>
                   <td className="ltr">{r.credit_usd ? usd(r.credit_usd) : '—'}</td>
@@ -116,11 +164,11 @@ export default function ProviderRequests() {
                         shipped without the button. */}
                     {r.status === 'approved' ? (
                       <button className="btn btn-sm btn-ghost" disabled={busy === r.id} onClick={() => decide(r, false)}>
-                        لغو دسترسی
+                        {t('revoke')}
                       </button>
                     ) : (
                       <button className="btn btn-sm btn-ghost" disabled={busy === r.id} onClick={() => decide(r, true)}>
-                        تأیید
+                        {t('approve')}
                       </button>
                     )}
                   </td>

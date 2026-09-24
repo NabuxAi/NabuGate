@@ -22,8 +22,16 @@ type Vendor struct {
 	Name string `json:"name"`
 	// Label is what a person calls it.
 	Label string `json:"label"`
+	// LabelEn is Label for the console's English screens. It is set only where
+	// Label is not already Latin — "OpenAI" reads the same in both — so an
+	// empty one means the console shows Label as it is.
+	LabelEn string `json:"label_en,omitempty"`
 	// Blurb is one line: what it is good at, in the words a customer would use.
 	Blurb string `json:"blurb"`
+	// BlurbEn is the same line in English. Every entry with a Blurb has one,
+	// because a Persian sentence on an English screen is a sentence its reader
+	// cannot use; the console falls back to Blurb only when this is empty.
+	BlurbEn string `json:"blurb_en,omitempty"`
 	// Capabilities are the coarse kinds of work it does. Not derived from the
 	// adapter interface, because a provider can implement an interface and still
 	// not sell that capability.
@@ -59,18 +67,21 @@ const (
 var catalogue = map[string]Vendor{
 	"parsigo": {
 		Label: "پارسی‌گو", Blurb: "تبدیل متنِ فارسی به گفتار با کلونینگِ صدا — روی سرورِ خودمان، بدون کلید و بدون اینکه متن جایی برود.",
+		LabelEn: "ParsiGo", BlurbEn: "Persian text-to-speech with voice cloning — on our own server, with no key, and the text never goes anywhere.",
 		Capabilities: []string{CapSpeech},
 		Site:         "https://github.com/nimaone/persian_tts", KeysURL: "https://github.com/nimaone/persian_tts",
 		Color: "#7c3aed",
 	},
 	"typesafe": {
 		Label: "TypeSafe AI", Blurb: "مدل‌های System 1 (Jev) — ارزیابی سریع، قطعی و ساختاریافته برای گاردریل‌ها و تصمیم‌گیری اتوماسیون.",
+		BlurbEn:      "System 1 models (Jev) — fast, deterministic, structured judgements for guardrails and automated decisions.",
 		Capabilities: []string{CapChat, CapDecisions},
 		Site:         "https://typesafe.ai", KeysURL: "https://typesafe.ai",
 		Color: "#059669",
 	},
 	"openai": {
 		Label: "OpenAI", Blurb: "GPT، Whisper و DALL·E — مرجعِ همان wire format که این دروازه صحبت می‌کند.",
+		BlurbEn:      "GPT, Whisper and DALL·E — the reference for the very wire format this gateway speaks.",
 		Capabilities: []string{CapChat, CapImage, CapSpeech, CapTranscribe, CapEmbed},
 		Site:         "https://openai.com", KeysURL: "https://platform.openai.com/api-keys",
 		Color: "#000000",
@@ -78,6 +89,7 @@ var catalogue = map[string]Vendor{
 	},
 	"anthropic": {
 		Label: "Anthropic", Blurb: "کلود — دنبال‌کردنِ دستور و کارِ طولانی، بهترین در متنِ بلند.",
+		BlurbEn:      "Claude — instruction following and long-running work; at its best with long context.",
 		Capabilities: []string{CapChat},
 		Site:         "https://anthropic.com", KeysURL: "https://console.anthropic.com/settings/keys",
 		Color: "#D97757",
@@ -85,6 +97,7 @@ var catalogue = map[string]Vendor{
 	},
 	"gemini": {
 		Label: "Google Gemini", Blurb: "چندرسانه‌ای در همه‌چیز؛ مدل‌های transcribe‌اش خطای متن را هم اصلاح می‌کنند.",
+		BlurbEn:      "Multimodal across the board; its transcribe models also correct errors in the text.",
 		Capabilities: []string{CapChat, CapImage, CapSpeech, CapTranscribe, CapEmbed},
 		Site:         "https://ai.google.dev", KeysURL: "https://aistudio.google.com/apikey",
 		Color: "#4285F4",
@@ -92,6 +105,7 @@ var catalogue = map[string]Vendor{
 	},
 	"groq": {
 		Label: "Groq", Blurb: "همان مدل‌های باز، چند برابر سریع‌تر. ارزان‌ترین whisper-large-v3-turbo.",
+		BlurbEn:      "The same open models, several times faster. The cheapest whisper-large-v3-turbo.",
 		Capabilities: []string{CapChat, CapTranscribe},
 		Site:         "https://groq.com", KeysURL: "https://console.groq.com/keys",
 		Color: "#F55036",
@@ -99,6 +113,7 @@ var catalogue = map[string]Vendor{
 	},
 	"openrouter": {
 		Label: "OpenRouter", Blurb: "یک کلید، صدها مدل از ده‌ها فروشنده. برای وقتی نمی‌خواهی حساب جدا باز کنی.",
+		BlurbEn:      "One key, hundreds of models from dozens of vendors. For when you don't want to open separate accounts.",
 		Capabilities: []string{CapChat},
 		Site:         "https://openrouter.ai", KeysURL: "https://openrouter.ai/keys",
 		Color: "#6467F2",
@@ -106,6 +121,7 @@ var catalogue = map[string]Vendor{
 	},
 	"openrouter2": {
 		Label: "OpenRouter (کلید دوم)", Blurb: "همان OpenRouter روی حسابِ دوم — سهمیه‌اش جداست.",
+		LabelEn: "OpenRouter (second key)", BlurbEn: "The same OpenRouter on a second account — with its own separate quota.",
 		Capabilities: []string{CapChat},
 		Site:         "https://openrouter.ai", KeysURL: "https://openrouter.ai/keys",
 		Color: "#6467F2",
@@ -113,6 +129,7 @@ var catalogue = map[string]Vendor{
 	},
 	"mistral": {
 		Label: "Mistral", Blurb: "مدل‌های اروپایی، و Voxtral که دقیق‌ترین رونویسیِ ارزان بازار است.",
+		BlurbEn:      "European models, plus Voxtral — the most accurate low-cost transcription on the market.",
 		Capabilities: []string{CapChat, CapTranscribe, CapEmbed},
 		Site:         "https://mistral.ai", KeysURL: "https://console.mistral.ai/api-keys",
 		Color: "#FA520F",
@@ -120,6 +137,7 @@ var catalogue = map[string]Vendor{
 	},
 	"cohere": {
 		Label: "Cohere", Blurb: "امبدینگ و rerank در سطح تولید؛ تیرِ رایگانِ توسعه‌دهنده دارد.",
+		BlurbEn:      "Production-grade embeddings and rerank; has a free developer tier.",
 		Capabilities: []string{CapChat, CapEmbed},
 		Site:         "https://cohere.com", KeysURL: "https://dashboard.cohere.com/api-keys",
 		Color: "#39594D",
@@ -127,6 +145,7 @@ var catalogue = map[string]Vendor{
 	},
 	"together": {
 		Label: "Together AI", Blurb: "مدل‌های بازِ میزبانی‌شده، و whisper-large-v3 روی سخت‌افزارِ خودشان.",
+		BlurbEn:      "Hosted open models, and whisper-large-v3 on their own hardware.",
 		Capabilities: []string{CapChat, CapTranscribe, CapImage, CapEmbed},
 		Site:         "https://together.ai", KeysURL: "https://api.together.xyz/settings/api-keys",
 		Color: "#0F6FFF",
@@ -134,6 +153,7 @@ var catalogue = map[string]Vendor{
 	},
 	"cerebras": {
 		Label: "Cerebras", Blurb: "سریع‌ترین inference موجود روی مدل‌های باز.",
+		BlurbEn:      "The fastest inference available on open models.",
 		Capabilities: []string{CapChat},
 		Site:         "https://cerebras.ai", KeysURL: "https://cloud.cerebras.ai",
 		Color: "#F15A29",
@@ -141,6 +161,7 @@ var catalogue = map[string]Vendor{
 	},
 	"nvidia": {
 		Label: "NVIDIA NIM", Blurb: "بیش از ۱۰۰ مدلِ میزبانی‌شده، تیرِ رایگانِ سخاوتمند.",
+		BlurbEn:      "Over 100 hosted models, with a generous free tier.",
 		Capabilities: []string{CapChat, CapEmbed},
 		Site:         "https://build.nvidia.com", KeysURL: "https://build.nvidia.com/settings/api-keys",
 		Color: "#76B900",
@@ -148,6 +169,7 @@ var catalogue = map[string]Vendor{
 	},
 	"github": {
 		Label: "GitHub Models", Blurb: "مدل‌های چند فروشنده با همان توکنِ گیت‌هاب. برای آزمایش رایگان.",
+		BlurbEn:      "Models from several vendors with your GitHub token. Free for experimenting.",
 		Capabilities: []string{CapChat, CapEmbed},
 		Site:         "https://github.com/marketplace/models", KeysURL: "https://github.com/settings/tokens",
 		Color: "#181717",
@@ -155,6 +177,7 @@ var catalogue = map[string]Vendor{
 	},
 	"cloudflare": {
 		Label: "Cloudflare Workers AI", Blurb: "مدل روی لبه، نزدیک کاربر. سهمیهٔ رایگانِ روزانه دارد.",
+		BlurbEn:      "Models at the edge, close to the user. Has a free daily allowance.",
 		Capabilities: []string{CapChat, CapImage, CapEmbed},
 		Site:         "https://developers.cloudflare.com/workers-ai", KeysURL: "https://dash.cloudflare.com/profile/api-tokens",
 		Color: "#F38020",
@@ -162,6 +185,7 @@ var catalogue = map[string]Vendor{
 	},
 	"elevenlabs": {
 		Label: "ElevenLabs", Blurb: "طبیعی‌ترین صدای مصنوعی، و Scribe که روی زبان‌های کم‌منبع بهتر از whisper است.",
+		BlurbEn:      "The most natural synthetic voices, and Scribe, which beats whisper on low-resource languages.",
 		Capabilities: []string{CapSpeech, CapTranscribe},
 		Site:         "https://elevenlabs.io", KeysURL: "https://elevenlabs.io/app/settings/api-keys",
 		Color: "#000000",
@@ -169,6 +193,7 @@ var catalogue = map[string]Vendor{
 	},
 	"speechmatics": {
 		Label: "Speechmatics", Blurb: "قوی‌ترین تبدیل گفتار به متن روی لهجه و زبانِ درهم‌آمیخته.",
+		BlurbEn:      "The strongest speech-to-text on accents and mixed-language speech.",
 		Capabilities: []string{CapTranscribe},
 		Site:         "https://speechmatics.com", KeysURL: "https://portal.speechmatics.com",
 		Color: "#1B1B1B",
@@ -176,6 +201,7 @@ var catalogue = map[string]Vendor{
 	},
 	"pexels": {
 		Label: "Pexels", Blurb: "عکسِ استوکِ رایگان — جای تصویرِ تولیدی وقتی عکسِ واقعی می‌خواهی.",
+		BlurbEn:      "Free stock photos — in place of a generated image when you want a real photo.",
 		Capabilities: []string{CapPhotos},
 		Site:         "https://pexels.com", KeysURL: "https://www.pexels.com/api/new",
 		Color: "#05A081",
@@ -183,6 +209,7 @@ var catalogue = map[string]Vendor{
 	},
 	"gamma": {
 		Label: "Gamma", Blurb: "اسلاید، سند و پستِ شبکه‌های اجتماعی — خروجی یک لینکِ میزبانی‌شده است.",
+		BlurbEn:      "Slides, documents and social posts — the output is a hosted link.",
 		Capabilities: []string{CapDocs},
 		Site:         "https://gamma.app", KeysURL: "https://gamma.app/settings/api",
 		Color: "#8B5CF6",
@@ -190,6 +217,7 @@ var catalogue = map[string]Vendor{
 	},
 	"parspack": {
 		Label: "پارس‌پک", Blurb: "میزبانِ ایرانی با مدل‌های OpenAI و متن‌باز. ریالی، بدون تحریم.",
+		LabelEn: "ParsPack", BlurbEn: "Iranian host with OpenAI and open-source models. Billed in rials, no sanctions.",
 		Capabilities: []string{CapChat, CapTranscribe, CapEmbed}, Iran: true,
 		Site: "https://parspack.com", KeysURL: "https://console.parspack.com",
 		Color: "#0F62FE",
@@ -197,6 +225,7 @@ var catalogue = map[string]Vendor{
 	},
 	"avalai": {
 		Label: "AvalAI", Blurb: "دسترسیِ ایرانی به مدل‌های جهانی با پرداخت ریالی.",
+		BlurbEn:      "Iranian access to global models, paid in rials.",
 		Capabilities: []string{CapChat, CapImage, CapTranscribe, CapEmbed}, Iran: true,
 		Site: "https://avalai.ir", KeysURL: "https://avalai.ir/panel",
 		Color: "#00A4A6",
@@ -204,6 +233,7 @@ var catalogue = map[string]Vendor{
 	},
 	"gapgpt": {
 		Label: "GapGPT", Blurb: "درگاهِ ایرانیِ چندمدلی، سازگار با OpenAI.",
+		BlurbEn:      "Iranian multi-model gateway, OpenAI-compatible.",
 		Capabilities: []string{CapChat, CapImage, CapTranscribe}, Iran: true,
 		Site: "https://gapgpt.app", KeysURL: "https://gapgpt.app/panel",
 		Color: "#7C3AED",
@@ -211,6 +241,7 @@ var catalogue = map[string]Vendor{
 	},
 	"arvan": {
 		Label: "ابر آروان", Blurb: "AIaaS آروان. هدرِ احرازش Bearer نیست، apikey است.",
+		LabelEn: "ArvanCloud", BlurbEn: "Arvan's AIaaS. Its auth header is apikey, not Bearer.",
 		Capabilities: []string{CapChat, CapEmbed}, Iran: true,
 		Site: "https://arvancloud.ir/ai", KeysURL: "https://panel.arvancloud.ir",
 		Color: "#F04E37",
@@ -218,24 +249,28 @@ var catalogue = map[string]Vendor{
 	},
 	"dahl": {
 		Label: "دال", Blurb: "درگاهِ ایرانیِ مدل‌های زبانی.",
+		LabelEn: "Dahl", BlurbEn: "Iranian gateway for language models.",
 		Capabilities: []string{CapChat}, Iran: true,
 		Site: "https://dahl.ai", Color: "#111827",
 		Icon: "M4 4h6.6a8 8 0 0 1 0 16H4V4Zm3.6 3.4v9.2h2.8a4.6 4.6 0 0 0 0-9.2H7.6Z",
 	},
 	"9router": {
 		Label: "9Router", Blurb: "روترِ چندفروشنده‌ای که خودمان اداره می‌کنیم.",
+		BlurbEn:      "A multi-vendor router we run ourselves.",
 		Capabilities: []string{CapChat}, Iran: true,
 		Color: "#0EA5E9",
 		Icon:  "M4 6h6a4 4 0 0 1 0 8H7.4l4.3 6H8.8L4 13.4V6Zm2.4 2.2v3.6H10a1.8 1.8 0 0 0 0-3.6H6.4ZM15 6h5v2.3h-5V6Zm0 4.9h5v2.2h-5v-2.2ZM15 16h5v2.2h-5V16Z",
 	},
 	"tokenrouter": {
 		Label: "TokenRouter", Blurb: "بیش از ۳۰۰ مدل با مسیریابیِ auto:*؛ مدل‌ها را با : جدا می‌کند نه /.",
+		BlurbEn:      "Over 300 models with auto:* routing; model ids are separated with : not /.",
 		Capabilities: []string{CapChat},
 		Site:         "https://tokenrouter.io", Color: "#0891B2",
 		Icon: "M2 11h6.4V6.5L15 12l-6.6 5.5V13H2v-2Zm14 0h6v2h-6v-2Z",
 	},
 	"replicate": {
 		Label: "Replicate", Blurb: "بازارِ هزاران مدلِ متن‌باز — تصویر، ویدیو و LLM. دروازه چت و تصویرش را می‌گیرد.",
+		BlurbEn:      "A marketplace of thousands of open-source models — image, video and LLMs. The gateway uses its chat and image.",
 		Capabilities: []string{CapChat, CapImage},
 		Site:         "https://replicate.com", KeysURL: "https://replicate.com/account/api-tokens",
 		Color: "#000000",
@@ -243,6 +278,7 @@ var catalogue = map[string]Vendor{
 	},
 	"runpod": {
 		Label: "RunPod", Blurb: "GPUی سرورلس با اندپوینتِ سازگارِ OpenAI؛ مدلِ خودت را بالا می‌آوری.",
+		BlurbEn:      "Serverless GPUs with an OpenAI-compatible endpoint; you bring up your own model.",
 		Capabilities: []string{CapChat, CapEmbed},
 		Site:         "https://runpod.io", KeysURL: "https://console.runpod.io/user/settings",
 		Color: "#673AB7",
@@ -250,23 +286,25 @@ var catalogue = map[string]Vendor{
 	},
 	"siliconflow": {
 		Label: "SiliconFlow", Blurb: "مدل‌های بازِ چینی، ارزان و سریع.",
+		BlurbEn:      "Chinese open models, cheap and fast.",
 		Capabilities: []string{CapChat, CapEmbed, CapImage},
 		Site:         "https://siliconflow.cn", KeysURL: "https://cloud.siliconflow.cn/account/ak",
 		Color: "#7C3AED",
 		Icon:  "M12 2 3 7v10l9 5 9-5V7l-9-5Zm0 2.6 6.6 3.7L12 12 5.4 8.3 12 4.6ZM5 10.2l6 3.4v6.1l-6-3.3v-6.2Zm14 0v6.2l-6 3.3v-6.1l6-3.4Z",
 	},
-	"whisper":  {Label: "Whisper (خودمان)", Blurb: "موتورِ رونویسیِ روی سرورِ خودمان. رایگان، بی‌کلید.", Capabilities: []string{CapTranscribe}, Color: "#059669"},
-	"llamacpp": {Label: "llama.cpp (خودمان)", Blurb: "مدلِ محلی روی سرورِ خودمان. رایگان، بی‌کلید.", Capabilities: []string{CapChat}, Color: "#059669"},
-	"infinity": {Label: "Infinity (خودمان)", Blurb: "امبدینگِ محلی. رایگان، بی‌کلید.", Capabilities: []string{CapEmbed}, Color: "#059669"},
-	"ollama":   {Label: "Ollama (خودمان)", Blurb: "مدلِ محلی. رایگان، بی‌کلید.", Capabilities: []string{CapChat}, Color: "#059669"},
-	"nabuocr":  {Label: "NabuOCR (خودمان)", Blurb: "OCR محلی روی Tesseract.", Capabilities: []string{CapDocs}, Color: "#059669"},
-	"imagegen": {Label: "MRC ImageGen", Blurb: "گرافیکِ برندشده — رندرِ قالب است، نه مدلِ diffusion.", Capabilities: []string{CapImage}, Color: "#DB2777"},
+	"whisper":  {Label: "Whisper (خودمان)", Blurb: "موتورِ رونویسیِ روی سرورِ خودمان. رایگان، بی‌کلید.", LabelEn: "Whisper (self-hosted)", BlurbEn: "Transcription engine on our own server. Free, no key.", Capabilities: []string{CapTranscribe}, Color: "#059669"},
+	"llamacpp": {Label: "llama.cpp (خودمان)", Blurb: "مدلِ محلی روی سرورِ خودمان. رایگان، بی‌کلید.", LabelEn: "llama.cpp (self-hosted)", BlurbEn: "Local model on our own server. Free, no key.", Capabilities: []string{CapChat}, Color: "#059669"},
+	"infinity": {Label: "Infinity (خودمان)", Blurb: "امبدینگِ محلی. رایگان، بی‌کلید.", LabelEn: "Infinity (self-hosted)", BlurbEn: "Local embeddings. Free, no key.", Capabilities: []string{CapEmbed}, Color: "#059669"},
+	"ollama":   {Label: "Ollama (خودمان)", Blurb: "مدلِ محلی. رایگان، بی‌کلید.", LabelEn: "Ollama (self-hosted)", BlurbEn: "Local model. Free, no key.", Capabilities: []string{CapChat}, Color: "#059669"},
+	"nabuocr":  {Label: "NabuOCR (خودمان)", Blurb: "OCR محلی روی Tesseract.", LabelEn: "NabuOCR (self-hosted)", BlurbEn: "Local OCR on Tesseract.", Capabilities: []string{CapDocs}, Color: "#059669"},
+	"imagegen": {Label: "MRC ImageGen", Blurb: "گرافیکِ برندشده — رندرِ قالب است، نه مدلِ diffusion.", BlurbEn: "Branded graphics — template rendering, not a diffusion model.", Capabilities: []string{CapImage}, Color: "#DB2777"},
 
 	// Not wired here yet. They are listed so a user can ask for them, and so
 	// the answer to "چرا فلان جا نیست؟" is on the same screen as everything
 	// else rather than in someone's head.
 	"deepgram": {
 		Label: "Deepgram", Blurb: "سریع‌ترین رونویسی — کلِ رفت‌وبرگشت یک درخواست است. مدلِ Nova-3.",
+		BlurbEn:      "The fastest transcription — the whole round trip is a single request. The Nova-3 model.",
 		Capabilities: []string{CapTranscribe},
 		Site:         "https://deepgram.com", KeysURL: "https://console.deepgram.com",
 		Color: "#13EF93",
@@ -274,6 +312,7 @@ var catalogue = map[string]Vendor{
 	},
 	"assemblyai": {
 		Label: "AssemblyAI", Blurb: "رونویسی به‌همراه خلاصه، موضوع و برچسبِ گوینده.",
+		BlurbEn:      "Transcription with summaries, topics and speaker labels.",
 		Capabilities: []string{CapTranscribe},
 		Site:         "https://assemblyai.com", KeysURL: "https://www.assemblyai.com/app/account",
 		Color: "#2545F6",
@@ -281,6 +320,7 @@ var catalogue = map[string]Vendor{
 	},
 	"deepseek": {
 		Label: "DeepSeek", Blurb: "استدلالِ قوی با قیمتی که کسی نمی‌زند. دو مدل: chat و reasoner.",
+		BlurbEn:      "Strong reasoning at a price nobody else matches. Two models: chat and reasoner.",
 		Capabilities: []string{CapChat},
 		Site:         "https://deepseek.com", KeysURL: "https://platform.deepseek.com/api_keys",
 		Color: "#4D6BFE",
@@ -288,6 +328,7 @@ var catalogue = map[string]Vendor{
 	},
 	"xai": {
 		Label: "xAI Grok", Blurb: "گراک، با دسترسی زندهٔ ایکس. سازگارِ OpenAI، پس مدل‌هایش مستقیم آدرس‌پذیرند.",
+		BlurbEn:      "Grok, with live access to X. OpenAI-compatible, so its models are directly addressable.",
 		Capabilities: []string{CapChat, CapImage},
 		Site:         "https://x.ai", KeysURL: "https://console.x.ai",
 		Color: "#000000",
@@ -295,6 +336,7 @@ var catalogue = map[string]Vendor{
 	},
 	"fireworks": {
 		Label: "Fireworks AI", Blurb: "بیش از ۱۰۰ مدلِ باز با سرعتِ بالا، و یک whisper که رینگِ رونویسی هم هست.",
+		BlurbEn:      "Over 100 open models at high speed, and a whisper that is also part of the transcription ring.",
 		Capabilities: []string{CapChat, CapTranscribe, CapImage},
 		Site:         "https://fireworks.ai", KeysURL: "https://fireworks.ai/account/api-keys",
 		Color: "#7B3FE4",
@@ -302,6 +344,7 @@ var catalogue = map[string]Vendor{
 	},
 	"fal": {
 		Label: "fal.ai", Blurb: "تصویر و ویدیوی سریع، مدل‌های بازِ دیداری. هنوز وصل نشده.",
+		BlurbEn:      "Fast image and video, open vision models. Not connected yet.",
 		Capabilities: []string{CapImage, CapVideo},
 		Site:         "https://fal.ai", KeysURL: "https://fal.ai/dashboard/keys",
 		Color: "#EC4899",
@@ -309,6 +352,7 @@ var catalogue = map[string]Vendor{
 	},
 	"stability": {
 		Label: "Stability AI", Blurb: "Stable Diffusion از خودِ سازنده. هنوز وصل نشده.",
+		BlurbEn:      "Stable Diffusion from its own maker. Not connected yet.",
 		Capabilities: []string{CapImage, CapVideo},
 		Site:         "https://stability.ai", KeysURL: "https://platform.stability.ai/account/keys",
 		Color: "#330066",
@@ -316,6 +360,7 @@ var catalogue = map[string]Vendor{
 	},
 	"azure": {
 		Label: "Azure OpenAI", Blurb: "همان مدل‌های OpenAI با قراردادِ سازمانیِ مایکروسافت. هنوز وصل نشده.",
+		BlurbEn:      "The same OpenAI models under an enterprise agreement with Microsoft. Not connected yet.",
 		Capabilities: []string{CapChat, CapImage, CapSpeech, CapTranscribe, CapEmbed},
 		Site:         "https://azure.microsoft.com/products/ai-services/openai-service",
 		Color:        "#0078D4",
@@ -323,12 +368,14 @@ var catalogue = map[string]Vendor{
 	},
 	"bedrock": {
 		Label: "AWS Bedrock", Blurb: "کلود، لاما و تایتان از داخلِ AWS. هنوز وصل نشده.",
+		BlurbEn:      "Claude, Llama and Titan from inside AWS. Not connected yet.",
 		Capabilities: []string{CapChat, CapImage, CapEmbed},
 		Site:         "https://aws.amazon.com/bedrock", Color: "#FF9900",
 		Icon: "M12 2 3 6.6v10.8L12 22l9-4.6V6.6L12 2Zm0 2.4 6.5 3.3v1.6L12 12.9 5.5 9.3V7.7L12 4.4ZM5.5 11.5 11 14.4v5.1l-5.5-2.8v-5.2Zm13 0v5.2L13 19.5v-5.1l5.5-2.9Z",
 	},
 	"perplexity": {
 		Label: "Perplexity", Blurb: "پاسخ بر پایهٔ جست‌وجوی زنده، با ارجاع. خانوادهٔ Sonar.",
+		BlurbEn:      "Answers grounded in live search, with citations. The Sonar family.",
 		Capabilities: []string{CapChat},
 		Site:         "https://perplexity.ai", KeysURL: "https://www.perplexity.ai/settings/api",
 		Color: "#20808D",
@@ -336,6 +383,7 @@ var catalogue = map[string]Vendor{
 	},
 	"runway": {
 		Label: "Runway", Blurb: "ویدیوی تولیدی. هنوز وصل نشده.",
+		BlurbEn:      "Generative video. Not connected yet.",
 		Capabilities: []string{CapVideo},
 		Site:         "https://runwayml.com", Color: "#000000",
 		Icon: "M3 3h8.4a5.7 5.7 0 0 1 2.5 10.8L21 21h-4.3l-6.2-6.6H6.6V21H3V3Zm3.6 3.3v5.1h4.6a2.6 2.6 0 0 0 0-5.1H6.6Z",

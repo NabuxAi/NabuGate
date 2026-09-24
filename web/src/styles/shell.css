@@ -1,0 +1,446 @@
+/*
+ * Console shell, second pass: the refreshed look shared by every screen.
+ *
+ * Loaded last, after app.css and polish.css, so it restyles the existing
+ * class names instead of asking twenty views to adopt new ones. Every rule
+ * uses logical properties or a [dir] guard, because the same markup now lays
+ * out right-to-left in Persian and left-to-right in English.
+ */
+
+/* ---- Type per language ---------------------------------------------------- */
+html[lang="en"] {
+  --ng-font: 'Inter', 'Vazirmatn', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+}
+body { font-family: var(--ng-font); line-height: 1.6; text-rendering: optimizeLegibility; }
+html[lang="en"] body { letter-spacing: -0.005em; }
+code, pre, .mono, kbd { font-family: var(--ng-mono); }
+::selection { background: rgba(91, 124, 255, 0.35); color: inherit; }
+
+/* Thin, quiet scrollbars that follow the theme. */
+* { scrollbar-width: thin; scrollbar-color: var(--ng-border-card) transparent; }
+*::-webkit-scrollbar { width: 10px; height: 10px; }
+*::-webkit-scrollbar-thumb { background: var(--ng-border-card); border-radius: 999px; border: 3px solid transparent; background-clip: padding-box; }
+*::-webkit-scrollbar-track { background: transparent; }
+
+.ico { flex: 0 0 auto; display: inline-block; vertical-align: middle; }
+
+/* ---- App backdrop ---------------------------------------------------------- */
+.app {
+  position: relative;
+  isolation: isolate;
+  background: var(--ng-bg);
+}
+.app::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(900px 500px at 100% -5%, var(--ng-glow-a), transparent 60%),
+    radial-gradient(700px 480px at 0% 110%, var(--ng-glow-b), transparent 60%);
+}
+
+/* ---- Sidebar --------------------------------------------------------------- */
+.sidebar {
+  padding: 18px 14px 14px;
+  gap: 14px;
+  background: color-mix(in srgb, var(--ng-surface) 82%, transparent);
+  border-inline-end: 1px solid var(--ng-border);
+  overflow: hidden;
+}
+.sb-brand { display: flex; align-items: center; gap: 11px; padding: 2px 6px 4px; }
+.sb-brand-text { display: flex; flex-direction: column; gap: 3px; min-width: 0; flex: 1; }
+.brand-name { font-size: 17px; font-weight: 800; letter-spacing: -0.01em; color: var(--ng-heading); line-height: 1.15; }
+.sb-role {
+  width: fit-content; font-size: 10.5px; font-weight: 700; line-height: 1.5;
+  padding: 1px 8px; border-radius: 999px;
+  color: var(--ng-ok-text); background: var(--ng-ok-surface); border: 1px solid var(--ng-ok-border);
+}
+.sb-role.is-admin { color: var(--ng-pass-text); background: var(--ng-pass-surface); border-color: var(--ng-pass-border); }
+.sidebar .sb-close { display: none; }
+.logo-mark { flex: 0 0 auto; filter: drop-shadow(0 6px 14px rgba(91, 124, 255, 0.35)); }
+
+.nav {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  margin-inline: -6px;
+  padding-inline: 6px;
+  gap: 2px;
+}
+.nav-group { margin-bottom: 10px; gap: 2px; }
+.nav-group-title {
+  font-size: 11px; font-weight: 700; color: var(--ng-subtle);
+  margin: 8px 12px 6px;
+}
+html[lang="en"] .nav-group-title { text-transform: uppercase; letter-spacing: 0.07em; font-size: 10.5px; }
+.nav-item {
+  padding: 9px 12px;
+  gap: 11px;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--ng-muted);
+  border-radius: 10px;
+  transition: background var(--ng-dur) var(--ng-ease), color var(--ng-dur) var(--ng-ease);
+}
+.nav-item .ic {
+  width: 30px; height: 30px; border-radius: 9px;
+  display: grid; place-items: center; font-size: 0;
+  color: var(--ng-muted);
+  background: transparent;
+  transition: background var(--ng-dur) var(--ng-ease), color var(--ng-dur) var(--ng-ease);
+}
+.nav-item:hover { background: var(--ng-bg-hover); color: var(--ng-heading); }
+.nav-item:hover .ic { color: var(--ng-heading); }
+.nav-item.active {
+  color: var(--ng-heading);
+  font-weight: 700;
+  background: linear-gradient(90deg, var(--ng-accent-soft), transparent 90%);
+}
+[dir="rtl"] .nav-item.active { background: linear-gradient(270deg, var(--ng-accent-soft), transparent 90%); }
+.nav-item.active .ic { color: #fff; background: var(--ng-brand-grad); box-shadow: var(--ng-shadow-brand); }
+.nav-item.active::before { inset-block: 9px; width: 3px; background: var(--ng-brand-grad); }
+.nav-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.sb-foot { display: flex; flex-direction: column; gap: 10px; padding-top: 12px; border-top: 1px solid var(--ng-border-faint); }
+.sb-user {
+  display: flex; align-items: center; gap: 6px;
+  padding: 6px; border-radius: 12px;
+  background: var(--ng-surface-soft); border: 1px solid var(--ng-border);
+}
+.sb-user-main {
+  flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px;
+  background: none; border: 0; padding: 2px; cursor: pointer; color: inherit; text-align: start; font: inherit;
+  border-radius: 8px;
+}
+.sb-avatar {
+  width: 34px; height: 34px; border-radius: 10px; flex: 0 0 auto;
+  display: grid; place-items: center; font-weight: 800; font-size: 14px; color: #fff;
+  background: var(--ng-brand-grad);
+}
+.sb-user-text { display: flex; flex-direction: column; min-width: 0; line-height: 1.35; }
+.sb-email { font-size: 12.5px; font-weight: 700; color: var(--ng-heading); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: start; }
+.sb-balance { font-size: 11.5px; color: var(--ng-muted); }
+.sb-balance b { color: var(--ng-ok-text); font-weight: 700; }
+.sb-controls { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.sb-controls .seg { flex: 1; }
+.sb-controls .seg-btn { flex: 1; }
+
+.svc { margin-top: 0; border-top: none; padding: 2px 6px 0; }
+.svc-name { font-size: 12px; font-weight: 700; }
+.dot-down { background: var(--ng-danger); box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.18); width: 9px; height: 9px; }
+.dot-ok-ring { animation: ng-breathe 2.8s ease-in-out infinite; }
+@keyframes ng-breathe {
+  0%, 100% { box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.18); }
+  50% { box-shadow: 0 0 0 6px rgba(16, 185, 129, 0.06); }
+}
+
+/* The old sidebar theme button is gone; its wrapper may still be referenced. */
+.sidebar-theme { display: none; }
+
+/* ---- Controls: icon button, segmented switch ------------------------------ */
+.icon-btn {
+  width: 36px; height: 36px; flex: 0 0 auto;
+  display: inline-grid; place-items: center;
+  border-radius: 10px; cursor: pointer;
+  color: var(--ng-muted);
+  background: var(--ng-surface-soft);
+  border: 1px solid var(--ng-border);
+  transition: color var(--ng-dur) var(--ng-ease), background var(--ng-dur) var(--ng-ease), border-color var(--ng-dur) var(--ng-ease), transform 80ms;
+}
+.icon-btn:hover { color: var(--ng-heading); background: var(--ng-bg-hover); border-color: var(--ng-border-card); }
+.icon-btn:active { transform: scale(0.94); }
+.icon-btn:focus-visible, .seg-btn:focus-visible { outline: 2px solid var(--ng-accent); outline-offset: 2px; }
+
+.seg {
+  display: inline-flex; align-items: center; gap: 2px; padding: 3px;
+  border-radius: 11px; background: var(--ng-surface-soft); border: 1px solid var(--ng-border);
+}
+.seg-btn {
+  min-width: 40px; height: 30px; padding: 0 10px; border-radius: 8px; border: 0; cursor: pointer;
+  font: inherit; font-size: 12.5px; font-weight: 700; color: var(--ng-muted); background: transparent;
+  transition: color var(--ng-dur) var(--ng-ease), background var(--ng-dur) var(--ng-ease), box-shadow var(--ng-dur) var(--ng-ease);
+}
+.seg-btn[lang="fa"] { font-family: 'Vazirmatn', var(--ng-font); }
+.seg-btn[lang="en"] { font-family: 'Inter', var(--ng-font); letter-spacing: 0.02em; }
+.seg-btn:hover { color: var(--ng-heading); }
+.seg-btn.active { color: var(--ng-heading); background: var(--ng-surface); box-shadow: var(--ng-shadow-xs), 0 0 0 1px var(--ng-border-card); }
+.seg-sm .seg-btn { height: 28px; }
+
+/* ---- Topbar ---------------------------------------------------------------- */
+.topbar {
+  min-height: var(--ng-topbar-h);
+  background: color-mix(in srgb, var(--ng-bg) 70%, transparent);
+}
+.topbar h2 { font-size: 20px; font-weight: 800; letter-spacing: -0.015em; }
+.topbar .sub { font-size: 12.5px; margin-top: 3px; }
+.menu-btn { font-size: 0; color: var(--ng-heading); }
+.content { gap: 20px; padding-top: 18px; }
+
+/* ---- Buttons --------------------------------------------------------------- */
+.btn { border-radius: 11px; font-weight: 700; font-size: 13px; min-height: 40px; padding: 9px 16px; }
+.btn-primary {
+  color: #fff;
+  background: var(--ng-brand-grad);
+  background-size: 140% 140%;
+  background-position: 0% 50%;
+  box-shadow: var(--ng-shadow-btn), inset 0 1px 0 rgba(255, 255, 255, 0.18);
+  transition: background-position 600ms var(--ng-ease), transform var(--ng-response) var(--ng-spring), filter var(--ng-dur) var(--ng-ease), box-shadow var(--ng-dur) var(--ng-ease);
+}
+.btn-primary:hover { background: var(--ng-brand-grad); background-size: 140% 140%; background-position: 100% 50%; transform: translateY(-1px); filter: brightness(1.05); }
+.btn-outline, .btn-secondary {
+  color: var(--ng-heading);
+  background: var(--ng-surface);
+  border: 1px solid var(--ng-border-card);
+  box-shadow: var(--ng-shadow-xs);
+}
+.btn-outline:hover, .btn-secondary:hover { background: var(--ng-bg-hover); border-color: var(--ng-accent-border); }
+.btn-ghost {
+  min-height: 32px; padding: 6px 12px; font-size: 12px; border-radius: 9px;
+  color: var(--ng-accent-strong);
+  background: var(--ng-accent-soft);
+  border: 1px solid transparent;
+}
+[data-theme="light"] .btn-ghost { color: var(--ng-accent); }
+.btn-ghost:hover { background: var(--ng-accent-soft); border-color: var(--ng-accent-border); }
+.btn-sm { min-height: 32px; padding: 6px 12px; font-size: 12px; border-radius: 9px; }
+.btn-danger { color: #fff; background: var(--ng-danger); }
+
+/* ---- Cards ----------------------------------------------------------------- */
+.card {
+  background: var(--ng-surface);
+  border: 1px solid var(--ng-border-card);
+  box-shadow: var(--ng-shadow-card);
+  border-radius: var(--ng-radius-lg);
+}
+[data-theme="dark"] .card {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.025), transparent 40%),
+    var(--ng-surface);
+}
+.card h3 { font-size: 15.5px; font-weight: 800; letter-spacing: -0.01em; }
+.card-head h3 { display: flex; align-items: center; gap: 8px; }
+.card-hover:hover { transform: translateY(-2px); border-color: var(--ng-accent-border); }
+
+/* KPI tiles: the icon becomes a small gradient-lit tile. */
+.kpi { gap: 10px; position: relative; overflow: hidden; }
+.kpi .kpi-label { font-size: 12.5px; font-weight: 600; }
+.kpi .kpi-value { font-size: 28px; font-weight: 800; letter-spacing: -0.02em; }
+.kpi-icon {
+  width: 36px; height: 36px; border-radius: 11px; font-size: 16px;
+  border: 1px solid var(--ng-accent-border);
+}
+.kpi-icon.ok { border-color: var(--ng-ok-border); }
+.kpi-icon.warn { border-color: var(--ng-warn-border); }
+.kpi-icon.pass { border-color: var(--ng-pass-border); }
+.kpi-hero {
+  border-color: var(--ng-accent-border);
+  background:
+    radial-gradient(420px 180px at 100% 0%, var(--ng-accent-soft), transparent 70%),
+    var(--ng-surface) !important;
+}
+[dir="rtl"] .kpi-hero {
+  background:
+    radial-gradient(420px 180px at 0% 0%, var(--ng-accent-soft), transparent 70%),
+    var(--ng-surface) !important;
+}
+
+/* ---- Badges, tags, pills --------------------------------------------------- */
+.badge { border-radius: 999px; padding: 3px 9px; font-size: 11px; font-weight: 700; }
+.tag { border-radius: 7px; }
+.pill { border-radius: 999px; }
+
+/* Banners carry a sentence or two; body size read as a heading. */
+.banner-ok, .banner-error, .banner-warn { font-size: 13.5px; line-height: 1.9; border-radius: 14px; }
+
+/* ---- Forms ----------------------------------------------------------------- */
+.input {
+  min-height: 42px;
+  border-radius: 11px;
+  background: var(--ng-surface-soft);
+  border-color: var(--ng-border-card);
+}
+.input:hover { border-color: color-mix(in srgb, var(--ng-accent) 30%, var(--ng-border-card)); }
+.input:focus { background: var(--ng-surface); border-color: var(--ng-accent); box-shadow: 0 0 0 4px var(--ng-accent-soft); }
+.label { font-weight: 600; }
+
+/* ---- Tables ---------------------------------------------------------------- */
+.tbl thead th {
+  background: var(--ng-surface-soft);
+  color: var(--ng-muted);
+  font-size: 11.5px;
+  font-weight: 700;
+  border-bottom: 1px solid var(--ng-border);
+  white-space: nowrap;
+}
+html[lang="en"] .tbl thead th { text-transform: uppercase; letter-spacing: 0.05em; font-size: 10.5px; }
+.tbl thead th:first-child { border-start-start-radius: 10px; border-end-start-radius: 10px; }
+.tbl thead th:last-child { border-start-end-radius: 10px; border-end-end-radius: 10px; }
+.tbl tbody td { font-size: 13px; }
+
+/* ---- Callouts, FAQ, steps, code ------------------------------------------- */
+.callout { border-radius: 14px; }
+.faq { border-radius: 14px; background: var(--ng-surface); border-color: var(--ng-border-card); }
+.faq summary { padding: 15px 18px; font-size: 14px; }
+.faq summary::after { content: ''; width: 9px; height: 9px; border-inline-end: 2px solid var(--ng-muted); border-block-end: 2px solid var(--ng-muted); transform: rotate(45deg); margin-top: -4px; transition: transform var(--ng-dur) var(--ng-ease); }
+.faq[open] summary::after { transform: rotate(-135deg); margin-top: 4px; }
+.faq[open] { border-color: var(--ng-accent-border); }
+.step { border-radius: 14px; background: var(--ng-surface); border-color: var(--ng-border-card); }
+.step .num { background: var(--ng-brand-grad); box-shadow: var(--ng-shadow-brand); }
+.code { border-radius: 14px; border-color: rgba(148, 163, 184, 0.16); padding: 16px 18px; font-size: 12.8px; }
+.code-wrap .copy { top: 10px; inset-inline-end: auto; right: 10px; border-radius: 8px; background: rgba(255, 255, 255, 0.06); color: #cbd5e1; border-color: rgba(255, 255, 255, 0.12); }
+.code-wrap .copy.done { color: #34d399; border-color: rgba(52, 211, 153, 0.4); }
+.response-box { background: var(--ng-surface-soft); color: var(--ng-text); box-shadow: none; }
+
+/* Inline code in running text. */
+.content p code, .content li code, .callout code, .docs-body p code, .docs-body li code {
+  font-size: 0.86em; padding: 1px 6px; border-radius: 6px;
+  background: var(--ng-chip-bg); border: 1px solid var(--ng-border);
+  color: var(--ng-heading);
+  unicode-bidi: isolate;
+}
+
+/* ---- Bars, checklist ------------------------------------------------------- */
+.bar { height: 7px; background: var(--ng-surface-softer); }
+.bar > i { background: var(--ng-brand-grad); }
+[dir="rtl"] .bar > i { transform-origin: right; }
+[dir="ltr"] .bar > i { transform-origin: left; }
+.check-item { border-radius: 14px; background: var(--ng-surface-soft); }
+.check-item:hover { border-color: var(--ng-accent-border); }
+.check-item .chev { color: var(--ng-subtle); }
+/* Arrows are drawn pointing right. "Forward" follows the reading direction,
+   "back" goes against it. */
+[dir="rtl"] .check-item .chev, [dir="rtl"] .flip-rtl { transform: scaleX(-1); }
+[dir="ltr"] .flip-back { transform: scaleX(-1); }
+
+/* ---- Empty state ------------------------------------------------------------ */
+.empty .empty-icon { background: var(--ng-accent-soft); border-color: var(--ng-accent-border); color: var(--ng-accent-strong); border-radius: 16px; }
+
+/* ---- Modals ----------------------------------------------------------------- */
+.modal-backdrop { background: rgba(3, 6, 15, 0.6); }
+.modal, .modal-backdrop > .card { border-radius: 20px; }
+
+/* ---- Welcome banner (dashboard) --------------------------------------------- */
+.welcome {
+  position: relative;
+  overflow: hidden;
+  display: flex; align-items: center; justify-content: space-between; gap: 18px; flex-wrap: wrap;
+  padding: 24px 26px;
+  border-radius: 22px;
+  border: 1px solid var(--ng-accent-border);
+  background:
+    radial-gradient(600px 240px at 100% 0%, rgba(168, 85, 247, 0.16), transparent 70%),
+    radial-gradient(600px 260px at 0% 100%, rgba(79, 140, 255, 0.18), transparent 70%),
+    var(--ng-surface);
+  box-shadow: var(--ng-shadow-card);
+}
+.welcome::after {
+  content: ''; position: absolute; inset: 0; pointer-events: none; opacity: 0.35;
+  background-image: radial-gradient(rgba(148, 163, 184, 0.25) 1px, transparent 1px);
+  background-size: 18px 18px;
+  mask-image: linear-gradient(90deg, transparent, #000 70%);
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 70%);
+}
+[dir="rtl"] .welcome::after { mask-image: linear-gradient(270deg, transparent, #000 70%); -webkit-mask-image: linear-gradient(270deg, transparent, #000 70%); }
+.welcome > * { position: relative; z-index: 1; }
+.welcome h1 { font-size: 24px; font-weight: 800; letter-spacing: -0.02em; color: var(--ng-heading); margin: 0; }
+.welcome p { color: var(--ng-muted); font-size: 13.5px; margin-top: 6px; }
+.welcome-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+.progress-ring { display: inline-flex; align-items: center; gap: 8px; font-size: 12px; color: var(--ng-muted); margin-top: 12px; }
+.progress-ring .track { width: 120px; height: 6px; border-radius: 999px; background: var(--ng-surface-softer); overflow: hidden; }
+.progress-ring .track i { display: block; height: 100%; background: var(--ng-brand-grad); border-radius: inherit; }
+
+/* ---- Sign-in -------------------------------------------------------------- */
+.auth {
+  min-height: 100dvh;
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
+  background: var(--ng-bg);
+}
+.auth-art {
+  position: relative; overflow: hidden;
+  display: flex; flex-direction: column; justify-content: space-between; gap: 32px;
+  padding: 40px 48px;
+  color: #eef2ff;
+  background:
+    radial-gradient(700px 420px at 90% 0%, rgba(168, 85, 247, 0.45), transparent 60%),
+    radial-gradient(700px 520px at 0% 100%, rgba(79, 140, 255, 0.5), transparent 60%),
+    #0a0f22;
+}
+.auth-art::before {
+  content: ''; position: absolute; inset: 0; pointer-events: none;
+  background-image: linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+  background-size: 44px 44px;
+  mask-image: radial-gradient(ellipse at center, #000 30%, transparent 75%);
+  -webkit-mask-image: radial-gradient(ellipse at center, #000 30%, transparent 75%);
+}
+.auth-art > * { position: relative; }
+.auth-brand { display: flex; align-items: center; gap: 12px; font-weight: 800; font-size: 19px; color: #fff; }
+.auth-brand small { display: block; font-size: 11.5px; font-weight: 500; color: rgba(226, 232, 255, 0.7); }
+.auth-pitch h1 { font-size: clamp(26px, 3vw, 38px); line-height: 1.25; font-weight: 800; letter-spacing: -0.02em; margin: 0 0 14px; color: #fff; }
+.auth-pitch p { color: rgba(226, 232, 255, 0.78); font-size: 15px; line-height: 1.9; max-width: 460px; }
+.auth-points { list-style: none; margin: 24px 0 0; padding: 0; display: grid; gap: 12px; }
+.auth-points li { display: flex; align-items: center; gap: 12px; font-size: 14px; color: rgba(238, 242, 255, 0.92); }
+.auth-points .ic { width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(255, 255, 255, 0.14); color: #c7d2fe; }
+.auth-models { display: flex; flex-wrap: wrap; gap: 8px; }
+.auth-models span { font-family: var(--ng-mono); font-size: 11.5px; padding: 5px 10px; border-radius: 999px; background: rgba(255, 255, 255, 0.07); border: 1px solid rgba(255, 255, 255, 0.12); color: rgba(226, 232, 255, 0.85); }
+.auth-side { position: relative; display: grid; place-items: center; padding: 72px 24px 40px; }
+.auth-top { position: absolute; top: 20px; inset-inline-end: 24px; inset-inline-start: 24px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.auth-top .auth-home { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--ng-muted); font-weight: 600; }
+.auth-top .auth-home:hover { color: var(--ng-heading); }
+.auth-top-controls { display: flex; align-items: center; gap: 8px; }
+.auth-card { width: 100%; max-width: 400px; }
+.auth-card h2 { font-size: 24px; font-weight: 800; letter-spacing: -0.02em; color: var(--ng-heading); margin: 0 0 6px; }
+.auth-card .auth-lead { color: var(--ng-muted); font-size: 13.5px; margin: 0 0 24px; line-height: 1.8; }
+.auth-tabs { display: grid; grid-template-columns: 1fr 1fr; margin-bottom: 22px; }
+.auth-tabs .seg-btn { height: 36px; font-size: 13px; }
+.field { display: block; margin-bottom: 16px; }
+.field > span { display: block; font-size: 12.5px; font-weight: 600; color: var(--ng-text); margin-bottom: 7px; }
+.field .hint { display: block; margin-top: 6px; font-size: 11.5px; color: var(--ng-muted); line-height: 1.7; }
+.auth-error { display: flex; gap: 8px; align-items: flex-start; margin: 0 0 14px; padding: 10px 12px; border-radius: 11px; font-size: 13px; color: var(--ng-danger-text); background: var(--ng-danger-bg); border: 1px solid color-mix(in srgb, var(--ng-danger) 35%, transparent); }
+.auth-submit { width: 100%; min-height: 46px; font-size: 14px; }
+.auth-or { display: flex; align-items: center; gap: 12px; margin: 22px 0 16px; color: var(--ng-subtle); font-size: 12px; }
+.auth-or::before, .auth-or::after { content: ''; flex: 1; height: 1px; background: var(--ng-border); }
+.auth-sso { display: grid; gap: 10px; }
+.auth-sso .btn { width: 100%; min-height: 44px; }
+.auth-switch { margin-top: 20px; text-align: center; font-size: 13px; color: var(--ng-muted); }
+.auth-switch button { background: none; border: 0; padding: 0; font: inherit; font-weight: 700; color: var(--ng-accent-strong); cursor: pointer; }
+[data-theme="light"] .auth-switch button { color: var(--ng-accent); }
+.auth-note { font-size: 12.5px; line-height: 1.9; color: var(--ng-muted); margin: 0 0 18px; padding: 12px 14px; border-radius: 12px; background: var(--ng-info-surface); border: 1px solid var(--ng-info-border); }
+
+@media (max-width: 920px) {
+  .auth { grid-template-columns: minmax(0, 1fr); }
+  .auth-art { display: none; }
+}
+
+/* ---- Boot shell ------------------------------------------------------------ */
+.boot-shell .boot-side { border-inline-start: 0; border-inline-end: 1px solid var(--ng-border); }
+
+/* ---- Mobile ---------------------------------------------------------------- */
+@media (max-width: 720px) {
+  .sidebar .sb-close { display: inline-grid; }
+  .app .sidebar { width: min(86vw, 300px); background: var(--ng-surface); }
+  .topbar h2 { font-size: 17px; }
+  .welcome { padding: 20px; }
+  .welcome h1 { font-size: 20px; }
+  .kpi .kpi-value { font-size: 24px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dot-ok-ring { animation: none; }
+  .btn-primary { transition: none; }
+}
+
+/* ---- Onboarding dialog ------------------------------------------------------ */
+.onboard { width: 500px; max-width: 95%; padding: 0 !important; overflow: hidden; position: relative; }
+.onboard-bar { height: 4px; background: var(--ng-brand-grad); }
+.onboard-body { padding: 34px 32px 14px; text-align: center; }
+.onboard-icon {
+  width: 68px; height: 68px; margin: 0 auto 18px; border-radius: 20px;
+  display: grid; place-items: center; color: #fff;
+  background: var(--ng-brand-grad); box-shadow: var(--ng-shadow-brand);
+}
+.onboard-body h2 { font-size: 21px; font-weight: 800; margin-bottom: 10px; color: var(--ng-heading); }
+.onboard-body p { color: var(--ng-muted); line-height: 1.9; font-size: 14px; }
+.onboard-foot { padding: 12px 28px 26px; }

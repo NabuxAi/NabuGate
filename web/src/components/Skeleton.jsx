@@ -1,3 +1,5 @@
+import { getLang } from '../i18n/index.jsx';
+
 /*
  * Loading placeholders that keep the page's shape while data arrives.
  *
@@ -88,7 +90,7 @@ export function SkeletonCards({ n = 3, h = 120 }) {
 /* A full-page silhouette, shown before the session is even known. */
 export function BootShell() {
   return (
-    <div className="boot-shell" aria-busy="true" aria-label="در حال بارگذاری">
+    <div className="boot-shell" aria-busy="true" aria-label={getLang() === 'fa' ? 'در حال بارگذاری' : 'Loading'}>
       <div className="boot-side">
         <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 12 }}>
           <Skeleton w={42} h={42} style={{ borderRadius: 12 }} />

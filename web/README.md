@@ -1,28 +1,29 @@
 # NabuGate Console (`web/`)
 
 A web admin console for the NabuGate AI gateway — the **NabuGate console** screen
-from the *NabuGen* design, implemented as a React + Vite SPA. RTL-first
-(Persian, Vazirmatn), built on the NabuDesk design language (indigo/blue accent,
-slate neutrals, emerald/amber/violet statuses).
+from the *NabuGen* design, implemented as a React + Vite SPA. Bilingual
+(Persian RTL and English LTR), built on the NabuDesk design language
+(indigo-to-violet brand gradient, slate neutrals, emerald/amber/violet statuses).
 
 ## Screens
 
-| View | What it shows |
-| --- | --- |
-| **داشبورد** (Dashboard) | KPI tiles (requests / tokens / cost / active providers / fallback rate), provider grid with live/idle status + type badges, usage-by-project, service health. |
-| **پرووایدرها** (Providers) | Every upstream provider from `config.yaml` — type, `base_url`, enabled/skipped. |
-| **مدل‌ها و آلیاس‌ها** (Models & aliases) | Chat alias → primary + fallback routing table, plus image / audio / embedding aliases and the passthrough note. |
-| **کلیدهای پروژه** (Project keys) | Per-key policy: project, `allow` list (globs), rate limit. |
-| **مصرف و هزینه** (Usage & cost) | Usage by model and the pricing table (USD / 1M tokens). |
-| **ساب‌اجنت‌ها**، **لاگ‌ها** | Placeholders for follow-up work. |
+Three surfaces share one bundle and one design system:
 
-## Data
+| Surface | Path | What it is |
+| --- | --- | --- |
+| **Landing** | `/`, `/fa`, `/en` | Public home page: hero with a live routing demo, provider/model marquee (from `/api/public/models`), features, setup snippets per tool, pricing, FAQ. |
+| **Docs** | `/docs`, `/en/docs`, and inside the console | Searchable section nav, "on this page" rail, prev/next; one content file per language in `src/views/docs/`. |
+| **Console** | `/panel/…` (users), `/admin/…` (admins) | Dashboard, balance & usage, plans, payments, API keys, providers, models, requests, integration, profile, security; admins also get global usage, users, access requests, agents & flows, system keys. |
 
-The views read from `src/data/mock.js`, whose shapes mirror the gateway's real
-config (providers, alias routes, per-key policy) and its `GET /v1/usage` output.
-The numbers are **representative** — swap the module for live calls to
-`GET /v1/models` and `GET /v1/usage` (and the config) to make it real, with no
-change to the views.
+## Languages
+
+Persian (`fa`, right-to-left, the default) and English (`en`, left-to-right).
+`src/i18n/index.jsx` holds the language provider, `useT()` and the locale-aware
+formatters (`fmtInt`, `usd`, `fmtDate` …). Each component keeps its own
+`{ fa, en }` dictionary next to the markup that uses it. The language comes from
+`?lang=`, a `/fa` or `/en` path prefix, the saved choice, or the browser, in
+that order; `index.html` applies it before first paint so the page never flips
+direction after loading.
 
 ## Develop
 
@@ -35,7 +36,7 @@ npm run preview  # serve the built bundle
 ```
 
 The bundle is static (`base: './'`), so it can be served by the gateway, a
-static host, or Coolify. Fonts (Vazirmatn) load from Google Fonts, matching the
+static host, or Coolify. Fonts (Vazirmatn, Inter, JetBrains Mono) load from Google Fonts, matching the
 design; self-host under `public/` if an offline build is required.
 
 ## Served by the gateway (`/admin/`)
@@ -64,4 +65,7 @@ cd web && npm run build   # regenerates web/dist/ (committed)
 
 React 18 + Vite 5, no router (lightweight `useState` view switch), no UI
 framework — styling is plain CSS driven by design tokens in
-`src/styles/tokens.css`.
+`src/styles/tokens.css` (day and night themes), refined by `polish.css` and
+`shell.css`; the landing and docs pages add `landing.css` and `docs.css`. Icons
+are inline SVG (`src/components/Icon.jsx`). Fonts: Vazirmatn for Persian,
+Inter for English, JetBrains Mono for code, from Google Fonts.

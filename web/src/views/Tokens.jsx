@@ -2,8 +2,100 @@ import { useEffect, useState } from 'react';
 
 import Layout from '../components/Layout.jsx';
 import * as api from '../api.js';
-import { faInt, faDigits } from '../data/mock.js';
+import { fmtInt, fmtDigits, useT } from '../i18n/index.jsx';
 import { Skeleton } from '../components/Skeleton.jsx';
+import Icon from '../components/Icon.jsx';
+
+const T = {
+  fa: {
+    title: 'کلیدهای API',
+    subtitle: 'یک توکن برای هر برنامه — مصرف جداگانه، دسترسی محدود، فیلتر مبدأ',
+    newToken: 'توکن جدید',
+    confirmDelete: 'توکن «{name}» حذف شود؟ برنامه‌ای که از آن استفاده می‌کند بلافاصله قطع می‌شود.',
+    colApp: 'اپ',
+    colToken: 'توکن',
+    colAccess: 'دسترسی',
+    colProviders: 'پروایدر مجاز',
+    colOrigins: 'مبدأ مجاز',
+    colRequests: 'درخواست',
+    colCost: 'هزینه',
+    colDenied: 'ردشده',
+    empty: 'هنوز توکنی ساخته نشده. کلیدهای تعریف‌شده در config.yaml جداگانه کار می‌کنند و اینجا نمایش داده نمی‌شوند.',
+    disabled: 'غیرفعال',
+    all: 'همه',
+    anywhere: 'هرجا',
+    enable: 'فعال',
+    disable: 'غیرفعال',
+    edit: 'ویرایش',
+    remove: 'حذف',
+    createTitle: 'توکن جدید',
+    appName: 'نام اپ',
+    appNameHint: 'مصرف با همین نام ثبت می‌شود.',
+    access: 'دسترسی',
+    accessHint: 'الگوهای مجاز، با فاصله یا ویرگول. اجباری است: توکنی که به همه‌چیز برسد، توکنِ ادمین است.',
+    providers: 'پروایدرهای مجاز',
+    providersHint: 'خالی یعنی همه. نام پروایدرها با فاصله یا ویرگول.',
+    origins: 'مبدأ مجاز',
+    originsHint: 'خالی یعنی هرجا. برای کلیدی که داخل یک وب‌اپ می‌نشیند پرش کن — آنجا کلید قابل مخفی‌ماندن نیست.',
+    rate: 'سقف نرخ (در دقیقه)',
+    rateHint: '۰ یعنی بی‌حد.',
+    cancel: 'انصراف',
+    create: 'ساخت',
+    mintedTitle: 'توکن «{name}» ساخته شد',
+    mintedNote: 'این تنها باری است که نمایش داده می‌شود. فقط هشِ آن ذخیره شده، پس دوباره قابل بازیابی نیست — همین حالا کپی‌اش کن.',
+    copied: 'کپی شد',
+    copy: 'کپی',
+    close: 'بستن',
+    editTitle: 'ویرایش توکن «{name}»',
+    providersHintShort: 'خالی یعنی همه.',
+    originsHintShort: 'خالی یعنی هرجا.',
+    save: 'ذخیره',
+  },
+  en: {
+    title: 'API keys',
+    subtitle: 'One token per app — separate usage, scoped access, origin filtering',
+    newToken: 'New token',
+    confirmDelete: 'Delete token “{name}”? Any app using it is cut off immediately.',
+    colApp: 'App',
+    colToken: 'Token',
+    colAccess: 'Access',
+    colProviders: 'Allowed providers',
+    colOrigins: 'Allowed origins',
+    colRequests: 'Requests',
+    colCost: 'Cost',
+    colDenied: 'Denied',
+    empty: 'No tokens yet. Keys defined in config.yaml work separately and are not listed here.',
+    disabled: 'Disabled',
+    all: 'All',
+    anywhere: 'Anywhere',
+    enable: 'Enable',
+    disable: 'Disable',
+    edit: 'Edit',
+    remove: 'Delete',
+    createTitle: 'New token',
+    appName: 'App name',
+    appNameHint: 'Usage is recorded under this name.',
+    access: 'Access',
+    accessHint: 'Allowed patterns, separated by spaces or commas. Required: a token that reaches everything is an admin token.',
+    providers: 'Allowed providers',
+    providersHint: 'Empty means all. Provider names, separated by spaces or commas.',
+    origins: 'Allowed origins',
+    originsHint: 'Empty means anywhere. Fill it in for a key that lives inside a web app — a key cannot stay hidden there.',
+    rate: 'Rate limit (per minute)',
+    rateHint: '0 means unlimited.',
+    cancel: 'Cancel',
+    create: 'Create',
+    mintedTitle: 'Token “{name}” created',
+    mintedNote: 'This is the only time it is shown. Only its hash is stored, so it cannot be recovered — copy it now.',
+    copied: 'Copied',
+    copy: 'Copy',
+    close: 'Close',
+    editTitle: 'Edit token “{name}”',
+    providersHintShort: 'Empty means all.',
+    originsHintShort: 'Empty means anywhere.',
+    save: 'Save',
+  },
+};
 
 /*
  * Per-app tokens.
@@ -17,6 +109,7 @@ import { Skeleton } from '../components/Skeleton.jsx';
  * the only chance to copy it.
  */
 export default function Tokens() {
+  const t = useT(T);
   const [tokens, setTokens] = useState(null);
   const [usage, setUsage] = useState({});
   const [error, setError] = useState(null);
@@ -32,7 +125,7 @@ export default function Tokens() {
   useEffect(load, []);
 
   async function remove(name) {
-    if (!confirm(`توکن «${name}» حذف شود؟ برنامه‌ای که از آن استفاده می‌کند بلافاصله قطع می‌شود.`)) return;
+    if (!confirm(t('confirmDelete', { name }))) return;
     try {
       await api.deleteToken(name);
       load();
@@ -41,9 +134,9 @@ export default function Tokens() {
     }
   }
 
-  async function toggle(t) {
+  async function toggle(tok) {
     try {
-      await api.setTokenDisabled(t.name, !t.disabled);
+      await api.setTokenDisabled(tok.name, !tok.disabled);
       load();
     } catch (e) {
       setError(e.message);
@@ -52,11 +145,11 @@ export default function Tokens() {
 
   return (
     <Layout
-      title="توکن هر اپ"
-      subtitle="یک توکن برای هر برنامه — مصرف جداگانه، دسترسی محدود، فیلتر مبدأ"
+      title={t('title')}
+      subtitle={t('subtitle')}
       actions={
         <button className="btn btn-primary" onClick={() => setCreating(true)}>
-          + توکن جدید
+          <Icon name="plus" size={16} />{t('newToken')}
         </button>
       }
     >
@@ -88,14 +181,14 @@ export default function Tokens() {
         <table className="tbl">
           <thead>
             <tr>
-              <th>اپ</th>
-              <th style={{ width: 120 }}>توکن</th>
-              <th>دسترسی</th>
-              <th>پروایدر مجاز</th>
-              <th>مبدأ مجاز</th>
-              <th style={{ width: 90 }}>درخواست</th>
-              <th style={{ width: 90 }}>هزینه</th>
-              <th style={{ width: 80 }}>ردشده</th>
+              <th>{t('colApp')}</th>
+              <th style={{ width: 120 }}>{t('colToken')}</th>
+              <th>{t('colAccess')}</th>
+              <th>{t('colProviders')}</th>
+              <th>{t('colOrigins')}</th>
+              <th style={{ width: 90 }}>{t('colRequests')}</th>
+              <th style={{ width: 90 }}>{t('colCost')}</th>
+              <th style={{ width: 80 }}>{t('colDenied')}</th>
               <th style={{ width: 130 }} />
             </tr>
           </thead>
@@ -110,66 +203,65 @@ export default function Tokens() {
             {tokens !== null && tokens.length === 0 && (
               <tr>
                 <td colSpan={9} style={{ color: 'var(--ng-muted)', padding: 18 }}>
-                  هنوز توکنی ساخته نشده. کلیدهای تعریف‌شده در config.yaml جداگانه کار
-                  می‌کنند و اینجا نمایش داده نمی‌شوند.
+                  {t('empty')}
                 </td>
               </tr>
             )}
-            {(tokens || []).map((t) => {
-              const u = usage[t.name] || {};
+            {(tokens || []).map((tok) => {
+              const u = usage[tok.name] || {};
               return (
-                <tr key={t.name} style={t.disabled ? { opacity: 0.5 } : undefined}>
+                <tr key={tok.name} style={tok.disabled ? { opacity: 0.5 } : undefined}>
                   <td style={{ fontWeight: 700, color: 'var(--ng-heading)' }}>
-                    {t.name}
-                    {t.disabled && (
+                    {tok.name}
+                    {tok.disabled && (
                       <div>
-                        <span className="badge badge-warn" style={{ marginTop: 4 }}>غیرفعال</span>
+                        <span className="badge badge-warn" style={{ marginTop: 4 }}>{t('disabled')}</span>
                       </div>
                     )}
                   </td>
                   <td>
-                    <span className="mono ltr" style={{ fontSize: 12 }}>{t.prefix}…</span>
+                    <span className="mono ltr" style={{ fontSize: 12 }}>{tok.prefix}…</span>
                   </td>
                   <td>
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-                      {(t.allow || []).map((a) => (
+                      {(tok.allow || []).map((a) => (
                         <span key={a} className="tag ltr">{a}</span>
                       ))}
                     </div>
                   </td>
                                     <td>
-                    {(t.providers || []).length === 0 ? (
-                      <span style={{ color: 'var(--ng-muted)', fontSize: 12 }}>همه</span>
+                    {(tok.providers || []).length === 0 ? (
+                      <span style={{ color: 'var(--ng-muted)', fontSize: 12 }}>{t('all')}</span>
                     ) : (
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-                        {t.providers.map((p) => (
+                        {tok.providers.map((p) => (
                           <span key={p} className="tag ltr">{p}</span>
                         ))}
                       </div>
                     )}
                   </td>
                   <td>
-                    {(t.allowed_origins || []).length === 0 ? (
-                      <span style={{ color: 'var(--ng-muted)', fontSize: 12 }}>هرجا</span>
+                    {(tok.allowed_origins || []).length === 0 ? (
+                      <span style={{ color: 'var(--ng-muted)', fontSize: 12 }}>{t('anywhere')}</span>
                     ) : (
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-                        {t.allowed_origins.map((o) => (
+                        {tok.allowed_origins.map((o) => (
                           <span key={o} className="tag ltr tag-pass">{o}</span>
                         ))}
                       </div>
                     )}
                   </td>
-                  <td className="mono">{faInt(u.requests || 0)}</td>
-                                    <td className="mono ltr">{faDigits('$' + (u.cost_usd || 0).toFixed(3))}</td>
+                  <td className="mono">{fmtInt(u.requests || 0)}</td>
+                                    <td className="mono ltr">{fmtDigits('$' + (u.cost_usd || 0).toFixed(3))}</td>
                   <td className="mono" style={u.denied ? { color: 'var(--ng-danger, #c53030)' } : undefined}>
-                    {faInt(u.denied || 0)}
+                    {fmtInt(u.denied || 0)}
                   </td>
-                  <td style={{ textAlign: 'left' }}>
-                    <button className="btn" onClick={() => toggle(t)}>
-                      {t.disabled ? 'فعال' : 'غیرفعال'}
+                  <td style={{ textAlign: 'end' }}>
+                    <button className="btn" onClick={() => toggle(tok)}>
+                      {tok.disabled ? t('enable') : t('disable')}
                     </button>{' '}
-                    <button className="btn" onClick={() => setEditing(t)}>ویرایش</button>{' '}
-                    <button className="btn" onClick={() => remove(t.name)}>حذف</button>
+                    <button className="btn" onClick={() => setEditing(tok)}>{t('edit')}</button>{' '}
+                    <button className="btn" onClick={() => remove(tok.name)}>{t('remove')}</button>
                   </td>
                 </tr>
               );
@@ -182,6 +274,7 @@ export default function Tokens() {
 }
 
 function CreateDialog({ onClose, onCreated }) {
+  const t = useT(T);
   const [name, setName] = useState('');
   const [allow, setAllow] = useState('');
   const [origins, setOrigins] = useState('');
@@ -215,51 +308,43 @@ function CreateDialog({ onClose, onCreated }) {
   return (
     <div className="modal-backdrop" onClick={onClose}>
       <form className="modal card" onClick={(e) => e.stopPropagation()} onSubmit={submit}>
-        <h3>توکن جدید</h3>
+        <h3>{t('createTitle')}</h3>
 
         <label className="signin-field">
-          نام اپ
+          {t('appName')}
           <input value={name} onChange={(e) => setName(e.target.value)} placeholder="nabuwrite" dir="ltr" required />
-          <span className="signin-hint">مصرف با همین نام ثبت می‌شود.</span>
+          <span className="signin-hint">{t('appNameHint')}</span>
         </label>
 
         <label className="signin-field">
-          دسترسی
+          {t('access')}
           <input value={allow} onChange={(e) => setAllow(e.target.value)} placeholder="write-*  nabu-fast" dir="ltr" required />
-          <span className="signin-hint">
-            الگوهای مجاز، با فاصله یا ویرگول. اجباری است: توکنی که به همه‌چیز برسد،
-            توکنِ ادمین است.
-          </span>
+          <span className="signin-hint">{t('accessHint')}</span>
         </label>
 
                 <label className="signin-field">
-          پروایدرهای مجاز
+          {t('providers')}
           <input value={providers} onChange={(e) => setProviders(e.target.value)} placeholder="openai, groq" dir="ltr" />
-          <span className="signin-hint">
-            خالی یعنی همه. نام پروایدرها با فاصله یا ویرگول.
-          </span>
+          <span className="signin-hint">{t('providersHint')}</span>
         </label>
 
         <label className="signin-field">
-          مبدأ مجاز
+          {t('origins')}
           <input value={origins} onChange={(e) => setOrigins(e.target.value)} placeholder="*.nabuxai.com" dir="ltr" />
-          <span className="signin-hint">
-            خالی یعنی هرجا. برای کلیدی که داخل یک وب‌اپ می‌نشیند پرش کن — آنجا کلید
-            قابل مخفی‌ماندن نیست.
-          </span>
+          <span className="signin-hint">{t('originsHint')}</span>
         </label>
 
         <label className="signin-field">
-          سقف نرخ (در دقیقه)
+          {t('rate')}
           <input type="number" min="0" value={rate} onChange={(e) => setRate(e.target.value)} dir="ltr" />
-          <span className="signin-hint">۰ یعنی بی‌حد.</span>
+          <span className="signin-hint">{t('rateHint')}</span>
         </label>
 
         {error && <p className="signin-error">{error}</p>}
 
         <div className="modal-actions">
-          <button type="button" className="btn" onClick={onClose}>انصراف</button>
-          <button className="btn btn-primary" disabled={busy}>{busy ? '…' : 'ساخت'}</button>
+          <button type="button" className="btn" onClick={onClose}>{t('cancel')}</button>
+          <button className="btn btn-primary" disabled={busy}>{busy ? '…' : t('create')}</button>
         </div>
       </form>
     </div>
@@ -267,15 +352,13 @@ function CreateDialog({ onClose, onCreated }) {
 }
 
 function MintedDialog({ minted, onClose }) {
+  const t = useT(T);
   const [copied, setCopied] = useState(false);
   return (
     <div className="modal-backdrop" onClick={onClose}>
       <div className="modal card" onClick={(e) => e.stopPropagation()}>
-        <h3>توکن «{minted.token?.name}» ساخته شد</h3>
-        <p className="signin-note">
-          این تنها باری است که نمایش داده می‌شود. فقط هشِ آن ذخیره شده، پس دوباره
-          قابل بازیابی نیست — همین حالا کپی‌اش کن.
-        </p>
+        <h3>{t('mintedTitle', { name: minted.token?.name ?? '' })}</h3>
+        <p className="signin-note">{t('mintedNote')}</p>
         <pre className="mono ltr token-secret">{minted.secret}</pre>
         <div className="modal-actions">
           <button
@@ -285,9 +368,9 @@ function MintedDialog({ minted, onClose }) {
               setCopied(true);
             }}
           >
-            {copied ? 'کپی شد' : 'کپی'}
+            {copied ? t('copied') : t('copy')}
           </button>
-          <button className="btn btn-primary" onClick={onClose}>بستن</button>
+          <button className="btn btn-primary" onClick={onClose}>{t('close')}</button>
         </div>
       </div>
     </div>
@@ -296,6 +379,7 @@ function MintedDialog({ minted, onClose }) {
 
 
 function EditDialog({ token, onClose, onSaved }) {
+  const t = useT(T);
   const [origins, setOrigins] = useState((token.allowed_origins || []).join(', '));
   const [providers, setProviders] = useState((token.providers || []).join(', '));
   const [error, setError] = useState(null);
@@ -320,25 +404,25 @@ function EditDialog({ token, onClose, onSaved }) {
   return (
     <div className="modal-backdrop" onClick={onClose}>
       <form className="modal card" onClick={(e) => e.stopPropagation()} onSubmit={submit}>
-        <h3>ویرایش توکن «{token.name}»</h3>
+        <h3>{t('editTitle', { name: token.name })}</h3>
 
         <label className="signin-field">
-          پروایدرهای مجاز
+          {t('providers')}
           <input value={providers} onChange={(e) => setProviders(e.target.value)} placeholder="openai, groq" dir="ltr" />
-          <span className="signin-hint">خالی یعنی همه.</span>
+          <span className="signin-hint">{t('providersHintShort')}</span>
         </label>
 
         <label className="signin-field">
-          مبدأ مجاز
+          {t('origins')}
           <input value={origins} onChange={(e) => setOrigins(e.target.value)} placeholder="*.nabuxai.com" dir="ltr" />
-          <span className="signin-hint">خالی یعنی هرجا.</span>
+          <span className="signin-hint">{t('originsHintShort')}</span>
         </label>
 
         {error && <p className="signin-error">{error}</p>}
 
         <div className="modal-actions">
-          <button type="button" className="btn" onClick={onClose}>انصراف</button>
-          <button className="btn btn-primary" disabled={busy}>{busy ? '…' : 'ذخیره'}</button>
+          <button type="button" className="btn" onClick={onClose}>{t('cancel')}</button>
+          <button className="btn btn-primary" disabled={busy}>{busy ? '…' : t('save')}</button>
         </div>
       </form>
     </div>

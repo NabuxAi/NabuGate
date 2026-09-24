@@ -1,7 +1,10 @@
 import { useEffect, useRef } from 'react';
+import Icon from './Icon.jsx';
+import { useI18n } from '../i18n/index.jsx';
 
 export default function Layout({ title, subtitle, actions, children }) {
   const main = useRef(null);
+  const { lang } = useI18n();
   const openNav = () => document.querySelector('.app')?.classList.add('nav-open');
 
   // The topbar is a floating material; its edge only appears once content has
@@ -20,7 +23,9 @@ export default function Layout({ title, subtitle, actions, children }) {
     <div className="main" ref={main}>
       <header className="topbar">
         <div className="topbar-title">
-          <button type="button" className="menu-btn" onClick={openNav} aria-label="منو">☰</button>
+          <button type="button" className="menu-btn" onClick={openNav} aria-label={lang === 'fa' ? 'منو' : 'Menu'}>
+            <Icon name="menu" size={19} />
+          </button>
           <div style={{ minWidth: 0 }}>
             <h2>{title}</h2>
             {subtitle && <p className="sub">{subtitle}</p>}

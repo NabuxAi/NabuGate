@@ -1,9 +1,45 @@
-import { useEffect, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import Layout from '../components/Layout.jsx';
 import * as api from '../api.js';
 import { SkeletonCards } from '../components/Skeleton.jsx';
+import Icon from '../components/Icon.jsx';
+import { fmtInt, useT } from '../i18n/index.jsx';
+
+const T = {
+  fa: {
+    title: 'مدل‌ها و آلیاس‌ها',
+    subtitle: 'کاتالوگ مدل‌های فعال و در دسترس در NabuGate',
+    aliasesTitle: 'مدل‌های پایه (Aliases)',
+    aliasesIntro: 'نبوگیت به جای دسترسی مستقیم به پروایدرها، مدل‌ها را در قالب «آلیاس» (Alias) ارائه می‌کند تا در صورت قطعی هر سرویس دهنده، به صورت خودکار مدل جایگزین (Fallback) استفاده شود. شما در کد خود این نام‌ها را صدا می‌زنید.',
+    noAliases: 'هیچ aliasی تعریف نشده است.',
+    activeProviders: '{n} ارائه‌دهنده فعال',
+    connected: 'متصل',
+    routing: 'مسیردهی مدل‌ها:',
+    agentsTitle: 'عامل‌های هوشمند (Sub-agents)',
+    agentsIntro: 'ساب‌اجنت‌ها (Sub-agents) پرامپت‌ها و پارامترهای از پیش تعریف شده‌ای هستند که روی یکی از آلیاس‌ها سوار می‌شوند. با صدا زدن نام ساب‌اجنت به عنوان Model، شما نیازی به تنظیم پرامپت سیستم در سمت کلاینت نخواهید داشت.',
+    noAgents: 'ساب‌اجنتی یافت نشد.',
+    agentReady: 'ساب‌اجنت آماده',
+    agentNote: 'سیستم پرامپت و پارامترهای پیش‌فرض این اجنت در بک‌اند دروازه (Gateway) نگهداری می‌شود.',
+  },
+  en: {
+    title: 'Models & aliases',
+    subtitle: 'The models active and available on NabuGate',
+    aliasesTitle: 'Base models (aliases)',
+    aliasesIntro: 'Rather than exposing providers directly, NabuGate offers models as aliases, so that when a provider goes down a fallback model takes over automatically. These are the names you call from your code.',
+    noAliases: 'No aliases are defined.',
+    activeProviders: '{n} active providers',
+    connected: 'Connected',
+    routing: 'Model routing:',
+    agentsTitle: 'Sub-agents',
+    agentsIntro: 'Sub-agents are predefined prompts and parameters layered on top of one of the aliases. Pass a sub-agent’s name as the model and you don’t need to set a system prompt on the client.',
+    noAgents: 'No sub-agents found.',
+    agentReady: 'Sub-agent ready',
+    agentNote: 'This agent’s system prompt and default parameters are kept in the gateway’s backend.',
+  },
+};
 
 export default function Models() {
+  const t = useT(T);
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
 
@@ -20,7 +56,7 @@ export default function Models() {
     if (l.includes('claude')) return { bg: 'rgba(249, 115, 22, 0.1)', color: '#f97316', border: 'rgba(249, 115, 22, 0.3)' };
     if (l.includes('gemini')) return { bg: 'rgba(59, 130, 246, 0.1)', color: '#3b82f6', border: 'rgba(59, 130, 246, 0.3)' };
     if (l.includes('deepseek')) return { bg: 'rgba(99, 102, 241, 0.1)', color: '#6366f1', border: 'rgba(99, 102, 241, 0.3)' };
-    return { bg: 'var(--ng-surface-soft)', color: 'var(--ng-fg)', border: 'var(--ng-border)' };
+    return { bg: 'var(--ng-accent-soft)', color: 'var(--ng-accent)', border: 'var(--ng-accent-border)' };
   };
 
   const getModelIcon = (name) => {
@@ -32,25 +68,20 @@ export default function Models() {
   };
 
   return (
-    <Layout
-      title="مدل‌ها و آلیاس‌ها"
-      subtitle="کاتالوگ مدل‌های فعال و در دسترس در NabuGate"
-    >
+    <Layout title={t('title')} subtitle={t('subtitle')}>
       {error && <div className="card banner-error">{error}</div>}
 
       <div style={{ marginBottom: 32 }}>
-        <h3 style={{ fontSize: 18, marginBottom: 8, color: 'var(--ng-heading)' }}>مدل‌های پایه (Aliases)</h3>
-        <p style={{ color: 'var(--ng-muted)', fontSize: 13, marginBottom: 20 }}>
-          نبوگیت به جای دسترسی مستقیم به پروایدرها، مدل‌ها را در قالب «آلیاس» (Alias) ارائه می‌کند تا در صورت قطعی هر سرویس دهنده، به صورت خودکار مدل جایگزین (Fallback) استفاده شود. شما در کد خود این نام‌ها را صدا می‌زنید.
-        </p>
+        <h3 style={{ fontSize: 18, marginBottom: 8, color: 'var(--ng-heading)' }}>{t('aliasesTitle')}</h3>
+        <p style={{ color: 'var(--ng-muted)', fontSize: 13, marginBottom: 20 }}>{t('aliasesIntro')}</p>
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 16 }}>
           {data === null && <div style={{ gridColumn: '1 / -1' }}><SkeletonCards n={6} h={110} /></div>}
-          {data !== null && aliases.length === 0 && <div className="card" style={{ padding: 24, textAlign: 'center', color: 'var(--ng-muted)', gridColumn: '1 / -1' }}>هیچ aliasی تعریف نشده است.</div>}
+          {data !== null && aliases.length === 0 && <div className="card" style={{ padding: 24, textAlign: 'center', color: 'var(--ng-muted)', gridColumn: '1 / -1' }}>{t('noAliases')}</div>}
           {aliases.map((a) => {
             const style = getModelColor(a.id);
             return (
-              <div key={a.id} className="card" style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 16, border: `1px solid \${style.border}` }}>
+              <div key={a.id} className="card" style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 16, border: `1px solid ${style.border}` }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                   <div style={{ width: 40, height: 40, borderRadius: 10, background: style.bg, color: style.color, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     {getModelIcon(a.id)}
@@ -58,18 +89,24 @@ export default function Models() {
                   <div style={{ flex: 1, overflow: 'hidden' }}>
                     <div style={{ fontWeight: 700, fontSize: 16, color: 'var(--ng-heading)', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }} dir="ltr">{a.id}</div>
                     <div style={{ fontSize: 12, color: style.color, marginTop: 4 }}>
-                      {a.targets ? `\${a.targets.length} ارائه‌دهنده فعال` : 'متصل'}
+                      {a.targets ? t('activeProviders', { n: fmtInt(a.targets.length) }) : t('connected')}
                     </div>
                   </div>
                 </div>
                 {a.targets && a.targets.length > 0 && (
                   <div style={{ fontSize: 12, color: 'var(--ng-muted)', background: 'var(--ng-surface)', padding: '8px 12px', borderRadius: 6, display: 'flex', flexDirection: 'column', gap: 4 }}>
-                    <span style={{ fontSize: 11, fontWeight: 'bold' }}>مسیردهی مدل‌ها:</span>
+                    <span style={{ fontSize: 11, fontWeight: 'bold' }}>{t('routing')}</span>
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-                      {a.targets.map((t, i) => (
-                        <span key={i} dir="ltr" style={{ fontSize: 11 }}>
-                          {t.model || 'default'} {i < a.targets.length - 1 ? '→' : ''}
-                        </span>
+                      {/* The arrow sits between the chips, not inside the LTR
+                          model id, so it points at the next hop in either
+                          direction. */}
+                      {a.targets.map((tg, i) => (
+                        <Fragment key={i}>
+                          <span dir="ltr" style={{ fontSize: 11 }}>{tg.model || 'default'}</span>
+                          {i < a.targets.length - 1 && (
+                            <Icon name="arrow" size={11} className="flip-rtl" style={{ alignSelf: 'center' }} />
+                          )}
+                        </Fragment>
                       ))}
                     </div>
                   </div>
@@ -81,26 +118,24 @@ export default function Models() {
       </div>
 
       <div style={{ marginBottom: 32 }}>
-        <h3 style={{ fontSize: 18, marginBottom: 8, color: 'var(--ng-heading)' }}>عامل‌های هوشمند (Sub-agents)</h3>
-        <p style={{ color: 'var(--ng-muted)', fontSize: 13, marginBottom: 20 }}>
-          ساب‌اجنت‌ها (Sub-agents) پرامپت‌ها و پارامترهای از پیش تعریف شده‌ای هستند که روی یکی از آلیاس‌ها سوار می‌شوند. با صدا زدن نام ساب‌اجنت به عنوان Model، شما نیازی به تنظیم پرامپت سیستم در سمت کلاینت نخواهید داشت.
-        </p>
+        <h3 style={{ fontSize: 18, marginBottom: 8, color: 'var(--ng-heading)' }}>{t('agentsTitle')}</h3>
+        <p style={{ color: 'var(--ng-muted)', fontSize: 13, marginBottom: 20 }}>{t('agentsIntro')}</p>
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 16 }}>
-          {agents.length === 0 && <div className="card" style={{ padding: 24, textAlign: 'center', color: 'var(--ng-muted)' }}>ساب‌اجنتی یافت نشد.</div>}
+          {agents.length === 0 && <div className="card" style={{ padding: 24, textAlign: 'center', color: 'var(--ng-muted)' }}>{t('noAgents')}</div>}
           {agents.map((a) => (
             <div key={a} className="card" style={{ padding: 20, border: '1px solid var(--ng-border)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
                 <div style={{ width: 40, height: 40, borderRadius: 10, background: 'rgba(139, 92, 246, 0.1)', color: '#8b5cf6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  🤖
+                  <Icon name="bot" size={20} />
                 </div>
                 <div style={{ flex: 1, overflow: 'hidden' }}>
                   <div style={{ fontWeight: 700, fontSize: 16, color: 'var(--ng-heading)', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }} dir="ltr">{a}</div>
-                  <div style={{ fontSize: 12, color: '#8b5cf6', marginTop: 4 }}>ساب‌اجنت آماده</div>
+                  <div style={{ fontSize: 12, color: '#8b5cf6', marginTop: 4 }}>{t('agentReady')}</div>
                 </div>
               </div>
               <div style={{ fontSize: 12, color: 'var(--ng-muted)', background: 'var(--ng-surface)', padding: '8px 12px', borderRadius: 6 }}>
-                سیستم پرامپت و پارامترهای پیش‌فرض این اجنت در بک‌اند دروازه (Gateway) نگهداری می‌شود.
+                {t('agentNote')}
               </div>
             </div>
           ))}
