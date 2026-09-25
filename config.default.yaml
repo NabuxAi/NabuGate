@@ -1030,6 +1030,24 @@ models:
       - provider: llamacpp
         model: "qwen-local"
 
+  # Nabusto's menu helper: a guest asks what to eat, and the answer names dishes by
+  # id in JSON, in Persian, Arabic, Kurdish or English. OpenAI's own key first,
+  # because gpt-4.1-mini keeps to the JSON and writes Persian well, and because
+  # nabu-fast's first rung, gemini-2.5-flash, answered 429 to every request on
+  # 25-26 Sep 2026 — so the helper was running on qwen-turbo. The provider is
+  # named on the OpenAI rungs: the model registry serves gpt-4.1-mini from Parspack
+  # and AvalAI only. No llama.cpp floor: 2k tokens of context cannot hold a menu.
+  nabu-concierge:
+    primary:
+      provider: openai
+      model: "gpt-4.1-mini"
+    fallback:
+      - provider: openai
+        model: "gpt-4o-mini"
+      - model: gemini-2.5-flash
+      - model: qwen-plus
+      - model: qwen-turbo
+
 
   # The console's alias, so every rung has to carry tools and hold a 10k-token
   # prompt. Rewritten 2026-09-06 after the whole chain died at once: 9router's
@@ -1400,6 +1418,12 @@ live:
     primary:
       provider: openai
       model: "gpt-realtime"
+    # Same vendor, so the SDP answer and the Realtime events keep their shape, at
+    # about a third of the price. It covers a refusal of the model (rate limit, a
+    # retired id), not a spent key: both rungs run on OPENAI_API_KEY.
+    fallback:
+      - provider: openai
+        model: "gpt-realtime-mini"
 
 
 audio:
@@ -1889,6 +1913,10 @@ flows_dir: "/app/flows"
 pricing:
   # Per minute of session, billed per second — a live model has no tokens.
   "openai/gpt-realtime": { per_minute: 0.30 }
+  # A live rung without a per_minute price refuses its whole alias (LiveProblems).
+  # About a third of gpt-realtime, as OpenAI prices mini's audio tokens.
+  "openai/gpt-realtime-mini": { per_minute: 0.10 }
+  "openai/gpt-4.1-mini": { input: 0.40, output: 1.60 }
   "openai/gpt-4o": { input: 2.5, output: 10 }
   "openai/gpt-4o-mini": { input: 0.15, output: 0.6 }
   "openai/text-embedding-3-small": { input: 0.02, output: 0 }
