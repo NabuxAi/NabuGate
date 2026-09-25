@@ -41,9 +41,9 @@ here. A `live:` alias is declared like an `audio:` one:
 ```yaml
 live:
   nabu-live:
-    primary: { provider: openai, model: "gpt-live-1" }
+    primary: { provider: openai, model: "gpt-realtime" }
 pricing:
-  "openai/gpt-live-1": { per_minute: 0.05 }
+  "openai/gpt-realtime": { per_minute: 0.30 }
 ```
 
 **Every live alias needs a `per_minute` price** for each provider/model it can

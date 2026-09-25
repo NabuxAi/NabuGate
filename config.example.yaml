@@ -527,17 +527,11 @@ images:
 # minutes the caller reports back (POST /v1/live/sessions/{id}/usage).
 # No fallback across vendors: the SDP answer comes from exactly one of them.
 live:
-  # gpt-live-1, as docs/live.md says, and nothing else: the "replicate,runpod"
-  # commit of 2026-09-18 swapped this to gpt-4o-realtime-preview, which OpenAI
-  # retired in March 2026 (with the Realtime beta in May), so every call was a
-  # 404 at the vendor and the console said "the voice service did not answer".
-  # No fallback rung: the browser SDK speaks the GPT-Live event contract, so a
-  # session opened on another realtime model would connect and then say nothing
-  # it understands.
+  # OpenAI rejects gpt-live-1 for realtime calls; use its supported WebRTC model.
   nabu-live:
     primary:
       provider: openai
-      model: "gpt-live-1"
+      model: "gpt-realtime"
 
 
 audio:
@@ -641,7 +635,7 @@ agents:
 
 pricing:
   # Per minute of session, billed per second — a live model has no tokens.
-  "openai/gpt-live-1": { per_minute: 0.05 }
+  "openai/gpt-realtime": { per_minute: 0.30 }
   "openai/gpt-4o": { input: 2.5, output: 10 }
   "openai/gpt-4o-mini": { input: 0.15, output: 0.6 }
   "openai/text-embedding-3-small": { input: 0.02, output: 0 }
