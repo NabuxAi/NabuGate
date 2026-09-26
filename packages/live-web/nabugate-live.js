@@ -1,4 +1,4 @@
-// @nabugate/live — realtime voice (GPT-Live) in the browser, through NabuGate.
+// @nabugate/live — realtime voice in the browser, through NabuGate.
 //
 // One file, no dependencies, ES module. The product's server owns the key
 // and the actions; this handles the call:
@@ -13,10 +13,15 @@
 //      POST /v1/live/sessions/{id}/usage so the minutes are billed (or
 //      reports its own clock instead; the gateway bills the highest snapshot)
 //
-// Event names follow the vendor's GPT-Live contract at the time of writing;
-// they are exported so a product can pin or override them.
+// The gateway decides which vendor a live alias lands on, so the events of
+// two vendors are understood and a call's first event says which it speaks:
+// OpenAI's Realtime API (`session.created`), which is what the gateway opens
+// through /v1/realtime/calls, and GPT-Live (`session.started`). Both sets of
+// names are exported so a product can pin or override them.
 
 export const DATA_CHANNEL = "oai-events";
+
+// GPT-Live.
 export const EVENTS = {
     started: "session.started",
     closed: "session.closed",
@@ -32,6 +37,24 @@ export const EVENTS = {
     thinkingAppend: "session.thinking.append",
     commentaryAppend: "session.commentary.append",
     instructionsAppend: "session.instructions.append",
+};
+
+// OpenAI's Realtime API, as its GA interface names them.
+export const REALTIME_EVENTS = {
+    created: "session.created",
+    speechStarted: "input_audio_buffer.speech_started",
+    inputTranscript: "conversation.item.input_audio_transcription.delta",
+    inputTranscriptDone: "conversation.item.input_audio_transcription.completed",
+    inputTranscriptFailed: "conversation.item.input_audio_transcription.failed",
+    outputTranscript: "response.output_audio_transcript.delta",
+    outputTranscriptDone: "response.output_audio_transcript.done",
+    audioStarted: "output_audio_buffer.started",
+    audioStopped: "output_audio_buffer.stopped",
+    audioCleared: "output_audio_buffer.cleared",
+    responseDone: "response.done",
+    itemCreate: "conversation.item.create",
+    responseCreate: "response.create",
+    error: "error",
 };
 
 export function transcriptRoleFor(type) {
@@ -83,30 +106,55 @@ export function usageSecondsFrom(event) {
     return null;
 }
 
+function argumentsOf(item) {
+    if (typeof item.arguments === "string" && item.arguments.trim()) {
+        try {
+            return JSON.parse(item.arguments);
+        } catch {
+            return { _raw: item.arguments };
+        }
+    }
+    return item.arguments && typeof item.arguments === "object" ? item.arguments : {};
+}
+
 export function functionCallFrom(event) {
     if (event?.type !== EVENTS.responseEnvelope) return null;
     const inner = event.event;
     if (inner?.type !== EVENTS.itemDone) return null;
     const item = inner.item;
     if (item?.type !== "function_call" || !item.call_id || !item.name) return null;
-    let args = {};
-    if (typeof item.arguments === "string" && item.arguments.trim()) {
-        try {
-            args = JSON.parse(item.arguments);
-        } catch {
-            args = { _raw: item.arguments };
-        }
-    } else if (item.arguments && typeof item.arguments === "object") {
-        args = item.arguments;
-    }
-    return { callId: item.call_id, name: item.name, arguments: args, delegationId: event.delegation_id || null };
+    return { callId: item.call_id, name: item.name, arguments: argumentsOf(item), delegationId: event.delegation_id || null };
+}
+
+// A Realtime response hands over its function calls whole in response.done.
+// Answering them there, together, lets one response.create follow all of
+// them; one per call would race the response that is still open.
+export function realtimeFunctionCallsFrom(event) {
+    if (event?.type !== REALTIME_EVENTS.responseDone) return [];
+    const output = Array.isArray(event.response?.output) ? event.response.output : [];
+    return output
+        .filter((item) => item?.type === "function_call" && item.call_id && item.name && (item.status ?? "completed") === "completed")
+        .map((item) => ({ callId: item.call_id, name: item.name, arguments: argumentsOf(item), delegationId: null }));
+}
+
+function outputText(output) {
+    return typeof output === "string" ? output : JSON.stringify(output ?? {});
 }
 
 export function functionOutputEvents(callId, output) {
-    const text = typeof output === "string" ? output : JSON.stringify(output ?? {});
     return [
-        { type: EVENTS.itemCreate, item: { type: "function_call_output", call_id: callId, output: text } },
+        { type: EVENTS.itemCreate, item: { type: "function_call_output", call_id: callId, output: outputText(output) } },
         { type: EVENTS.responseCreate },
+    ];
+}
+
+export function realtimeOutputEvents(results) {
+    return [
+        ...results.map(({ callId, output }) => ({
+            type: REALTIME_EVENTS.itemCreate,
+            item: { type: "function_call_output", call_id: callId, output: outputText(output) },
+        })),
+        { type: REALTIME_EVENTS.responseCreate },
     ];
 }
 
@@ -130,14 +178,20 @@ function waitForIceGathering(pc, timeoutMs = 1500) {
  * @param {(offerSdp: string) => Promise<{sdp_answer?: string, sdp?: string}>} o.signal
  * @param {(call: {callId:string,name:string,arguments:object}) => Promise<any>} [o.onToolCall]
  * @param {(delegation: {id:string}, reply: {think(t):void, say(t):void, instruct(t):void}) => void} [o.onDelegation]
- *   client-delegation mode: the product's own backend answers; reply with the three appends.
- * @param {(role:'user'|'agent', delta:string) => void} [o.onTranscript]
+ *   GPT-Live client-delegation mode: the product's own backend answers; reply with the three appends.
+ * @param {(role:'user'|'agent', delta:string, turn:{item:string|null, final:boolean}) => void} [o.onTranscript]
+ *   `turn.item` is the vendor's id for the utterance, when it gives one. The caller's words are
+ *   transcribed after they stop talking, so they can arrive while the answer is already being
+ *   spoken: on Realtime an empty delta opens their turn the moment they start, and keying turns
+ *   by `item` keeps the transcript in the order things were said. `final` closes a turn; one of
+ *   the caller's that closes empty was noise.
  * @param {(seconds:number) => void} [o.onUsage]
  * @param {(speaking:boolean) => void} [o.onSpeaking]
  * @param {() => void} [o.onConnect]
  * @param {(reason:string) => void} [o.onClose]
  * @param {(message:string) => void} [o.onError]
  * @param {(event:object) => void} [o.onEvent]
+ * @param {boolean} [o.speakFirst] Realtime: the assistant opens the call rather than waiting to be spoken to.
  */
 export async function connectLive({
     signal,
@@ -150,6 +204,7 @@ export async function connectLive({
     onClose,
     onError,
     onEvent,
+    speakFirst = false,
     iceServers = [{ urls: "stun:stun.l.google.com:19302" }],
     audioElement,
 } = {}) {
@@ -169,6 +224,11 @@ export async function connectLive({
     let resolveClosed;
     const closedPromise = new Promise((r) => (resolveClosed = r));
     let speakingTimer;
+    // "realtime" or "gpt-live", read off the call's first event.
+    let dialect = null;
+    // The caller's Realtime turns whose words have streamed in, so the full
+    // transcript that closes them is not written a second time.
+    const heard = new Set();
 
     const send = (event) => {
         if (channel.readyState === "open") channel.send(JSON.stringify(event));
@@ -196,6 +256,48 @@ export async function connectLive({
             send({ type: EVENTS.instructionsAppend, delegation_id: delegationId, content: String(content) }),
     });
 
+    const run = (call) =>
+        Promise.resolve()
+            .then(() => (onToolCall ? onToolCall(call) : { error: "no tool handler" }))
+            .catch((error) => ({ error: error?.message || "tool failed" }));
+
+    const onRealtimeEvent = (event, type) => {
+        const turn = (final) => ({ item: event.item_id || null, final });
+        switch (type) {
+            case REALTIME_EVENTS.speechStarted:
+                return void onTranscript?.("user", "", turn(false));
+            case REALTIME_EVENTS.inputTranscript:
+                heard.add(event.item_id);
+                return void onTranscript?.("user", event.delta || "", turn(false));
+            case REALTIME_EVENTS.inputTranscriptDone:
+                // A transcription model that does not stream sends the words only here.
+                if (!heard.delete(event.item_id) && event.transcript) onTranscript?.("user", event.transcript, turn(false));
+                return void onTranscript?.("user", "", turn(true));
+            case REALTIME_EVENTS.inputTranscriptFailed:
+                heard.delete(event.item_id);
+                return void onTranscript?.("user", "", turn(true));
+            case REALTIME_EVENTS.outputTranscript:
+                return void onTranscript?.("agent", event.delta || "", turn(false));
+            case REALTIME_EVENTS.outputTranscriptDone:
+                return void onTranscript?.("agent", "", turn(true));
+            case REALTIME_EVENTS.audioStarted:
+                return void onSpeaking?.(true);
+            case REALTIME_EVENTS.audioStopped:
+            case REALTIME_EVENTS.audioCleared:
+                return void onSpeaking?.(false);
+            case REALTIME_EVENTS.responseDone: {
+                const calls = realtimeFunctionCallsFrom(event);
+                if (!calls.length) return;
+                return void Promise.all(calls.map(run)).then((outputs) => {
+                    const results = calls.map((call, i) => ({ callId: call.callId, output: outputs[i] }));
+                    for (const out of realtimeOutputEvents(results)) send(out);
+                });
+            }
+            case REALTIME_EVENTS.error:
+                return void onError?.(event.error?.message || event.message || "Voice session error");
+        }
+    };
+
     channel.onmessage = (message) => {
         let event;
         try {
@@ -205,10 +307,16 @@ export async function connectLive({
         }
         onEvent?.(event);
         const type = event?.type || "";
-        if (type === EVENTS.started) return void onConnect?.();
+        if (type === REALTIME_EVENTS.created || type === EVENTS.started) {
+            dialect = type === EVENTS.started ? "gpt-live" : "realtime";
+            onConnect?.();
+            if (speakFirst && dialect === "realtime") send({ type: REALTIME_EVENTS.responseCreate });
+            return;
+        }
+        if (dialect === "realtime") return void onRealtimeEvent(event, type);
         const role = transcriptRoleFor(type);
         if (role) {
-            onTranscript?.(role, event.delta);
+            onTranscript?.(role, event.delta, { item: null, final: false });
             if (role === "agent") {
                 onSpeaking?.(true);
                 clearTimeout(speakingTimer);
@@ -218,12 +326,9 @@ export async function connectLive({
         }
         const call = functionCallFrom(event);
         if (call) {
-            Promise.resolve()
-                .then(() => (onToolCall ? onToolCall(call) : { error: "no tool handler" }))
-                .catch((error) => ({ error: error?.message || "tool failed" }))
-                .then((result) => {
-                    for (const out of functionOutputEvents(call.callId, result)) send(out);
-                });
+            run(call).then((result) => {
+                for (const out of functionOutputEvents(call.callId, result)) send(out);
+            });
             return;
         }
         if (type === EVENTS.delegationCreated && event.delegation?.id) {
@@ -270,8 +375,12 @@ export async function connectLive({
         instruct: (content) => replyFor(null).instruct(content),
         async close() {
             if (closed) return;
-            send({ type: EVENTS.close });
-            await Promise.race([closedPromise, new Promise((r) => setTimeout(r, 2500))]);
+            // GPT-Live is hung up with an event and says goodbye first; a Realtime
+            // call has no such event and ends when the connection does.
+            if (dialect !== "realtime") {
+                send({ type: EVENTS.close });
+                await Promise.race([closedPromise, new Promise((r) => setTimeout(r, 2500))]);
+            }
             teardown("close_requested");
         },
     };

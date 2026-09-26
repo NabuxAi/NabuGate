@@ -39,12 +39,29 @@ await call.close();
 `onToolCall` receives `{ callId, name, arguments }` and returns whatever the
 model should read (a string or JSON). Throw, and the model is told the
 action failed instead of stalling. `onDelegation` is the alternative when
-your own backend does the thinking (client delegation): reply with
+your own backend does the thinking (GPT-Live client delegation): reply with
 `think()`, `say()` and `instruct()`.
+
+The SDK speaks both vendors a live alias can land on and tells them apart by
+the call's first event: OpenAI's Realtime API (`session.created`), which is
+what the gateway opens through `/v1/realtime/calls`, and GPT-Live
+(`session.started`). On Realtime:
+
+- `onTranscript(role, delta, { item, final })` carries the vendor's item id.
+  The caller's words are transcribed after they stop talking, so an empty
+  delta opens their turn the moment they start; key turns by `item` and the
+  transcript keeps the order things were said in. A caller turn that ends
+  `final` and empty was noise.
+- Function calls are answered from `response.done`, all of a response's calls
+  together and then one `response.create`.
+- `speakFirst: true` has the assistant open the call.
+- `close()` just closes the connection; Realtime has no hang-up event.
 
 ## 2. Your server — three endpoints
 
-**Session** — build the session for *this* user and forward the offer:
+**Session** — build the session for *this* user and forward the offer. The
+`session` object is the vendor's own; this is OpenAI Realtime's, which is what
+`nabu-live` serves:
 
 ```php
 // Laravel (NabuCRM / NabuDesk)
@@ -54,13 +71,15 @@ Route::post('/api/voice/session', function (Request $r) {
         ->post(config('services.nabugate.url').'/live/sessions', [
             'model' => 'nabu-live',
             'session' => [
+                'type' => 'realtime',
                 'instructions' => "You are {$user->workspace->name}'s assistant. Speak the caller's language. Act through the tools; never claim an action happened unless the tool returned ok.",
-                'audio' => ['output' => ['voice' => 'quartz']],
-                'delegation' => ['type' => 'responses', 'responses' => [
-                    'model' => 'gpt-5.6-luna',
-                    'tools' => VoiceTools::definitions($user),   // OpenAI function-tool JSON
-                    'tool_choice' => 'auto',
-                ]],
+                'audio' => [
+                    // Without it only the assistant's side of the call is transcribed.
+                    'input' => ['transcription' => ['model' => 'gpt-4o-mini-transcribe']],
+                    'output' => ['voice' => 'marin'],
+                ],
+                'tools' => VoiceTools::definitions($user),   // OpenAI function-tool JSON
+                'tool_choice' => 'auto',
             ],
             'transport' => ['type' => 'webrtc', 'sdp' => $r->input('sdp')],
         ])->throw()->json();
