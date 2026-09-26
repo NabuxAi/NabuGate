@@ -1417,13 +1417,13 @@ live:
   nabu-live:
     primary:
       provider: openai
-      model: "gpt-realtime"
+      model: "gpt-realtime-mini"
     # Same vendor, so the SDP answer and the Realtime events keep their shape, at
     # about a third of the price. It covers a refusal of the model (rate limit, a
     # retired id), not a spent key: both rungs run on OPENAI_API_KEY.
     fallback:
       - provider: openai
-        model: "gpt-realtime-mini"
+        model: "gpt-realtime"
 
 
 audio:
