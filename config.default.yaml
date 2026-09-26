@@ -164,6 +164,20 @@ providers:
     base_url: "https://api.openai.com/v1"
     api_key_env: "OPENAI_API_KEY"
 
+  # OpenAI again, for its gpt-4o transcription models only. They refuse
+  # verbose_json ("Use 'json' or 'text' instead"), which the openai entry
+  # above asks for on every transcription so whisper-1 keeps its segments;
+  # transcribe_format is per provider, hence a second name on the same key.
+  # Measured from this host on a 4-second clip: gpt-4o-transcribe 0.7 s,
+  # gpt-4o-mini-transcribe 0.6 s — against 48-93 s on the self-hosted whisper
+  # while the box is busy. Read only by nabu-transcribe-live.
+  openai-transcribe:
+    enabled: true
+    type: openai
+    base_url: "https://api.openai.com/v1"
+    api_key_env: "OPENAI_API_KEY"
+    transcribe_format: "json"
+
   groq:
     enabled: true
     type: openai
@@ -1529,6 +1543,31 @@ transcription:
         model: "gemini-3.5-transcribe"
       - provider: gemini
         model: "gemini-3-flash"
+
+  # A person waiting on their own words: dictation into a text field, a voice
+  # note read back while the sender is still looking. Seconds matter more
+  # than cents here, so it leads with the hosted engines that answer in under
+  # a second and keeps the self-hosted whisper — free, but CPU-bound and 48-93 s
+  # for 4 s of audio on a loaded host — as the last rung rather than the
+  # first. No segments: the gpt-4o models answer plain json, and a dictated
+  # sentence has no use for timestamps. Bulk work stays on nabu-transcribe.
+  nabu-transcribe-live:
+    primary:
+      provider: openai-transcribe
+      model: "gpt-4o-transcribe"
+    fallback:
+      # A different engine entirely, and strong on the languages whisper
+      # handles worst (Persian, Arabic dialects). 0.5 s on the same clip.
+      - provider: elevenlabs
+        model: "scribe_v2"
+      - provider: openai-transcribe
+        model: "gpt-4o-mini-transcribe"
+      - provider: openai
+        model: "whisper-1"
+      - provider: groq
+        model: "whisper-large-v3-turbo"
+      - provider: whisper
+        model: "mobiuslabsgmbh/faster-whisper-large-v3-turbo"
 
   # Cheapest path, for bulk work where a few percent of accuracy is worth the
   # price difference. Same shape, fewer rungs.

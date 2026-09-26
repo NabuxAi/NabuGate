@@ -78,3 +78,51 @@ func TestShippedProvidersAgreeOnBYOK(t *testing.T) {
 		}
 	}
 }
+
+// nabu-transcribe-live is for a person waiting on their own words, so its
+// first rung must be a hosted engine that answers in a second, asked for plain
+// json (the gpt-4o models refuse verbose_json), and the self-hosted whisper
+// must still be there at the end for the day every vendor is down.
+func TestShippedLiveTranscribeLeadsWithAHostedEngine(t *testing.T) {
+	t.Setenv("OPENAI_API_KEY", "test-key")
+	t.Setenv("ELEVENLABS_API_KEY", "test-key")
+	t.Setenv("WHISPER_BASE_URL", "http://whisper:8000/v1")
+
+	c, err := Load("../../config.default.yaml")
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	route, ok := c.Transcription["nabu-transcribe-live"]
+	if !ok {
+		t.Fatal("nabu-transcribe-live alias missing")
+	}
+	if route.Primary.Provider != "openai-transcribe" || route.Primary.Model != "gpt-4o-transcribe" {
+		t.Errorf("primary = %s/%s, want openai-transcribe/gpt-4o-transcribe", route.Primary.Provider, route.Primary.Model)
+	}
+	if p, ok := c.Providers["openai-transcribe"]; !ok || p.TranscribeFormat != "json" {
+		t.Errorf("openai-transcribe must declare transcribe_format json, got %+v", p)
+	}
+
+	adapters, warnings := c.BuildAdapters()
+	chain := append([]Target{route.Primary}, route.Fallback...)
+	for _, want := range []string{"openai-transcribe", "elevenlabs", "whisper"} {
+		found := false
+		for _, tgt := range chain {
+			if tgt.Provider != want {
+				continue
+			}
+			if a, built := adapters[want]; built {
+				if _, ok := a.(provider.TranscriptionAdapter); ok {
+					found = true
+				}
+			}
+		}
+		if !found {
+			t.Errorf("chain has no usable %s rung; warnings: %s", want, strings.Join(warnings, "; "))
+		}
+	}
+	if last := chain[len(chain)-1]; last.Provider != "whisper" {
+		t.Errorf("last rung = %s, want the self-hosted whisper", last.Provider)
+	}
+}
+
