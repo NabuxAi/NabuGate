@@ -111,11 +111,36 @@ type Token struct {
 
 // Counters is the persisted usage for one project.
 type Counters struct {
-	Requests         int64   `json:"requests"`
-	PromptTokens     int64   `json:"prompt_tokens"`
-	CompletionTokens int64   `json:"completion_tokens"`
-	CostUSD          float64 `json:"cost_usd"`
-	Denied           int64   `json:"denied"`
+	Requests         int64 `json:"requests"`
+	PromptTokens     int64 `json:"prompt_tokens"`
+	CompletionTokens int64 `json:"completion_tokens"`
+	// CostUSD is what callers were charged: what left their balances.
+	CostUSD float64 `json:"cost_usd"`
+	// ProviderCostUSD is what the vendors charged the gateway for the same calls,
+	// at list price. It is below CostUSD by a plan's markup, and zero for calls
+	// served on the caller's own vendor key, which the gateway did not pay for.
+	// Counters written before it existed carry none.
+	ProviderCostUSD float64 `json:"provider_cost_usd"`
+	Denied          int64   `json:"denied"`
+}
+
+// UsageEntry is one metered call's share of the counters.
+type UsageEntry struct {
+	// Requests is how many requests the call adds: one, or none for a further
+	// usage report on a live session that has already been counted.
+	Requests         int64
+	PromptTokens     int64
+	CompletionTokens int64
+	CostUSD          float64
+	ProviderCostUSD  float64
+}
+
+func (c *Counters) add(e UsageEntry) {
+	c.Requests += e.Requests
+	c.PromptTokens += e.PromptTokens
+	c.CompletionTokens += e.CompletionTokens
+	c.CostUSD += e.CostUSD
+	c.ProviderCostUSD += e.ProviderCostUSD
 }
 
 // AgentRecord is a console-managed sub-agent, persisted so it survives a
@@ -165,6 +190,9 @@ type state struct {
 	// ProviderRequests are asks to spend the gateway's own upstream credential.
 	// See provideraccess.go — a grant is additive and never removes access.
 	ProviderRequests []ProviderRequest `json:"provider_requests,omitempty"`
+	// AliasSettings are what an administrator chose per alias in the console;
+	// see aliassettings.go.
+	AliasSettings map[string]AliasSetting `json:"alias_settings,omitempty"`
 }
 
 // Store is the persisted gateway state.
@@ -733,32 +761,24 @@ func (s *Store) SetOrigins(name string, origins []string) error {
 // RecordUsage accumulates one call against a project. Kept in memory and
 // flushed by Persist, because a disk write per request would dominate the cost
 // of a cheap completion.
-func (s *Store) RecordUsage(project, prov, model string, prompt, completion int64, cost float64) {
+func (s *Store) RecordUsage(project, prov, model string, e UsageEntry) {
 	if project == "" {
 		project = "(admin)"
 	}
+	cost := e.CostUSD
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	c := s.st.Usage[project]
-	c.Requests++
-	c.PromptTokens += prompt
-	c.CompletionTokens += completion
-	c.CostUSD += cost
+	c.add(e)
 	s.st.Usage[project] = c
 
 	cm := s.st.UsageByModel[model]
-	cm.Requests++
-	cm.PromptTokens += prompt
-	cm.CompletionTokens += completion
-	cm.CostUSD += cost
+	cm.add(e)
 	s.st.UsageByModel[model] = cm
 
 	cp := s.st.UsageByProv[prov]
-	cp.Requests++
-	cp.PromptTokens += prompt
-	cp.CompletionTokens += completion
-	cp.CostUSD += cost
+	cp.add(e)
 	s.st.UsageByProv[prov] = cp
 
 	// Deduct from the owner's balance if the project corresponds to a token.

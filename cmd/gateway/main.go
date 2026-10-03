@@ -13,6 +13,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strings"
 	"syscall"
 	"time"
 
@@ -86,6 +87,13 @@ func main() {
 		log.Error("live alias refused", "alias", alias, "reason", reason)
 	}
 	r.SetLiveProblems(liveProblems)
+	r.SetVoices(cfg.Voices)
+	// An unpriced route is the same mistake for every other capability, except
+	// that it is not refused: the call is served and metered at nothing while the
+	// vendor bills the gateway. Said at start-up, because nothing else would say it.
+	for route, aliases := range cfg.UnpricedRoutes() {
+		log.Warn("unpriced route: calls served here are billed at nothing", "route", route, "aliases", strings.Join(aliases, ","))
+	}
 	enforcer := policy.New(cfg.Server.APIKeys, cfg.Server.Keys)
 	tracker := usage.New(cfg.Pricing)
 	agents, agentWarnings := cfg.BuildAgents()

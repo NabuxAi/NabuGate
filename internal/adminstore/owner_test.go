@@ -85,8 +85,8 @@ func TestUsageIsScopedToTheOwnersProjects(t *testing.T) {
 	st.NewToken("alice-app", []string{"nabu-*"}, 60, nil, "alice@nabuxai.com", nil)
 	st.NewToken("bob-app", []string{"nabu-*"}, 60, nil, "bob@nabuxai.com", nil)
 
-	st.RecordUsage("alice-app", "gemini", "nabu-fast", 100, 50, 0.001)
-	st.RecordUsage("bob-app", "gemini", "nabu-fast", 900, 400, 0.09)
+	st.RecordUsage("alice-app", "gemini", "nabu-fast", UsageEntry{Requests: 1, PromptTokens: 100, CompletionTokens: 50, CostUSD: 0.001})
+	st.RecordUsage("bob-app", "gemini", "nabu-fast", UsageEntry{Requests: 1, PromptTokens: 900, CompletionTokens: 400, CostUSD: 0.09})
 
 	usage := st.UsageForOwner("alice@nabuxai.com")
 	if len(usage) != 1 {

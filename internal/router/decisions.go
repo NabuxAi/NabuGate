@@ -28,7 +28,7 @@ type DecisionResult struct {
 func (r *Router) Decide(ctx context.Context, alias string, req provider.DecisionRequest) (DecisionResult, error) {
 	var targets []config.Target
 	if route, ok := r.decisions[alias]; ok {
-		targets = append([]config.Target{route.Primary}, route.Fallback...)
+		targets = r.rungs(alias, route)
 	} else if t, ok := r.resolvePassthrough(alias); ok {
 		targets = []config.Target{t}
 	} else {

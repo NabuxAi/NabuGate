@@ -91,7 +91,7 @@ func (r *Router) AliasHealthAll() []AliasHealth {
 }
 
 func (r *Router) aliasHealth(alias, kind string, route config.ModelRoute) AliasHealth {
-	rungs := append([]config.Target{route.Primary}, route.Fallback...)
+	rungs := r.rungs(alias, route)
 
 	health := AliasHealth{ID: alias, Kind: kind, Configured: len(rungs)}
 

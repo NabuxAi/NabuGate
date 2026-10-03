@@ -13,7 +13,7 @@ func TestUsageDebitsTheOwnerWhateverTheCase(t *testing.T) {
 	st.NewToken("Alice-App", []string{"nabu-*"}, 60, nil, "alice@nabuxai.com", nil)
 	st.AddPayment("alice@nabuxai.com", 10, "success", "inv-1")
 
-	st.RecordUsage("alice-app", "gemini", "nabu-fast", 100, 50, 2.5)
+	st.RecordUsage("alice-app", "gemini", "nabu-fast", UsageEntry{Requests: 1, PromptTokens: 100, CompletionTokens: 50, CostUSD: 2.5})
 
 	if got := st.GetUser("alice@nabuxai.com").Balance; got != 7.5 {
 		t.Fatalf("balance = %v after a $2.50 call, want 7.5", got)
@@ -34,13 +34,13 @@ func TestTheDebitThatExhaustsABalanceIsPersistedImmediately(t *testing.T) {
 
 	// Well short of zero: stays in memory only, as a per-request write would
 	// cost more than the completion it records.
-	st.RecordUsage("bob-app", "gemini", "nabu-fast", 10, 5, 0.25)
+	st.RecordUsage("bob-app", "gemini", "nabu-fast", UsageEntry{Requests: 1, PromptTokens: 10, CompletionTokens: 5, CostUSD: 0.25})
 	if got := mustOpen(t, path).GetUser("bob@nabuxai.com").Balance; got != 1 {
 		t.Fatalf("an ordinary debit was flushed eagerly: on-disk balance %v, want 1", got)
 	}
 
 	// The call that crosses zero is written through.
-	st.RecordUsage("bob-app", "gemini", "nabu-fast", 10, 5, 0.80)
+	st.RecordUsage("bob-app", "gemini", "nabu-fast", UsageEntry{Requests: 1, PromptTokens: 10, CompletionTokens: 5, CostUSD: 0.80})
 	if got := mustOpen(t, path).GetUser("bob@nabuxai.com").Balance; got > 0 {
 		t.Fatalf("exhausting debit not on disk: on-disk balance %v, want <= 0", got)
 	}

@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"nabugate/internal/provider"
+	"nabugate/internal/usage"
 )
 
 // maxAudioUpload caps a single transcription upload.
@@ -93,14 +94,10 @@ func (s *Server) handleTranscription(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Audio is billed by duration upstream, and a transcript's token count says
-	// nothing about what it cost. Record the seconds so the console's numbers
-	// mean something for this capability too.
-	usage := result.Usage
-	if usage.TotalTokens == 0 && result.Duration > 0 {
-		usage.TotalTokens = int(result.Duration)
-	}
-	cost := s.record(r, result.Provider, result.Model, usage)
+	// Most transcription is billed by the minute of audio and some by its
+	// tokens; each model is priced in the unit its vendor bills, so the call is
+	// metered in both and the price decides which one costs anything.
+	cost := s.recordMetered(r, result.Provider, result.Model, usage.Metered{Tokens: result.Usage, Seconds: result.Duration})
 
 	w.Header().Set("X-Nabu-Provider", result.Provider)
 	w.Header().Set("X-Nabu-Model", result.Model)

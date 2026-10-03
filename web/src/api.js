@@ -101,6 +101,12 @@ export const overview = () => req('/overview');
 
 export const usage = () => req('/usage');
 
+// Every alias with the models that serve it, their prices, and its voice; an
+// administrator can choose which configured model answers first and the voice.
+export const aliases = () => req('/aliases');
+export const saveAlias = (alias, setting) =>
+  req(`/aliases/${encodeURIComponent(alias)}`, { method: 'PUT', body: JSON.stringify(setting) });
+
 export const resetUsage = (project) =>
   req(`/usage/reset${project ? `?project=${encodeURIComponent(project)}` : ''}`, {
     method: 'POST',

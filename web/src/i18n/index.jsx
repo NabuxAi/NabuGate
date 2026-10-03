@@ -96,7 +96,16 @@ export function fmtNum(n, opts) {
 // in and stores as cost_usd. Parts of the panel used to render the same
 // `balance` field labelled "تومان" while others labelled it "$" — one of the
 // two was wrong by a factor of tens of thousands, and neither said which.
-export const usd = (n) => fmtDigits('$' + Number(n || 0).toFixed(2));
+//
+// An amount under a cent keeps the digits that make it. A call costs a fraction
+// of a cent, and rounded to cents every request in the panel read $0.00 and
+// looked free.
+export const usd = (n) => {
+  const v = Number(n || 0);
+  const abs = Math.abs(v);
+  const digits = abs > 0 && abs < 0.01 ? Math.min(8, Math.ceil(-Math.log10(abs)) + 1) : 2;
+  return fmtDigits('$' + v.toFixed(digits));
+};
 
 /* Dates follow the language: the Solar Hijri calendar in Persian. */
 export function fmtDate(d, kind = 'date') {

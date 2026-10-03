@@ -88,6 +88,13 @@ type Router struct {
 	catalog map[string]catalogEntry
 	ttl     time.Duration
 	now     func() time.Time
+
+	// voices are the config's named voices (SetVoices); settings are what an
+	// administrator chose per alias in the console (SetAliasSettings), which
+	// change while requests are being served.
+	voices     map[string]map[string]string
+	settingsMu sync.RWMutex
+	settings   map[string]AliasSetting
 }
 
 // catalogEntry is one provider's cached live-discovered model IDs, and when
@@ -226,14 +233,14 @@ func (r *Router) expand(t config.Target) []config.Target {
 func (r *Router) resolveChatTargets(model string) ([]config.Target, bool) {
 	if route, ok := r.models[model]; ok {
 		var out []config.Target
-		for _, t := range append([]config.Target{route.Primary}, route.Fallback...) {
+		for _, t := range r.rungs(model, route) {
 			out = append(out, r.expand(t)...)
 		}
 		return out, len(out) > 0
 	}
 	if route, ok := r.decisions[model]; ok {
 		var out []config.Target
-		for _, t := range append([]config.Target{route.Primary}, route.Fallback...) {
+		for _, t := range r.rungs(model, route) {
 			out = append(out, r.expand(t)...)
 		}
 		return out, len(out) > 0
@@ -447,7 +454,7 @@ func (r *Router) Image(ctx context.Context, alias string, req provider.ImageRequ
 	if !ok {
 		return ImageResult{}, fmt.Errorf("unknown image alias %q", alias)
 	}
-	targets := append([]config.Target{route.Primary}, route.Fallback...)
+	targets := r.rungs(alias, route)
 	var failures targetErrors
 
 	for i, t := range r.attempts(ctx, targets) {
@@ -498,7 +505,8 @@ func (r *Router) Speech(ctx context.Context, alias string, req provider.SpeechRe
 	if !ok {
 		return SpeechResult{}, fmt.Errorf("unknown audio alias %q", alias)
 	}
-	targets := append([]config.Target{route.Primary}, route.Fallback...)
+	targets := r.rungs(alias, route)
+	voice := r.requestedVoice(alias, route, req.Voice)
 	var failures targetErrors
 
 	for i, t := range r.attempts(ctx, targets) {
@@ -519,6 +527,7 @@ func (r *Router) Speech(ctx context.Context, alias string, req provider.SpeechRe
 			continue
 		}
 		req.Model = t.Model
+		req.Voice = r.voiceFor(voice, t.Provider)
 		start := time.Now()
 		resp, err := spAdapter.Speech(ctx, req)
 		attrs := []any{"capability", "speech", "alias", alias, "provider", t.Provider, "model", t.Model, "attempt", i + 1, "latency_ms", time.Since(start).Milliseconds()}
@@ -571,7 +580,7 @@ func (r *Router) Embed(ctx context.Context, alias string, req provider.Embedding
 	if !ok {
 		return EmbedResult{}, fmt.Errorf("unknown embedding alias %q", alias)
 	}
-	targets := append([]config.Target{route.Primary}, route.Fallback...)
+	targets := r.rungs(alias, route)
 	var failures targetErrors
 
 	for i, t := range r.attempts(ctx, targets) {
@@ -625,8 +634,8 @@ type AliasInfo struct {
 // available cannot be answered here, so such a rung counts as reachable and the
 // alias stays listed. Treating it as unavailable hid nabu-fast, nabu-smart and
 // nabu-cheap — three aliases that work — the first time this filter shipped.
-func (r *Router) firstReachableProvider(route config.ModelRoute) (string, bool) {
-	for _, t := range append([]config.Target{route.Primary}, route.Fallback...) {
+func (r *Router) firstReachableProvider(alias string, route config.ModelRoute) (string, bool) {
+	for _, t := range r.rungs(alias, route) {
 		if t.Provider == "" {
 			return "", true
 		}
@@ -650,7 +659,7 @@ func (r *Router) AliasInfos() []AliasInfo {
 			// anyway offers callers a model that fails every request — and one
 			// consumer presents this catalogue directly as its users' model
 			// picker, so those become options a person can choose and cannot use.
-			owner, ok := r.firstReachableProvider(route)
+			owner, ok := r.firstReachableProvider(alias, route)
 			if !ok {
 				continue
 			}
@@ -672,7 +681,7 @@ func (r *Router) AliasInfos() []AliasInfo {
 		if _, refused := r.liveProblems[alias]; refused {
 			continue
 		}
-		if owner, ok := r.firstReachableProvider(route); ok {
+		if owner, ok := r.firstReachableProvider(alias, route); ok {
 			out = append(out, AliasInfo{ID: alias, Owner: owner})
 		}
 	}
@@ -857,7 +866,7 @@ func (r *Router) Transcribe(ctx context.Context, alias string, req provider.Tran
 	if !ok {
 		return TranscribeResult{}, fmt.Errorf("unknown transcription alias %q", alias)
 	}
-	targets := append([]config.Target{route.Primary}, route.Fallback...)
+	targets := r.rungs(alias, route)
 	var failures targetErrors
 
 	for i, t := range r.attempts(ctx, targets) {

@@ -133,8 +133,8 @@ func TestUsageSurvivesReopen(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	s.RecordUsage("nabuwrite", "openai", "gpt-4", 100, 40, 0.002)
-	s.RecordUsage("nabuwrite", "openai", "gpt-4", 50, 10, 0.001)
+	s.RecordUsage("nabuwrite", "openai", "gpt-4", UsageEntry{Requests: 1, PromptTokens: 100, CompletionTokens: 40, CostUSD: 0.002})
+	s.RecordUsage("nabuwrite", "openai", "gpt-4", UsageEntry{Requests: 1, PromptTokens: 50, CompletionTokens: 10, CostUSD: 0.001})
 	s.RecordDenied("nabuwrite")
 	if err := s.Persist(); err != nil {
 		t.Fatalf("Persist: %v", err)
