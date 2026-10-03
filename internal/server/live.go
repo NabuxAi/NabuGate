@@ -16,6 +16,7 @@ import (
 	"nabugate/internal/adminstore"
 	"nabugate/internal/provider"
 	"nabugate/internal/router"
+	"nabugate/internal/usage"
 )
 
 // Realtime voice (GPT-Live) is the one capability whose traffic does not pass
@@ -326,25 +327,16 @@ func (s *Server) handleLiveUsage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	cost := s.usage.SecondsCost(session.provider, session.model, delta)
-	if session.byCaller || servedByCaller(r.Context()) {
-		cost = 0
-	} else {
-		cost = gatewayRateFrom(r.Context()).apply(cost)
-	}
+	list := s.usage.Cost(session.provider, session.model, usage.Metered{Seconds: float64(delta)})
+	cost, providerCost := s.charge(r.Context(), session.byCaller, list)
 	if delta > 0 {
-		s.usage.RecordAt(project, session.provider, session.model, provider.Usage{}, cost)
-		if s.admin != nil {
-			s.admin.RecordUsage(project, session.provider, session.model, 0, 0, cost)
-		}
-		s.requests.Add(adminstore.RequestEntry{
-			Project:  project,
-			Provider: session.provider,
-			Model:    session.model,
-			CostUSD:  cost,
+		// The call was counted as one request when it was signalled; a report of
+		// its clock only adds minutes and money. Counting each one made a
+		// two-minute call nine requests in the console.
+		s.meter(r, project, session.provider, session.model, adminstore.UsageEntry{
+			CostUSD:         cost,
+			ProviderCostUSD: providerCost,
 		})
-		s.log.Info("billed", "project", project, "provider", session.provider, "model", session.model,
-			"live_seconds", delta, "cost_usd", cost)
 	}
 
 	writeJSON(w, http.StatusOK, liveUsageResponse{

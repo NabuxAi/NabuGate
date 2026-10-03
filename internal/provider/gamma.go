@@ -120,7 +120,8 @@ func (a *GammaAdapter) Chat(ctx context.Context, req ChatRequest) (ChatResponse,
 		fmt.Fprintf(&b, "\n\ncredits: %d used, %d remaining", status.Credits.Deducted, status.Credits.Remaining)
 	}
 
-	return ChatResponse{Content: b.String(), FinishReason: "stop"}, nil
+	// Gamma bills in credits, and says exactly how many this generation took.
+	return ChatResponse{Content: b.String(), FinishReason: "stop", Usage: Usage{Credits: status.Credits.Deducted}}, nil
 }
 
 // buildRequest reads the prompt as Gamma's own JSON when it is JSON, and as

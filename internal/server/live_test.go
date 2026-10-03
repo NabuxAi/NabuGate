@@ -237,6 +237,10 @@ func TestLiveUsageBillsSnapshotsOnce(t *testing.T) {
 	if got := byModel["openai/gpt-live-1"].CostUSD; got < 0.0899 || got > 0.0901 {
 		t.Fatalf("tracker cost = %v, want 0.09", got)
 	}
+	// One call is one request, however many times it reported its clock.
+	if got := byModel["openai/gpt-live-1"].Requests; got != 1 {
+		t.Fatalf("tracker counted %d requests for one call, want 1", got)
+	}
 }
 
 func TestLiveSessionUnknownAlias(t *testing.T) {

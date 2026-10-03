@@ -137,8 +137,8 @@ func TestUsageIsScopedToTheCallerUnlessTheyAreAnAdmin(t *testing.T) {
 	if _, _, err := store.NewToken("theirs", []string{"*"}, 0, nil, "them@example.com", nil); err != nil {
 		t.Fatalf("mint key: %v", err)
 	}
-	store.RecordUsage("mine", "openai", "gpt", 10, 10, 0.01)
-	store.RecordUsage("theirs", "openai", "gpt", 99, 99, 9.99)
+	store.RecordUsage("mine", "openai", "gpt", adminstore.UsageEntry{Requests: 1, PromptTokens: 10, CompletionTokens: 10, CostUSD: 0.01})
+	store.RecordUsage("theirs", "openai", "gpt", adminstore.UsageEntry{Requests: 1, PromptTokens: 99, CompletionTokens: 99, CostUSD: 9.99})
 
 	s := &Server{admin: store}
 
@@ -187,8 +187,8 @@ func TestOverviewDoesNotLeakAnotherOwnersSpend(t *testing.T) {
 	if _, _, err := store.NewToken("mine", []string{"*"}, 0, nil, "me@example.com", nil); err != nil {
 		t.Fatalf("mint key: %v", err)
 	}
-	store.RecordUsage("mine", "openai", "gpt", 1, 1, 0.01)
-	store.RecordUsage("theirs", "openai", "gpt", 99, 99, 9.99)
+	store.RecordUsage("mine", "openai", "gpt", adminstore.UsageEntry{Requests: 1, PromptTokens: 1, CompletionTokens: 1, CostUSD: 0.01})
+	store.RecordUsage("theirs", "openai", "gpt", adminstore.UsageEntry{Requests: 1, PromptTokens: 99, CompletionTokens: 99, CostUSD: 9.99})
 
 	s := newOverviewServer(store)
 

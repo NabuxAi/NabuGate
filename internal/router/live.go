@@ -128,7 +128,8 @@ func (r *Router) LiveSession(ctx context.Context, alias string, body []byte) (Li
 	if reason, bad := r.liveProblems[alias]; bad {
 		return LiveResult{}, &LiveMisconfiguredError{Alias: alias, Reason: reason}
 	}
-	targets := append([]config.Target{route.Primary}, route.Fallback...)
+	targets := r.rungs(alias, route)
+	voice := r.requestedVoice(alias, route, liveVoice(body))
 	var failures targetErrors
 	var lastRefusal *provider.LiveUpstreamError
 
@@ -148,8 +149,19 @@ func (r *Router) LiveSession(ctx context.Context, alias string, body []byte) (Li
 			failures.add(t.label, t.Model, fmt.Errorf("provider not allowed by token policy"))
 			continue
 		}
+		// The voice is resolved per rung: a named voice is a different vendor
+		// voice for each provider, and the caller's body is left as it came.
+		rungBody := body
+		if vendorVoice := r.voiceFor(voice, t.Provider); vendorVoice != liveVoice(body) {
+			rewritten, err := withLiveVoice(body, vendorVoice)
+			if err != nil {
+				failures.add(t.label, t.Model, fmt.Errorf("could not set the voice: %w", err))
+				continue
+			}
+			rungBody = rewritten
+		}
 		start := time.Now()
-		resp, err := liveAdapter.CreateLiveSession(ctx, provider.LiveSessionRequest{Model: t.Model, Body: body})
+		resp, err := liveAdapter.CreateLiveSession(ctx, provider.LiveSessionRequest{Model: t.Model, Body: rungBody})
 		attrs := []any{"capability", "live", "alias", alias, "provider", t.Provider, "model", t.Model, "attempt", i + 1, "latency_ms", time.Since(start).Milliseconds()}
 		if err != nil {
 			failures.add(t.label, t.Model, err)

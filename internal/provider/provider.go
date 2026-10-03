@@ -46,6 +46,18 @@ type Usage struct {
 	PromptTokens     int `json:"prompt_tokens"`
 	CompletionTokens int `json:"completion_tokens"`
 	TotalTokens      int `json:"total_tokens"`
+	// Credits are a vendor's own billing unit when it bills in credits rather
+	// than tokens (Gamma). Never on the wire: a client reads tokens here.
+	Credits int `json:"-"`
+}
+
+// EstimateTokens is the gateway's count of a text's tokens when the vendor
+// reported none: four bytes to a token, rounded up. It is only reached when an
+// upstream said nothing at all, so a vendor that reports real usage is never
+// affected — and a call that reported nothing is still billed for something
+// rather than for nothing.
+func EstimateTokens(bytes int) int {
+	return (bytes + 3) / 4
 }
 
 // ChatResponse is the normalized response returned by every adapter.

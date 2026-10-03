@@ -14,7 +14,7 @@ func TestCostSplitsByDirectionPerMillionTokens(t *testing.T) {
 	tr := New(map[string]Price{
 		"openai/gpt-4o": {Input: 2.5, Output: 10},
 	})
-	got := tr.Cost("openai", "gpt-4o", provider.Usage{PromptTokens: 1_000_000, CompletionTokens: 100_000})
+	got := tr.Cost("openai", "gpt-4o", Tokens(provider.Usage{PromptTokens: 1_000_000, CompletionTokens: 100_000}))
 	if want := 2.5 + 1.0; math.Abs(got-want) > 1e-9 {
 		t.Fatalf("cost = %v, want %v", got, want)
 	}
@@ -25,7 +25,7 @@ func TestCostSplitsByDirectionPerMillionTokens(t *testing.T) {
 // free — so the behaviour is pinned here, where a change to it is deliberate.
 func TestUnpricedModelCostsZero(t *testing.T) {
 	tr := New(nil)
-	if got := tr.Cost("openai", "gpt-4o", provider.Usage{PromptTokens: 5000}); got != 0 {
+	if got := tr.Cost("openai", "gpt-4o", Tokens(provider.Usage{PromptTokens: 5000})); got != 0 {
 		t.Fatalf("unpriced cost = %v, want 0", got)
 	}
 }
@@ -84,7 +84,7 @@ func TestAProviderDefaultPricesTheModelsNobodyListed(t *testing.T) {
 		"9router/gpt-live":       {PerMinute: 6},
 	})
 
-	u := provider.Usage{PromptTokens: 1_000_000, CompletionTokens: 1_000_000}
+	u := Tokens(provider.Usage{PromptTokens: 1_000_000, CompletionTokens: 1_000_000})
 
 	// An unlisted model falls back to the provider's default instead of free.
 	if got := tr.Cost("9router", "some-model-shipped-last-tuesday", u); math.Abs(got-3) > 1e-9 {
@@ -101,10 +101,70 @@ func TestAProviderDefaultPricesTheModelsNobodyListed(t *testing.T) {
 		t.Fatalf("unpriced provider cost = %v, want 0", got)
 	}
 	// Per-minute pricing reads the same table, so a live model is covered too.
-	if got := tr.SecondsCost("9router", "unlisted-live", 60); math.Abs(got-3) > 1e-9 {
+	if got := tr.Cost("9router", "unlisted-live", Metered{Seconds: 60}); math.Abs(got-3) > 1e-9 {
 		t.Fatalf("wildcard per-minute cost = %v, want 3", got)
 	}
-	if got := tr.SecondsCost("9router", "gpt-live", 60); math.Abs(got-6) > 1e-9 {
+	if got := tr.Cost("9router", "gpt-live", Metered{Seconds: 60}); math.Abs(got-6) > 1e-9 {
 		t.Fatalf("listed per-minute cost = %v, want 6", got)
+	}
+}
+
+// The same model is sold by five resellers under five spellings. Its list price
+// is written once, under its own name, and reaches every one of them — while a
+// price written for one provider still wins for that provider.
+func TestAModelsListPriceReachesEveryoneServingIt(t *testing.T) {
+	prices := map[string]Price{
+		"gpt-4o-mini":        {Input: 0.15, Output: 0.6},
+		"avalai/gpt-4o-mini": {Input: 0.2, Output: 0.8},
+		"parspack/*":         {Input: 9, Output: 9},
+	}
+	for _, c := range []struct {
+		provider, model string
+		want            Price
+	}{
+		{"gapgpt", "gpt-4o-mini", prices["gpt-4o-mini"]},
+		// The vendor prefix and the case are not part of the model.
+		{"parspack", "openai/gpt-4o-mini", prices["gpt-4o-mini"]},
+		{"9router", "openrouter/openai/GPT-4o-mini", prices["gpt-4o-mini"]},
+		// A provider's own price is more specific than the list price.
+		{"avalai", "gpt-4o-mini", prices["avalai/gpt-4o-mini"]},
+		// The list price is more specific than a provider's catch-all.
+		{"parspack", "openai/gpt-5.5", prices["parspack/*"]},
+	} {
+		got, ok := Lookup(prices, c.provider, c.model)
+		if !ok || got != c.want {
+			t.Errorf("Lookup(%s, %s) = %+v, %v; want %+v", c.provider, c.model, got, ok, c.want)
+		}
+	}
+}
+
+// A ":free" model costs nothing even behind a provider whose catch-all would
+// otherwise bill it — that suffix is the router's own word that it is free.
+func TestAFreeModelIsFree(t *testing.T) {
+	prices := map[string]Price{"openrouter/*": {Input: 1, Output: 1}}
+	got, ok := Lookup(prices, "openrouter", "nvidia/nemotron-3-super-120b-a12b:free")
+	if !ok || got != (Price{}) {
+		t.Fatalf("free model price = %+v, %v; want zero and priced", got, ok)
+	}
+}
+
+// Each unit is billed only for the work that was done in it: a minute of audio,
+// an image, a million characters spoken.
+func TestEveryUnitIsBilledAtItsOwnRate(t *testing.T) {
+	p := Price{Input: 2, Output: 8, PerMinute: 0.006, PerImage: 0.04, PerMillionChars: 15, PerCredit: 0.004}
+	for _, c := range []struct {
+		name string
+		m    Metered
+		want float64
+	}{
+		{"tokens", Tokens(provider.Usage{PromptTokens: 500_000, CompletionTokens: 250_000}), 1 + 2},
+		{"ninety seconds", Metered{Seconds: 90}, 0.009},
+		{"two images", Metered{Images: 2}, 0.08},
+		{"two thousand characters", Metered{Characters: 2000}, 0.03},
+		{"fifty credits", Tokens(provider.Usage{Credits: 50}), 0.2},
+	} {
+		if got := p.Of(c.m); math.Abs(got-c.want) > 1e-12 {
+			t.Errorf("%s: cost = %v, want %v", c.name, got, c.want)
+		}
 	}
 }

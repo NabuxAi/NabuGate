@@ -1,21 +1,19 @@
 import { useEffect, useState } from 'react';
 import Layout from '../components/Layout.jsx';
 import * as api from '../api.js';
-import { fmtInt, fmtDigits, usd, useT } from '../i18n/index.jsx';
+import { fmtInt, usd, useT } from '../i18n/index.jsx';
 import Icon from '../components/Icon.jsx';
 
 const T = {
   fa: {
     title: 'مصرف',
-    subtitle: 'تحلیل مصرف توکن، درخواست‌ها و هزینه‌ها در بازه‌ی انتخابی.',
-    last30: '۳۰ روز اخیر',
-    lastWeek: 'هفته اخیر',
-    today: 'امروز',
+    subtitle: 'توکن، درخواست و هزینه از آخرین بازنشانی شمارنده‌ها.',
     outTokens: 'توکن خروجی',
     inTokens: 'توکن ورودی',
     totalTokens: 'کل توکن',
-    providerCost: 'هزینه ارائه‌دهنده',
-    estCost: 'هزینه تخمینی',
+    providerCost: 'هزینهٔ ارائه‌دهنده',
+    providerCostHint: 'آنچه ارائه‌دهنده‌ها با قیمت رسمی برای همین درخواست‌ها از دروازه گرفته‌اند. ثبتش از این نسخه شروع شده است.',
+    charged: 'کسرشده از اعتبار',
     requests: 'درخواست‌ها',
     byProvider: 'مصرف به تفکیک ارائه دهنده',
     byModel: 'مصرف به تفکیک مدل',
@@ -31,15 +29,13 @@ const T = {
   },
   en: {
     title: 'Usage',
-    subtitle: 'Token, request and cost analytics for the selected period.',
-    last30: 'Last 30 days',
-    lastWeek: 'Last week',
-    today: 'Today',
+    subtitle: 'Tokens, requests and cost since the counters were last reset.',
     outTokens: 'Output tokens',
     inTokens: 'Input tokens',
     totalTokens: 'Total tokens',
     providerCost: 'Provider cost',
-    estCost: 'Estimated cost',
+    providerCostHint: 'What the providers charged the gateway for these requests, at list price. Recorded from this version on.',
+    charged: 'Charged to balances',
     requests: 'Requests',
     byProvider: 'Usage by provider',
     byModel: 'Usage by model',
@@ -60,6 +56,9 @@ export default function Usage() {
   const [byProject, setByProject] = useState({});
   const [byModel, setByModel] = useState({});
   const [byProvider, setByProvider] = useState({});
+  // Only an administrator sees the whole deployment, and only for the whole
+  // deployment does what the vendors charged the gateway mean anything.
+  const [scoped, setScoped] = useState(false);
   const [error, setError] = useState(null);
 
   const load = () =>
@@ -69,6 +68,7 @@ export default function Usage() {
         setByProject(r.by_project || {});
         setByModel(r.by_model || {});
         setByProvider(r.by_provider || {});
+        setScoped(Boolean(r.scoped));
       })
       .catch((e) => setError(e.message));
 
@@ -87,24 +87,15 @@ export default function Usage() {
       prompt_tokens: acc.prompt_tokens + (v.prompt_tokens || 0),
       completion_tokens: acc.completion_tokens + (v.completion_tokens || 0),
       cost: acc.cost + (v.cost_usd || 0),
+      providerCost: acc.providerCost + (v.provider_cost_usd || 0),
     }),
-    { requests: 0, prompt_tokens: 0, completion_tokens: 0, cost: 0 }
+    { requests: 0, prompt_tokens: 0, completion_tokens: 0, cost: 0, providerCost: 0 }
   );
 
   const totalTokens = total.prompt_tokens + total.completion_tokens;
 
   return (
-    <Layout
-      title={t('title')}
-      subtitle={t('subtitle')}
-      actions={
-        <select className="input" style={{ width: 'auto' }} aria-label={t('title')}>
-          <option>{t('last30')}</option>
-          <option>{t('lastWeek')}</option>
-          <option>{t('today')}</option>
-        </select>
-      }
-    >
+    <Layout title={t('title')} subtitle={t('subtitle')}>
       {error && <div className="card banner-error">{error}</div>}
 
       {/* Six totals, as the same KPI tiles the dashboard uses so the two
@@ -114,14 +105,13 @@ export default function Usage() {
           { label: t('outTokens'), value: fmtInt(total.completion_tokens), icon: 'arrowUp', tone: 'ok' },
           { label: t('inTokens'), value: fmtInt(total.prompt_tokens), icon: 'arrowDown' },
           { label: t('totalTokens'), value: fmtInt(totalTokens), icon: 'layers', tone: 'pass' },
-          { label: t('providerCost'), value: '$ ' + fmtDigits(total.cost.toFixed(3)), icon: 'receipt', ltr: true },
-          // This multiplied the dollar figure by a rate written into the
-          // source as "dummy exchange rate for UI". A made-up number rendered
-          // in تومان beside real ones reads as a real one.
-          { label: t('estCost'), value: usd(total.cost), icon: 'card', tone: 'warn', ltr: true },
+          { label: t('charged'), value: usd(total.cost), icon: 'card', tone: 'warn', ltr: true },
+          // What a call cost the gateway sat under this label, and it was the
+          // charged amount — a plan's markup included — under another name.
+          !scoped && { label: t('providerCost'), value: usd(total.providerCost), icon: 'receipt', ltr: true, hint: t('providerCostHint') },
           { label: t('requests'), value: fmtInt(total.requests), icon: 'zap' },
-        ].map((k) => (
-          <div key={k.icon} className="card kpi">
+        ].filter(Boolean).map((k) => (
+          <div key={k.icon} className="card kpi" title={k.hint}>
             <div className="kpi-label">
               <span className={'kpi-icon' + (k.tone ? ' ' + k.tone : '')}><Icon name={k.icon} size={18} /></span>
               {k.label}
@@ -150,7 +140,7 @@ export default function Usage() {
                   <tr key={name}>
                     <td style={{ fontWeight: 700, color: 'var(--ng-heading)' }} dir="ltr">{name}</td>
                     <td className="mono">{fmtInt((v.prompt_tokens || 0) + (v.completion_tokens || 0))}</td>
-                    <td className="mono ltr">{fmtDigits('$' + (v.cost_usd || 0).toFixed(4))}</td>
+                    <td className="mono ltr">{usd(v.cost_usd)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -175,7 +165,7 @@ export default function Usage() {
                   <tr key={name}>
                     <td style={{ fontWeight: 700, color: 'var(--ng-heading)' }} dir="ltr">{name}</td>
                     <td className="mono">{fmtInt((v.prompt_tokens || 0) + (v.completion_tokens || 0))}</td>
-                    <td className="mono ltr">{fmtDigits('$' + (v.cost_usd || 0).toFixed(4))}</td>
+                    <td className="mono ltr">{usd(v.cost_usd)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -196,7 +186,7 @@ export default function Usage() {
               <th>{t('outTokens')}</th>
               <th>{t('inTokens')}</th>
               <th>{t('requests')}</th>
-              <th>{t('providerCost')}</th>
+              <th>{t('charged')}</th>
             </tr>
           </thead>
           <tbody>
@@ -215,7 +205,7 @@ export default function Usage() {
                 <td className="mono">{fmtInt(v.completion_tokens || 0)}</td>
                 <td className="mono">{fmtInt(v.prompt_tokens || 0)}</td>
                 <td className="mono">{fmtInt(v.requests || 0)}</td>
-                <td className="mono ltr">{fmtDigits('$' + (v.cost_usd || 0).toFixed(4))}</td>
+                <td className="mono ltr">{usd(v.cost_usd)}</td>
               </tr>
             ))}
           </tbody>

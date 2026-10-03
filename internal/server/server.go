@@ -13,6 +13,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"nabugate/internal/adminstore"
 	"nabugate/internal/agent"
@@ -111,6 +112,7 @@ func (s *Server) SetAdminStore(st *adminstore.Store) {
 	s.admin = st
 	s.loadManagedAgents()
 	s.loadManagedFlows()
+	s.applyAliasSettings()
 }
 
 // loadManagedAgents registers the console-created sub-agents into the live
@@ -329,41 +331,70 @@ func (s *Server) lookupConsoleToken(token string) (adminstore.Token, bool) {
 	return s.admin.Lookup(token)
 }
 
-// record meters one call and returns what the caller was charged for it, so
-// the handler can tell them: a product that bills its own tenants per request
-// (NabuCRM's per-business AI credit) needs the figure the gateway settled on,
-// not a guess from the token counts at a price list of its own.
+// record meters one call billed by its tokens and returns what the caller was
+// charged for it, so the handler can tell them: a product that bills its own
+// tenants per request (NabuCRM's per-business AI credit) needs the figure the
+// gateway settled on, not a guess from the token counts at a price list of its
+// own.
 func (s *Server) record(r *http.Request, prov, model string, u provider.Usage) float64 {
-	project := s.project(r)
-	cost := s.usage.Cost(prov, model, u)
-	if servedByCaller(r.Context()) {
-		// The caller's own vendor account already paid for this call. The usage
-		// is still recorded so the console shows what ran; the cost is zero so
-		// the gateway does not bill for someone else's spend.
-		cost = 0
-	} else {
-		// Served on the gateway's own credential, so the gateway's money paid
-		// the vendor. What the user is charged for that is their plan's rate —
-		// the metered cost when they have no plan, which is how every
-		// deployment behaved before subscriptions existed.
-		cost = gatewayRateFrom(r.Context()).apply(cost)
+	return s.recordMetered(r, prov, model, usage.Tokens(u))
+}
+
+// recordMetered meters one call in whatever units its work was measured in —
+// tokens, seconds of audio, images, characters spoken — and returns what the
+// caller was charged.
+func (s *Server) recordMetered(r *http.Request, prov, model string, m usage.Metered) float64 {
+	charged, providerCost := s.charge(r.Context(), false, s.usage.Cost(prov, model, m))
+	s.meter(r, s.project(r), prov, model, adminstore.UsageEntry{
+		Requests:         1,
+		PromptTokens:     int64(m.Tokens.PromptTokens),
+		CompletionTokens: int64(m.Tokens.CompletionTokens),
+		CostUSD:          charged,
+		ProviderCostUSD:  providerCost,
+	})
+	return charged
+}
+
+// charge splits a call's list cost into what the caller is charged and what the
+// gateway paid the vendor for it.
+//
+// A call served on the caller's own vendor key cost the gateway nothing and is
+// charged nothing: their vendor already billed them, and the usage is recorded
+// only so the console shows what ran. One served on the gateway's credential
+// was paid for with the gateway's money, and the caller is charged their plan's
+// rate on it — the list cost itself when they have no plan, which is how every
+// deployment behaved before subscriptions existed.
+func (s *Server) charge(ctx context.Context, byCaller bool, list float64) (charged, providerCost float64) {
+	if byCaller || servedByCaller(ctx) {
+		return 0, 0
 	}
-	s.usage.RecordAt(project, prov, model, u, cost)
+	return gatewayRateFrom(ctx).apply(list), list
+}
+
+// meter writes one metered call everywhere usage is kept: the in-memory
+// tracker, the persisted counters the console reads (which also take the charge
+// off the owner's balance) and the recent-requests log.
+func (s *Server) meter(r *http.Request, project, prov, model string, e adminstore.UsageEntry) {
+	u := provider.Usage{
+		PromptTokens:     int(e.PromptTokens),
+		CompletionTokens: int(e.CompletionTokens),
+		TotalTokens:      int(e.PromptTokens + e.CompletionTokens),
+	}
+	s.usage.RecordAt(project, prov, model, e.Requests, u, e.CostUSD)
 	// Also accumulate into the persisted counters, so the console's numbers are
 	// real across restarts rather than resetting to zero on every redeploy.
 	if s.admin != nil {
-		s.admin.RecordUsage(project, prov, model, int64(u.PromptTokens), int64(u.CompletionTokens), cost)
+		s.admin.RecordUsage(project, prov, model, e)
 	}
 	s.requests.Add(adminstore.RequestEntry{
 		Project:  project,
 		Provider: prov,
 		Model:    model,
 		Tokens:   int64(u.TotalTokens),
-		CostUSD:  cost,
+		CostUSD:  e.CostUSD,
 	})
 	s.log.Info("billed", "project", project, "provider", prov, "model", model,
-		"total_tokens", u.TotalTokens, "cost_usd", cost)
-	return cost
+		"total_tokens", u.TotalTokens, "cost_usd", e.CostUSD, "provider_cost_usd", e.ProviderCostUSD)
 }
 
 // costHeader is what a metered response says the request cost, in dollars.
@@ -941,8 +972,11 @@ func (s *Server) handleImages(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	cost := s.recordMetered(r, result.Provider, result.Model, usage.Metered{Images: len(result.Images)})
+
 	w.Header().Set("X-Nabu-Provider", result.Provider)
 	w.Header().Set("X-Nabu-Model", result.Model)
+	w.Header().Set(costHeader, formatCost(cost))
 
 	data := make([]map[string]string, 0, len(result.Images))
 	for _, b64 := range result.Images {
@@ -989,9 +1023,14 @@ func (s *Server) handleSpeech(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Speech is billed by the characters spoken: a vendor quotes it per
+	// character, or per token of an input that is these same characters.
+	cost := s.recordMetered(r, result.Provider, result.Model, usage.Metered{Characters: utf8.RuneCountInString(body.Input)})
+
 	// OpenAI's /v1/audio/speech returns raw audio bytes, so we do too.
 	w.Header().Set("X-Nabu-Provider", result.Provider)
 	w.Header().Set("X-Nabu-Model", result.Model)
+	w.Header().Set(costHeader, formatCost(cost))
 	w.Header().Set("Content-Type", result.ContentType)
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write(result.Audio)
@@ -1080,7 +1119,18 @@ func (s *Server) handleEmbeddings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	cost := s.record(r, result.Provider, result.Model, result.Usage)
+	// Gemini's embedding endpoint reports no usage at all, and 28,460 calls of
+	// it were metered at nothing before this was counted here.
+	usedTokens := result.Usage
+	if usedTokens.PromptTokens == 0 {
+		var inputBytes int
+		for _, in := range inputs {
+			inputBytes += len(in)
+		}
+		usedTokens.PromptTokens = provider.EstimateTokens(inputBytes)
+		usedTokens.TotalTokens = usedTokens.PromptTokens
+	}
+	cost := s.record(r, result.Provider, result.Model, usedTokens)
 
 	w.Header().Set("X-Nabu-Provider", result.Provider)
 	w.Header().Set("X-Nabu-Model", result.Model)

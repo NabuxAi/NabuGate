@@ -63,6 +63,20 @@ vendor rejected, `429` for the vendor's rate limit, `502` for anything only the
 gateway's operator can fix (a rejected key, a vendor 5xx). The vendor's own
 message comes back on one line, with anything credential-shaped masked.
 
+## Voices
+
+The voice a call speaks in is part of the vendor's own body:
+`session.audio.output.voice` on OpenAI Realtime, which is what `nabu-live` opens.
+A caller may send a vendor voice there (`marin`), or a name from the config's
+`voices:` block, which the gateway turns into the serving provider's own voice.
+When the body names no voice, the alias's default is written in: what an
+administrator chose in the console (Models → Change), else the alias's `voice:`
+in the config. The rest of the body travels exactly as the caller sent it.
+
+The console can also choose which configured model of an alias answers first —
+`gpt-realtime` or `gpt-realtime-mini` behind `nabu-live` — from the next session
+on, without a deploy.
+
 ## Billing — `POST /v1/live/sessions/{id}/usage`
 
 Only the vendor knows exactly how long a call ran, and it tells the *browser*:

@@ -270,14 +270,8 @@ func (a *OpenAIAdapter) ChatStream(ctx context.Context, req ChatRequest, onDelta
 		for _, m := range req.Messages {
 			promptBytes += len(m.Content) + len(m.Role) + 4
 		}
-		pTok := (promptBytes + 3) / 4
-		if pTok < 1 && promptBytes > 0 {
-			pTok = 1
-		}
-		cTok := (outputBytes + 3) / 4
-		if cTok < 1 && outputBytes > 0 {
-			cTok = 1
-		}
+		pTok := EstimateTokens(promptBytes)
+		cTok := EstimateTokens(outputBytes)
 		usage = Usage{
 			PromptTokens:     pTok,
 			CompletionTokens: cTok,

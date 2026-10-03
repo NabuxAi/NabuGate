@@ -180,18 +180,12 @@ func formatDecisionChatResponse(decResp DecisionResponse, originalPrompt string)
 	// Calculate tokens accurately.
 	pTokens := decResp.Usage.PromptTokens
 	if pTokens <= 0 {
-		pTokens = (len(originalPrompt) + 3) / 4
-		if pTokens < 1 {
-			pTokens = 1
-		}
+		pTokens = max(1, EstimateTokens(len(originalPrompt)))
 	}
 
 	cTokens := decResp.Usage.CompletionTokens
 	if cTokens <= 0 {
-		cTokens = (len(content) + 3) / 4
-		if cTokens < 1 {
-			cTokens = 1
-		}
+		cTokens = max(1, EstimateTokens(len(content)))
 	}
 
 	usage := Usage{

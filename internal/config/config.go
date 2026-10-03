@@ -43,7 +43,14 @@ type Config struct {
 	// vendor over WebRTC and the gateway does the signalling. Billed per
 	// minute (usage.Price.PerMinute), not per token.
 	Live    map[string]ModelRoute  `yaml:"live"`
-	Pricing map[string]usage.Price `yaml:"pricing"` // USD per 1M tokens (or per minute), keyed by "provider/model"
+	Pricing map[string]usage.Price `yaml:"pricing"` // USD per unit; keys and lookup order in usage.Lookup
+
+	// Voices are names a caller can give a speech or live alias without knowing
+	// which vendor will speak: each maps a provider to that vendor's own voice.
+	// A chain that falls back from ElevenLabs to OpenAI cannot carry one vendor
+	// voice across — "Rachel" means nothing to OpenAI — so the gateway resolves
+	// a named voice for whichever provider actually serves the call.
+	Voices map[string]map[string]string `yaml:"voices"`
 
 	// Registry maps a logical model name to the providers that can serve it.
 	// A target naming a model with no provider expands through this, so one
@@ -325,6 +332,10 @@ type Serving struct {
 type ModelRoute struct {
 	Primary  Target   `yaml:"primary"`
 	Fallback []Target `yaml:"fallback"`
+	// Voice is what a speech or live alias speaks in when the caller names no
+	// voice: a name from `voices:`, or a vendor's own voice. The console can
+	// replace it without a deploy.
+	Voice string `yaml:"voice"`
 }
 
 // Resolve loads the config from the NABU_CONFIG_YAML env var when it is set

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 
 import Layout from '../components/Layout.jsx';
 import * as api from '../api.js';
-import { fmtInt, fmtDigits, useT } from '../i18n/index.jsx';
+import { fmtInt, usd, useT } from '../i18n/index.jsx';
 import { Skeleton } from '../components/Skeleton.jsx';
 import Icon from '../components/Icon.jsx';
 
@@ -252,7 +252,7 @@ export default function Tokens() {
                     )}
                   </td>
                   <td className="mono">{fmtInt(u.requests || 0)}</td>
-                                    <td className="mono ltr">{fmtDigits('$' + (u.cost_usd || 0).toFixed(3))}</td>
+                                    <td className="mono ltr">{usd(u.cost_usd)}</td>
                   <td className="mono" style={u.denied ? { color: 'var(--ng-danger, #c53030)' } : undefined}>
                     {fmtInt(u.denied || 0)}
                   </td>
