@@ -319,7 +319,7 @@ export default function Decisions() {
   useEffect(() => {
     api.aliases()
       .then((r) => {
-        const usable = (r.aliases || []).filter((a) => a.kind === 'chat' || a.kind === 'decision');
+        const usable = (r.aliases || []).filter((a) => a.kind === 'models' || a.kind === 'decisions');
         setAliases(usable);
         if (usable.length && !usable.some((a) => a.alias === model)) {
           setModel(usable.find((a) => a.alias === 'nabu-fast')?.alias || usable[0].alias);
