@@ -759,3 +759,57 @@ select.input {
   grid-template-columns: repeat(auto-fit, minmax(240px, 340px));
   justify-content: start;
 }
+
+/* ── Decision engine playground ───────────────────────────────────────────
+   Scoped dec-* classes for the Decisions view: question editor, probability
+   bars and the reliability diagram. */
+
+.dec-key-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.dec-key-row .input-wrap { flex: 1 1 220px; min-width: 0; }
+
+.dec-controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; margin-bottom: 12px; }
+.dec-controls label { display: flex; flex-direction: column; gap: 5px; font-size: 12px; color: var(--ng-muted); }
+.dec-temp input[type='range'] { accent-color: var(--ng-accent); }
+.dec-temp small { font-size: 11px; line-height: 1.5; }
+
+.dec-state { display: flex; flex-direction: column; gap: 5px; font-size: 12px; color: var(--ng-muted); margin-bottom: 12px; }
+
+.dec-questions h4 { font-size: 13px; color: var(--ng-heading); margin-bottom: 8px; }
+.dec-question { display: flex; flex-direction: column; gap: 8px; padding: 10px; border: 1px solid var(--ng-faint, #eee); border-radius: 10px; margin-bottom: 10px; }
+.dec-q-head { display: grid; grid-template-columns: minmax(80px, 160px) 110px auto; gap: 8px; }
+.dec-options { display: flex; flex-direction: column; gap: 6px; }
+.dec-option-row { display: flex; gap: 8px; align-items: center; }
+.dec-option-row .input:first-child { flex: 0 0 130px; }
+.dec-option-row .input:not(:first-child) { flex: 1; }
+
+.dec-run-row { display: flex; justify-content: flex-start; margin-top: 10px; }
+
+.dec-result { margin-top: 14px; display: flex; flex-direction: column; gap: 12px; }
+.dec-meta { display: flex; flex-wrap: wrap; gap: 8px; }
+.dec-answer { border: 1px solid var(--ng-faint, #eee); border-radius: 10px; padding: 10px 12px; }
+.dec-answer-head { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 8px; }
+.dec-answer-pick { display: flex; align-items: center; gap: 10px; font-size: 13px; }
+.dec-conf { color: var(--ng-muted); font-size: 12px; }
+
+.dec-bars { display: flex; flex-direction: column; gap: 5px; }
+.dec-bar-row { display: grid; grid-template-columns: minmax(60px, 130px) 1fr 58px; align-items: center; gap: 8px; }
+.dec-bar-row.chosen .dec-bar-key { color: var(--ng-accent); font-weight: 800; }
+.dec-bar-key { font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; direction: ltr; text-align: start; }
+.dec-bar-track { display: block; height: 9px; border-radius: 999px; background: var(--ng-surface-soft, #f3f4f6); overflow: hidden; }
+.dec-bar-fill { display: block; height: 100%; border-radius: 999px; background: var(--ng-accent); opacity: 0.55; }
+.dec-bar-row.chosen .dec-bar-fill { opacity: 1; }
+.dec-bar-val { font-size: 11.5px; color: var(--ng-muted); text-align: end; direction: ltr; }
+
+.dec-error { color: var(--ng-warn-text, #b45309); font-size: 12.5px; margin: 8px 0 0; overflow-wrap: anywhere; }
+
+.dec-calib { margin-top: 14px; display: flex; flex-direction: column; gap: 14px; }
+.dec-stat-grid { grid-template-columns: repeat(3, 1fr); }
+.dec-stat-grid .stat .value { font-size: 18px; }
+.dec-bins-block h4 { font-size: 13px; color: var(--ng-heading); margin-bottom: 6px; }
+.dec-bins { display: flex; flex-direction: column; gap: 4px; }
+.dec-bin-row { display: grid; grid-template-columns: 74px 1fr 1fr; gap: 8px; align-items: center; font-size: 11.5px; color: var(--ng-muted); }
+.dec-bin-head { color: var(--ng-heading); font-weight: 700; }
+.dec-bin-track { display: block; height: 8px; border-radius: 999px; background: var(--ng-surface-soft, #f3f4f6); overflow: hidden; }
+.dec-bin-fill { display: block; height: 100%; border-radius: 999px; }
+.dec-bin-fill.conf { background: var(--ng-accent); opacity: 0.5; }
+.dec-bin-fill.acc { background: var(--ng-ok, #10b981); }

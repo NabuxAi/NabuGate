@@ -210,6 +210,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /v1/embeddings", s.auth(s.handleEmbeddings))
 	mux.HandleFunc("POST /v1/systemone", s.auth(s.handleDecisions))
 	mux.HandleFunc("POST /v1/decisions", s.auth(s.handleDecisions))
+	mux.HandleFunc("POST /v1/decisions/calibrate", s.auth(s.handleDecisionCalibrate))
 	mux.HandleFunc("GET /v1/usage", s.auth(s.handleUsage))
 	mux.HandleFunc("GET /v1/photos/search", s.auth(s.handlePhotoSearch))
 
