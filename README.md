@@ -24,7 +24,8 @@ OpenAI-wire compatible, so any OpenAI client works by changing the base URL:
 | `POST /v1/audio/speech` | Text to speech |
 | `POST /v1/audio/transcriptions` | Speech to text |
 | `POST /v1/systemone` | System 1 structured decisions (Jev / TypeSafe) |
-| `POST /v1/decisions` | System 1 structured decisions (alias) |
+| `POST /v1/decisions` | Structured decisions — dedicated alias, any chat alias, or `provider/model` |
+| `POST /v1/decisions/calibrate` | Fit the local engine's calibration temperature on labelled samples |
 | `GET /v1/models` | Aliases, agents and passthrough catalogues |
 | `GET /v1/agents` | Agents with their model and tool names |
 | `GET /v1/usage` | Tokens and cost for the calling key |

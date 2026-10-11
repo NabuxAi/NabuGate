@@ -1915,6 +1915,12 @@ embeddings:
 
 # Structured decision aliases (TypeSafe / System One / Decisions).
 # Evaluated via POST /v1/systemone or POST /v1/decisions.
+#
+# A decision does not need an entry here: any chat alias also answers
+# /v1/decisions through the local engine — one forward pass per question over
+# the letter tokens' logprobs, with an optional "temperature" (calibration)
+# and "engine" ("auto" | "local" | "native") in the request body. POST
+# /v1/decisions/calibrate fits that temperature from labelled samples.
 decisions:
   nabu-decision:
     primary:
