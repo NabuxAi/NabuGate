@@ -338,7 +338,10 @@ export default function Decisions() {
     setKeyBusy(true);
     setKeyError(null);
     try {
-      const r = await api.createToken({ name: 'decisions-playground', allow: [], rateLimit: 60 });
+      // A key with no allow-list is refused (it would reach everything), and
+      // it should not anyway: scope it to the aliases the dropdown offers.
+      const allow = aliases.length ? aliases.map((a) => a.alias) : ['nabu-*'];
+      const r = await api.createToken({ name: 'decisions-playground', allow, rateLimit: 60 });
       setApiKey(r.secret);
     } catch (err) {
       setKeyError(err.message);
