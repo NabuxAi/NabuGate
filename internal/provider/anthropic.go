@@ -51,14 +51,32 @@ type anthropicResponse struct {
 	Content []struct {
 		Text string `json:"text"`
 	} `json:"content"`
-	StopReason string `json:"stop_reason"`
-	Usage      struct {
-		InputTokens  int `json:"input_tokens"`
-		OutputTokens int `json:"output_tokens"`
-	} `json:"usage"`
-	Error *struct {
+	StopReason string            `json:"stop_reason"`
+	Usage      anthropicUsageRaw `json:"usage"`
+	Error      *struct {
 		Message string `json:"message"`
 	} `json:"error"`
+}
+
+// anthropicUsageRaw is Anthropic's usage object. The cache directions are
+// billed at rates of their own on the real invoice, so they are carried
+// separately rather than folded into the input count.
+type anthropicUsageRaw struct {
+	InputTokens              int `json:"input_tokens"`
+	OutputTokens             int `json:"output_tokens"`
+	CacheReadInputTokens     int `json:"cache_read_input_tokens"`
+	CacheCreationInputTokens int `json:"cache_creation_input_tokens"`
+}
+
+// usage normalizes the raw shape into the gateway's Usage.
+func (u anthropicUsageRaw) usage() Usage {
+	return Usage{
+		PromptTokens:       u.InputTokens,
+		CompletionTokens:   u.OutputTokens,
+		TotalTokens:        u.InputTokens + u.OutputTokens,
+		CacheReadInput:     u.CacheReadInputTokens,
+		CacheCreationInput: u.CacheCreationInputTokens,
+	}
 }
 
 // mapAnthropicFinish normalizes Anthropic's stop_reason to the OpenAI vocabulary.
@@ -141,14 +159,18 @@ func (a *AnthropicAdapter) Chat(ctx context.Context, req ChatRequest) (ChatRespo
 		text.WriteString(c.Text)
 	}
 
+	usage := parsed.Usage.usage()
+	if usage.TotalTokens == 0 && usage.CacheReadInput == 0 && usage.CacheCreationInput == 0 {
+		// Anthropic answered with content but no usage object. Guess from the
+		// bytes that moved, flagged as a guess, so the call is metered at
+		// something rather than passed off as a free month.
+		usage = estimateUsage(req, len(text.String()))
+	}
+
 	return ChatResponse{
 		Content:      text.String(),
 		FinishReason: mapAnthropicFinish(parsed.StopReason),
-		Usage: Usage{
-			PromptTokens:     parsed.Usage.InputTokens,
-			CompletionTokens: parsed.Usage.OutputTokens,
-			TotalTokens:      parsed.Usage.InputTokens + parsed.Usage.OutputTokens,
-		},
+		Usage:        usage,
 	}, nil
 }
 
@@ -210,6 +232,7 @@ func (a *AnthropicAdapter) ChatStream(ctx context.Context, req ChatRequest, onDe
 	defer resp.Body.Close()
 
 	var usage Usage
+	var outputBytes int
 	err = readSSE(resp.Body, func(data []byte) (bool, error) {
 		var ev struct {
 			Type  string `json:"type"`
@@ -218,9 +241,7 @@ func (a *AnthropicAdapter) ChatStream(ctx context.Context, req ChatRequest, onDe
 				OutputTokens int    `json:"output_tokens"`
 			} `json:"delta"`
 			Message struct {
-				Usage struct {
-					InputTokens int `json:"input_tokens"`
-				} `json:"usage"`
+				Usage anthropicUsageRaw `json:"usage"`
 			} `json:"message"`
 			Usage struct {
 				OutputTokens int `json:"output_tokens"`
@@ -232,17 +253,26 @@ func (a *AnthropicAdapter) ChatStream(ctx context.Context, req ChatRequest, onDe
 		switch ev.Type {
 		case "content_block_delta":
 			if ev.Delta.Text != "" {
+				outputBytes += len(ev.Delta.Text)
 				if err := onDelta(ev.Delta.Text); err != nil {
 					return true, err
 				}
 			}
 		case "message_start":
 			usage.PromptTokens = ev.Message.Usage.InputTokens
+			usage.CacheReadInput = ev.Message.Usage.CacheReadInputTokens
+			usage.CacheCreationInput = ev.Message.Usage.CacheCreationInputTokens
 		case "message_delta":
 			usage.CompletionTokens = ev.Usage.OutputTokens
 		}
 		usage.TotalTokens = usage.PromptTokens + usage.CompletionTokens
 		return false, nil
 	})
+	if usage.TotalTokens == 0 && usage.CacheReadInput == 0 && usage.CacheCreationInput == 0 {
+		// No message_start and no message_delta arrived — the upstream told us
+		// nothing about what the call spent. Guess from the bytes on the wire,
+		// flagged as a guess, exactly as the OpenAI-wire stream path does.
+		usage = estimateUsage(req, outputBytes)
+	}
 	return usage, err
 }

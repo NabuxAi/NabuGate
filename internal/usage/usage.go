@@ -29,6 +29,14 @@ type Price struct {
 	PerMillionChars float64 `yaml:"per_million_chars" json:"per_million_chars,omitempty"`
 	// PerCredit is per credit of a vendor that bills in its own credits.
 	PerCredit float64 `yaml:"per_credit" json:"per_credit,omitempty"`
+	// InputCacheRead and InputCacheWrite are per 1,000,000 tokens for
+	// Anthropic's cache-token directions, which its invoices bill at rates of
+	// their own (a cache read is roughly a tenth of a plain input token). Both
+	// default to zero, so a model priced without them meters exactly as it did
+	// before they existed — an operator opts in by writing the rate, and until
+	// then cache-heavy Anthropic traffic still under-reports provider cost.
+	InputCacheRead  float64 `yaml:"input_cache_read" json:"input_cache_read,omitempty"`
+	InputCacheWrite float64 `yaml:"input_cache_write" json:"input_cache_write,omitempty"`
 }
 
 // Metered is one call's work in every unit a price can be quoted in. Most calls
@@ -84,6 +92,7 @@ func Lookup(prices map[string]Price, providerName, model string) (Price, bool) {
 // Of is what a call's metered work costs at a price.
 func (p Price) Of(m Metered) float64 {
 	cost := float64(m.Tokens.PromptTokens)/1e6*p.Input + float64(m.Tokens.CompletionTokens)/1e6*p.Output
+	cost += float64(m.Tokens.CacheReadInput)/1e6*p.InputCacheRead + float64(m.Tokens.CacheCreationInput)/1e6*p.InputCacheWrite
 	if m.Seconds > 0 {
 		cost += m.Seconds / 60 * p.PerMinute
 	}
@@ -100,18 +109,79 @@ func (p Price) Of(m Metered) float64 {
 }
 
 // Stat is the aggregated usage for a project or a model.
+//
+// Every field is additive JSON: readers written against the older four-field
+// shape keep decoding, and the newer fields answer the questions a plain
+// token count hides — what the vendors charged us, how much of the report is
+// the gateway's own guess, and which models nobody priced.
 type Stat struct {
 	Requests         int64   `json:"requests"`
 	PromptTokens     int64   `json:"prompt_tokens"`
 	CompletionTokens int64   `json:"completion_tokens"`
 	CostUSD          float64 `json:"cost_usd"`
+	// ProviderCostUSD is what the vendors charged the gateway for the same
+	// work, at list price. Below CostUSD by a plan's markup, zero for calls
+	// served on the caller's own vendor key.
+	ProviderCostUSD float64 `json:"provider_cost_usd"`
+	// UnpricedRequests counts calls metered on a model with no price in the
+	// config: they recorded their tokens and cost nothing, and this is the
+	// flag that says so rather than letting them pass as a free month.
+	UnpricedRequests int64 `json:"unpriced_requests"`
+	// EstimatedRequests counts calls whose token counts are the gateway's own
+	// four-bytes-per-token guess because the upstream reported no usage.
+	EstimatedRequests int64 `json:"estimated_requests"`
+	// FailedRequests counts work the vendor already did on requests that did
+	// not complete — a stream cut mid-flight, a tool loop that errored on a
+	// later step. The tokens and vendor cost are real; the caller is not
+	// charged, and the request is not counted as served.
+	FailedRequests int64 `json:"failed_requests"`
+	// The physical units a non-token call consumed, in the unit its vendor
+	// bills: seconds of audio, images made, characters spoken. Zero for a
+	// token-only call, so a consumer can render each unit only when it exists.
+	AudioSeconds float64 `json:"audio_seconds"`
+	Images       int64   `json:"images"`
+	Characters   int64   `json:"characters"`
 }
 
-func (s *Stat) add(requests int64, u provider.Usage, cost float64) {
-	s.Requests += requests
-	s.PromptTokens += int64(u.PromptTokens)
-	s.CompletionTokens += int64(u.CompletionTokens)
-	s.CostUSD += cost
+// Entry is one call's share of the counters — everything a single metered
+// event carries into the books, in one struct, so the tracker can record it
+// atomically instead of field by field.
+type Entry struct {
+	Requests         int64
+	PromptTokens     int
+	CompletionTokens int
+	CostUSD          float64
+	ProviderCostUSD  float64
+	// Unpriced, Estimated and Failed are the honesty flags: the call hit a
+	// model nobody priced, its token counts are the gateway's own estimate,
+	// and/or the request never completed. Each adds one to its Stat counter.
+	Unpriced  bool
+	Estimated bool
+	Failed    bool
+	// The physical units the call consumed, alongside any tokens.
+	AudioSeconds float64
+	Images       int
+	Characters   int
+}
+
+func (s *Stat) add(e Entry) {
+	s.Requests += e.Requests
+	s.PromptTokens += int64(e.PromptTokens)
+	s.CompletionTokens += int64(e.CompletionTokens)
+	s.CostUSD += e.CostUSD
+	s.ProviderCostUSD += e.ProviderCostUSD
+	if e.Unpriced {
+		s.UnpricedRequests++
+	}
+	if e.Estimated {
+		s.EstimatedRequests++
+	}
+	if e.Failed {
+		s.FailedRequests++
+	}
+	s.AudioSeconds += e.AudioSeconds
+	s.Images += int64(e.Images)
+	s.Characters += int64(e.Characters)
 }
 
 // Tracker accumulates usage. It is safe for concurrent use.
@@ -142,11 +212,20 @@ func (t *Tracker) Price(providerName, model string) (Price, bool) {
 // Cost returns the USD list cost of a call's metered work, 0 when the model is
 // unpriced.
 func (t *Tracker) Cost(providerName, model string, m Metered) float64 {
+	cost, _ := t.PriceOf(providerName, model, m)
+	return cost
+}
+
+// PriceOf returns a call's list cost and whether the model is priced at all.
+// The bool is what lets a caller record "this ran on a model nobody priced"
+// instead of letting the same fact hide inside a zero — a zero that means
+// free is information, a zero that means unknown is a hole in the books.
+func (t *Tracker) PriceOf(providerName, model string, m Metered) (float64, bool) {
 	p, ok := t.Price(providerName, model)
 	if !ok {
-		return 0
+		return 0, false
 	}
-	return p.Of(m)
+	return p.Of(m), true
 }
 
 // Record attributes a call's token usage and cost to the project and model,
@@ -162,6 +241,18 @@ func (t *Tracker) Record(project, providerName, model string, u provider.Usage) 
 // twice, once here and once by the vendor. requests is how many requests the
 // call adds: none for a further usage report on a live session already counted.
 func (t *Tracker) RecordAt(project, providerName, model string, requests int64, u provider.Usage, cost float64) float64 {
+	return t.RecordEntry(project, providerName, model, Entry{
+		Requests:         requests,
+		PromptTokens:     u.PromptTokens,
+		CompletionTokens: u.CompletionTokens,
+		CostUSD:          cost,
+	})
+}
+
+// RecordEntry books one call's whole metered event — tokens, both costs, the
+// honesty flags and the physical units — to the project and the model in one
+// stroke, and returns the recorded cost.
+func (t *Tracker) RecordEntry(project, providerName, model string, e Entry) float64 {
 	if project == "" {
 		project = "(unscoped)"
 	}
@@ -169,9 +260,9 @@ func (t *Tracker) RecordAt(project, providerName, model string, requests int64, 
 
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	t.statLocked(t.byProject, project).add(requests, u, cost)
-	t.statLocked(t.byModel, modelKey).add(requests, u, cost)
-	return cost
+	t.statLocked(t.byProject, project).add(e)
+	t.statLocked(t.byModel, modelKey).add(e)
+	return e.CostUSD
 }
 
 func (t *Tracker) statLocked(m map[string]*Stat, key string) *Stat {

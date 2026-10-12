@@ -21,13 +21,14 @@ func (s *Server) accountUsage(w http.ResponseWriter, r *http.Request) {
 	perProject := s.admin.UsageForOwner(email)
 
 	var requests, prompt, completion, denied int64
-	var cost float64
+	var cost, providerCost float64
 	for _, c := range perProject {
 		requests += c.Requests
 		prompt += c.PromptTokens
 		completion += c.CompletionTokens
 		denied += c.Denied
 		cost += c.CostUSD
+		providerCost += c.ProviderCostUSD
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
 		"projects":          perProject,
@@ -39,6 +40,10 @@ func (s *Server) accountUsage(w http.ResponseWriter, r *http.Request) {
 		// see, and the one thing an aggregate token count hides completely.
 		"denied":   denied,
 		"cost_usd": cost,
+		// Additive: what the vendors charged the gateway for the same calls, so
+		// the operator's own dashboard can read both sides of the ledger. The
+		// panel of a plain customer ignores it.
+		"provider_cost_usd": providerCost,
 	})
 }
 

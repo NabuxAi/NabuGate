@@ -98,6 +98,14 @@ func (s *Server) handleTranscription(w http.ResponseWriter, r *http.Request) {
 	// tokens; each model is priced in the unit its vendor bills, so the call is
 	// metered in both and the price decides which one costs anything.
 	cost := s.recordMetered(r, result.Provider, result.Model, usage.Metered{Tokens: result.Usage, Seconds: result.Duration})
+	if result.Duration == 0 && result.Usage.TotalTokens == 0 {
+		// A transcript with neither a duration nor a token count meters at
+		// nothing while the audio really was uploaded and processed. The
+		// request is on the books regardless; this is said out loud because a
+		// silent zero is how a billing hole survives for a month.
+		s.log.Warn("transcription metered at nothing: the vendor returned no duration and no token usage",
+			"project", s.project(r), "provider", result.Provider, "model", result.Model, "audio_bytes", len(audio))
+	}
 
 	w.Header().Set("X-Nabu-Provider", result.Provider)
 	w.Header().Set("X-Nabu-Model", result.Model)

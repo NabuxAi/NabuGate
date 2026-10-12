@@ -243,6 +243,11 @@ func (s *Server) testFlow(w http.ResponseWriter, r *http.Request) {
 	req := provider.ChatRequest{Messages: []provider.Message{{Role: "user", Content: body.Message}}}
 
 	result, err := s.runFlow(r.Context(), fl, req, 1, nil)
+	// The test runs on the gateway's own provider keys, so whatever it spent
+	// is booked under a project of its own — the operator sees what testing
+	// costs, and no customer's usage moves. The steps that ran before a
+	// failure are booked too: they are real spend all the same.
+	s.recordFlowFor(r, "(flow-test)", fl, result)
 	if err != nil {
 		// The steps that did run are returned alongside the error: a chain that
 		// died at step three is diagnosed by reading steps one and two.

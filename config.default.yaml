@@ -590,6 +590,42 @@ providers:
       - "jev-latest"
       - "jev-1.13.0"
 
+  # v1m (v1m.ir) — System One decision engine with the same Noul/Choice/Score
+  # primitives as TypeSafe, on an Iranian endpoint with crypto top-ups and a
+  # free daily quota (500 requests/day; no per-token price is published, so
+  # pricing below is an explicit zero). Wire-compatible with the typesafe
+  # adapter — same /systemone, same usage shape — so like cloudflare/tokenrouter
+  # riding the openai adapter it needs no adapter of its own, only this
+  # base_url. Skipped automatically when V1M_API_KEY is unset.
+  #
+  # CAUTION — the questions contract differs from what the vendor's own docs
+  # say (their cURL example returns 422 as written): every question needs both
+  # `type` AND `instructions`; a `choice` question takes `criteria` (a map, or
+  # at least 2 options) instead of `choices`; a `score` question takes an
+  # ordered `criteria` array (at least 2 levels) instead of min/max.
+  #
+  # Cold start is slow: the first call after idle took ~52s in a live test
+  # (2026-10-11). The gateway's shared HTTP client allows 120s, so the call
+  # fits, but do not put v1m where a caller times out before that.
+  v1m:
+    enabled: true
+    type: typesafe
+    base_url: "https://v1m.ir/v1"
+    api_key_env: "V1M_API_KEY"
+    passthrough: true
+    # Static catalogue from the live /v1/models (2026-10-11). qwen2.5-1.5b-
+    # systemone is admin-only upstream and laya-multilingual-onnx is absent
+    # from the live catalog, so neither is listed here. Live discovery still
+    # merges the vendor's own /v1/models — which does return the admin-only
+    # qwen id — so it can appear on /v1/models; "v1m/*" prices whatever
+    # discovery surfaces.
+    models:
+      - "v1m-latest"
+      - "v1m-preview"
+      - "v1m-1.0"
+      - "rev-latest"
+      - "jev-latest"
+
   # Perplexity — answers grounded in a live search, with citations. Sonar has no
   # /v1/models, so its catalogue is a static list the way Cloudflare's is.
   perplexity:
@@ -1913,7 +1949,7 @@ embeddings:
       provider: gemini
       model: "gemini-embedding-2-preview"
 
-# Structured decision aliases (TypeSafe / System One / Decisions).
+# Structured decision aliases (TypeSafe and v1m / System One / Decisions).
 # Evaluated via POST /v1/systemone or POST /v1/decisions.
 decisions:
   nabu-decision:
@@ -1923,6 +1959,17 @@ decisions:
     fallback:
       - provider: openrouter
         model: "typesafe/jev-latest"
+
+  # v1m-fronted decisions; the fallback rung comes from a different vendor
+  # (the TypeSafe SaaS), the way nabu-decision's second rung comes from
+  # openrouter.
+  nabu-v1m:
+    primary:
+      provider: v1m
+      model: "v1m-latest"
+    fallback:
+      - provider: typesafe
+        model: "jev-latest"
 
 # Sub-agents (system prompt + defaults over an alias, addressable as a "model").
 # The Cinematic Scrollytelling squad ships as one YAML file per agent under
@@ -2078,6 +2125,12 @@ pricing:
   # a caller may name a version released after this file was written, and an
   # unpriced call is billed at nothing rather than refused.
   "typesafe/*": { input: 0.042, output: 0 }
+
+  # ── v1m (System One): free daily quota, no per-token price published ──────
+  # The explicit zero is a recorded decision (TestEveryRouteIsPriced), not an
+  # omission — an unpriced call would meter at nothing with no one choosing it.
+  "v1m/v1m-latest": { input: 0, output: 0 }
+  "v1m/*": { input: 0, output: 0 }
 
   # ── Free: runs on our own machines, or a free API ─────────────────────────
   "llamacpp/*": {}

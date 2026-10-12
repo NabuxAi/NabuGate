@@ -122,6 +122,22 @@ type Counters struct {
 	// Counters written before it existed carry none.
 	ProviderCostUSD float64 `json:"provider_cost_usd"`
 	Denied          int64   `json:"denied"`
+
+	// The honesty counters, added additively the same way ProviderCostUSD was:
+	// state files written before them carry none, and a consumer of the old
+	// shape keeps decoding. Unpriced = calls on a model with no price in the
+	// config (metered at nothing on purpose, now visibly). Estimated = calls
+	// whose token counts are the gateway's own guess. Failed = vendor work on
+	// requests that never completed — real vendor cost, no caller charge.
+	UnpricedRequests  int64 `json:"unpriced_requests"`
+	EstimatedRequests int64 `json:"estimated_requests"`
+	FailedRequests    int64 `json:"failed_requests"`
+
+	// The physical units a non-token call consumed, in the unit its vendor
+	// bills: seconds of audio, images made, characters spoken.
+	AudioSeconds float64 `json:"audio_seconds"`
+	Images       int64   `json:"images"`
+	Characters   int64   `json:"characters"`
 }
 
 // UsageEntry is one metered call's share of the counters.
@@ -133,6 +149,17 @@ type UsageEntry struct {
 	CompletionTokens int64
 	CostUSD          float64
 	ProviderCostUSD  float64
+	// Unpriced marks a call on a model with no price in the config; Estimated
+	// marks token counts the gateway guessed; Failed marks work the vendor did
+	// on a request that never completed. Each lands in its own counter so a
+	// metered-at-nothing call never reads as a free month.
+	Unpriced  bool
+	Estimated bool
+	Failed    bool
+	// The physical units the call consumed, in its vendor's billing unit.
+	AudioSeconds float64
+	Images       int
+	Characters   int
 }
 
 func (c *Counters) add(e UsageEntry) {
@@ -141,6 +168,18 @@ func (c *Counters) add(e UsageEntry) {
 	c.CompletionTokens += e.CompletionTokens
 	c.CostUSD += e.CostUSD
 	c.ProviderCostUSD += e.ProviderCostUSD
+	if e.Unpriced {
+		c.UnpricedRequests++
+	}
+	if e.Estimated {
+		c.EstimatedRequests++
+	}
+	if e.Failed {
+		c.FailedRequests++
+	}
+	c.AudioSeconds += e.AudioSeconds
+	c.Images += int64(e.Images)
+	c.Characters += int64(e.Characters)
 }
 
 // AgentRecord is a console-managed sub-agent, persisted so it survives a

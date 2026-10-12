@@ -6,8 +6,10 @@ import (
 	"encoding/json"
 	"io"
 	"log/slog"
+	"math"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -138,6 +140,169 @@ func TestServerDecisionsEndpoint(t *testing.T) {
 	byProj, _ := tracker.Snapshot()
 	if stat, ok := byProj["crm"]; !ok || stat.Requests == 0 {
 		t.Errorf("expected usage recorded for project crm")
+	}
+}
+
+// nabu-v1m is the v1m.ir-fronted decision alias riding the same typesafe
+// adapter. The upstream below answers with the recorded shape of a live v1m
+// call (2026-10-11): answers carry fields the plain TypeSafe shape does not
+// (confidence, probabilities, legend), and the questions contract is v1m's
+// own — instructions on every question, criteria instead of choices/min-max.
+// Everything must reach the caller untouched, and the zero-priced route must
+// still meter its tokens.
+func TestServerDecisionsV1MAlias(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost || r.URL.Path != "/systemone" {
+			http.NotFound(w, r)
+			return
+		}
+		if got := r.Header.Get("Authorization"); got != "Bearer v1m-key" {
+			http.Error(w, "bad auth", http.StatusUnauthorized)
+			return
+		}
+		var req map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		if req["model"] != "v1m-latest" {
+			http.Error(w, "wrong model", http.StatusBadRequest)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{
+			"model": "v1m-1.0",
+			"answers": {
+				"is_fraud": {"type": "noul", "noul": 0.88},
+				"action": {"type": "choice", "choice": "manual_review", "confidence": 0.81, "probabilities": {"manual_review": 0.81, "auto_approve": 0.19}},
+				"risk": {"type": "score", "score": 3.5, "confidence": 0.77, "legend": {"3": "high", "4": "critical"}, "probabilities": {"3": 0.4, "4": 0.6}}
+			},
+			"usage": {"input_tokens": 312, "output_tokens": 48}
+		}`))
+	}))
+	defer upstream.Close()
+
+	adapters := map[string]provider.Adapter{
+		"v1m": provider.NewTypeSafeAdapter("v1m", upstream.URL, "v1m-key"),
+	}
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	r := router.New(adapters, nil, nil, nil, nil, nil, nil, logger)
+	r.SetDecisions(map[string]config.ModelRoute{
+		"nabu-v1m": {
+			Primary: config.Target{Provider: "v1m", Model: "v1m-latest"},
+			Fallback: []config.Target{
+				{Provider: "typesafe", Model: "jev-latest"},
+			},
+		},
+	})
+
+	enforcer := policy.New([]string{"valid-key"}, []policy.KeyConfig{
+		{Key: "proj-key", Project: "crm", Allow: []string{"nabu-v1m"}},
+	})
+	tracker := usage.New(map[string]usage.Price{
+		"v1m/v1m-latest": {Input: 0, Output: 0},
+	})
+	srv := New(r, enforcer, tracker, nil, logger)
+	gw := httptest.NewServer(srv.Handler())
+	defer gw.Close()
+
+	body := map[string]any{
+		"model": "nabu-v1m",
+		"state": map[string]any{"amount": 9900, "country": "IR"},
+		"questions": map[string]any{
+			"is_fraud": map[string]any{"type": "noul", "instructions": "Is this transaction fraudulent?"},
+			"action": map[string]any{
+				"type":         "choice",
+				"instructions": "What should we do?",
+				"criteria":     map[string]string{"manual_review": "a human looks", "auto_approve": "let it through"},
+			},
+			"risk": map[string]any{
+				"type":         "score",
+				"instructions": "How risky is this?",
+				"criteria":     []string{"low", "moderate", "high", "critical"},
+			},
+		},
+	}
+	data, _ := json.Marshal(body)
+	req, _ := http.NewRequest(http.MethodPost, gw.URL+"/v1/systemone", bytes.NewReader(data))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer proj-key")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		raw, _ := io.ReadAll(resp.Body)
+		t.Fatalf("expected 200, got %d: %s", resp.StatusCode, raw)
+	}
+
+	if prov := resp.Header.Get("X-Nabu-Provider"); prov != "v1m" {
+		t.Errorf("expected X-Nabu-Provider v1m, got %s", prov)
+	}
+	if model := resp.Header.Get("X-Nabu-Model"); model != "v1m-latest" {
+		t.Errorf("expected X-Nabu-Model v1m-latest, got %s", model)
+	}
+
+	var res struct {
+		Model   string `json:"model"`
+		Answers struct {
+			IsFraud struct {
+				Type string  `json:"type"`
+				Noul float64 `json:"noul"`
+			} `json:"is_fraud"`
+			Action struct {
+				Choice        string             `json:"choice"`
+				Confidence    float64            `json:"confidence"`
+				Probabilities map[string]float64 `json:"probabilities"`
+			} `json:"action"`
+			Risk struct {
+				Score         float64            `json:"score"`
+				Legend        map[string]string  `json:"legend"`
+				Probabilities map[string]float64 `json:"probabilities"`
+			} `json:"risk"`
+		} `json:"answers"`
+		Usage struct {
+			InputTokens  int `json:"input_tokens"`
+			OutputTokens int `json:"output_tokens"`
+			TotalTokens  int `json:"total_tokens"`
+		} `json:"usage"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&res); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+	if res.Model != "v1m-latest" {
+		t.Errorf("expected model v1m-latest, got %s", res.Model)
+	}
+	if res.Answers.IsFraud.Noul != 0.88 {
+		t.Errorf("expected is_fraud noul 0.88, got %f", res.Answers.IsFraud.Noul)
+	}
+	if res.Answers.Action.Choice != "manual_review" || res.Answers.Action.Confidence != 0.81 {
+		t.Errorf("unexpected action answer: %+v", res.Answers.Action)
+	}
+	if res.Answers.Action.Probabilities["auto_approve"] != 0.19 {
+		t.Errorf("expected action probabilities to pass through, got %v", res.Answers.Action.Probabilities)
+	}
+	if res.Answers.Risk.Legend["4"] != "critical" || res.Answers.Risk.Probabilities["3"] != 0.4 {
+		t.Errorf("expected risk legend/probabilities to pass through, got %v / %v", res.Answers.Risk.Legend, res.Answers.Risk.Probabilities)
+	}
+	if res.Usage.InputTokens != 312 || res.Usage.OutputTokens != 48 || res.Usage.TotalTokens != 360 {
+		t.Errorf("unexpected usage: %+v", res.Usage)
+	}
+
+	// The explicit-zero price meters no cost, but the tokens and the request
+	// must still land on the project's ledger.
+	byProj, _ := tracker.Snapshot()
+	stat, ok := byProj["crm"]
+	if !ok || stat.Requests == 0 {
+		t.Fatalf("expected usage recorded for project crm")
+	}
+	if stat.PromptTokens != 312 || stat.CompletionTokens != 48 {
+		t.Errorf("expected 312/48 tracked tokens, got %d/%d", stat.PromptTokens, stat.CompletionTokens)
+	}
+	if stat.CostUSD != 0 {
+		t.Errorf("expected zero cost on the free quota price, got %f", stat.CostUSD)
 	}
 }
 
@@ -357,5 +522,111 @@ func TestServerChatStreamWithDecisionModel(t *testing.T) {
 	}
 	if stat.PromptTokens != 120 {
 		t.Errorf("expected 120 tracked prompt tokens, got %d", stat.PromptTokens)
+	}
+}
+
+// ───────────────────── cost visibility on /v1/decisions ─────────────────────
+
+// The decision response now carries what the caller was charged — on the
+// X-Nabu-Cost-USD header like every other metered route, and additively in
+// the usage object — and an upstream that answered without a usage object is
+// metered as a flagged estimate instead of an indifferent zero.
+func TestDecisionsCostIsOnTheWireAndTheBooks(t *testing.T) {
+	ts, _, _ := setupDecisionTestEnvironment(t)
+	defer ts.Close()
+
+	body := `{"model":"nabu-decision","state":{"amount":9900},"questions":{"intent":{"type":"choice"}}}`
+	req, _ := http.NewRequest(http.MethodPost, ts.URL+"/v1/decisions", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer proj-key")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+
+	header := resp.Header.Get("X-Nabu-Cost-USD")
+	if header == "" {
+		t.Fatal("X-Nabu-Cost-USD missing from the decision response")
+	}
+	var out struct {
+		Usage struct {
+			CostUSD     float64 `json:"cost_usd"`
+			InputTokens int     `json:"input_tokens"`
+		} `json:"usage"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+		t.Fatal(err)
+	}
+	// The upstream reported input_tokens=120 at $0.042 per million — a number
+	// in the fourth decimal, which is why the header carries six.
+	if got := strconv.FormatFloat(out.Usage.CostUSD, 'f', 6, 64); got != header {
+		t.Fatalf("body cost %s disagrees with header %s", got, header)
+	}
+	if want := 120.0 / 1e6 * 0.042; math.Abs(out.Usage.CostUSD-want) > 1e-9 {
+		t.Errorf("cost_usd = %v, want %v (120 input tokens at the priced rate)", out.Usage.CostUSD, want)
+	}
+}
+
+// An upstream that gives answers but no usage at all: the request is still
+// one estimated request on the books, flagged, and the cost header still
+// shows what the estimate was charged.
+func TestDecisionsWithoutUpstreamUsageIsEstimated(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"model":"jev-latest","answers":{"intent":{"type":"choice","choice":"general_chat"}}}`))
+	}))
+	defer upstream.Close()
+
+	adapters := map[string]provider.Adapter{
+		"typesafe": provider.NewTypeSafeAdapter("typesafe", upstream.URL, "k"),
+	}
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	r := router.New(adapters, nil, nil, nil, nil, nil, nil, logger)
+	r.SetDecisions(map[string]config.ModelRoute{
+		"nabu-decision": {Primary: config.Target{Provider: "typesafe", Model: "jev-latest"}},
+	})
+	tracker := usage.New(map[string]usage.Price{"typesafe/jev-latest": {Input: 0.042, Output: 0}})
+	srv := New(r, policy.New(nil, nil), tracker, nil, logger)
+	gw := httptest.NewServer(srv.Handler())
+	defer gw.Close()
+
+	body := `{"model":"nabu-decision","state":{"amount":9900},"questions":{"intent":{"type":"choice"}}}`
+	req, _ := http.NewRequest(http.MethodPost, gw.URL+"/v1/decisions", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer valid-key")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("status = %d", resp.StatusCode)
+	}
+
+	var out struct {
+		Usage struct {
+			CostUSD   float64 `json:"cost_usd"`
+			Estimated *bool   `json:"estimated"`
+		} `json:"usage"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+		t.Fatal(err)
+	}
+	if out.Usage.Estimated == nil || !*out.Usage.Estimated {
+		t.Error("the response must say the counts are an estimate")
+	}
+	if out.Usage.CostUSD <= 0 {
+		t.Errorf("cost_usd = %v, want the estimate charged at the priced rate", out.Usage.CostUSD)
+	}
+	if resp.Header.Get("X-Nabu-Cost-USD") == "" {
+		t.Error("X-Nabu-Cost-USD missing")
+	}
+	_, byModel := tracker.Snapshot()
+	row := byModel["typesafe/jev-latest"]
+	if row.EstimatedRequests != 1 || row.PromptTokens <= 0 {
+		t.Errorf("books = %+v, want one estimated request with positive tokens", row)
 	}
 }

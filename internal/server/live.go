@@ -327,7 +327,7 @@ func (s *Server) handleLiveUsage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	list := s.usage.Cost(session.provider, session.model, usage.Metered{Seconds: float64(delta)})
+	list, priced := s.usage.PriceOf(session.provider, session.model, usage.Metered{Seconds: float64(delta)})
 	cost, providerCost := s.charge(r.Context(), session.byCaller, list)
 	if delta > 0 {
 		// The call was counted as one request when it was signalled; a report of
@@ -336,6 +336,8 @@ func (s *Server) handleLiveUsage(w http.ResponseWriter, r *http.Request) {
 		s.meter(r, project, session.provider, session.model, adminstore.UsageEntry{
 			CostUSD:         cost,
 			ProviderCostUSD: providerCost,
+			Unpriced:        !priced && !servedByCaller(r.Context()),
+			AudioSeconds:    float64(delta),
 		})
 	}
 

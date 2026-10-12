@@ -27,7 +27,13 @@ import (
 type elevenTranscription struct {
 	Text         string `json:"text"`
 	LanguageCode string `json:"language_code"`
-	Words        []struct {
+	// AudioDurationSecs is the vendor's own length for the audio, in seconds —
+	// the field the ElevenLabs speech-to-text response documents as
+	// audio_duration_secs. The word timestamps are the primary source for
+	// duration, but a transcript with no word boundaries (an empty or
+	// wordless utterance) would otherwise bill zero minutes of real audio.
+	AudioDurationSecs float64 `json:"audio_duration_secs"`
+	Words             []struct {
 		Text      string  `json:"text"`
 		Start     float64 `json:"start"`
 		End       float64 `json:"end"`
@@ -138,6 +144,12 @@ func (a *ElevenLabsAdapter) Transcribe(ctx context.Context, req TranscriptionReq
 
 	if out.Text == "" && len(out.Segments) == 0 {
 		return TranscriptionResponse{}, fmt.Errorf("%s: empty transcription", a.name)
+	}
+	// The vendor's own duration fills in where the word timestamps end: a
+	// transcript whose words carry no end (or no words at all) used to meter
+	// zero minutes of audio that was really uploaded and really billed.
+	if out.Duration == 0 && parsed.AudioDurationSecs > 0 {
+		out.Duration = parsed.AudioDurationSecs
 	}
 	return out, nil
 }

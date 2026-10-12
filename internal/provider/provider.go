@@ -46,9 +46,20 @@ type Usage struct {
 	PromptTokens     int `json:"prompt_tokens"`
 	CompletionTokens int `json:"completion_tokens"`
 	TotalTokens      int `json:"total_tokens"`
+	// CacheReadInput and CacheCreationInput are Anthropic's cache-token
+	// directions, which its invoices bill at rates of their own. They are read
+	// for metering (usage.Price can rate them) but never summed into
+	// PromptTokens, so the token counts a caller sees stay the wire counts.
+	CacheReadInput     int `json:"-"`
+	CacheCreationInput int `json:"-"`
 	// Credits are a vendor's own billing unit when it bills in credits rather
 	// than tokens (Gamma). Never on the wire: a client reads tokens here.
 	Credits int `json:"-"`
+	// Estimated marks counts the gateway itself produced — the
+	// four-bytes-per-token fallback taken when an upstream reported no usage
+	// at all — so the guess is distinguishable from a vendor's number
+	// everywhere the Usage travels. Never on the wire: a client reads tokens.
+	Estimated bool `json:"-"`
 }
 
 // EstimateTokens is the gateway's count of a text's tokens when the vendor

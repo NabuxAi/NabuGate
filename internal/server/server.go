@@ -2,11 +2,13 @@
 package server
 
 import (
+	"bytes"
 	"context"
 	"encoding/base64"
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log/slog"
 	"math"
 	"net/http"
@@ -337,22 +339,65 @@ func (s *Server) lookupConsoleToken(token string) (adminstore.Token, bool) {
 // gateway settled on, not a guess from the token counts at a price list of its
 // own.
 func (s *Server) record(r *http.Request, prov, model string, u provider.Usage) float64 {
-	return s.recordMetered(r, prov, model, usage.Tokens(u))
+	return s.recordMeteredFor(r, s.project(r), prov, model, usage.Tokens(u))
+}
+
+// recordForProject is record with the project named, for work attributed to a
+// project that is not the caller's own — the console's flow tests, which run
+// on the gateway's own provider keys and belong on the books under their own
+// name rather than inside a customer's usage.
+func (s *Server) recordForProject(r *http.Request, project, prov, model string, u provider.Usage) float64 {
+	return s.recordMeteredFor(r, project, prov, model, usage.Tokens(u))
 }
 
 // recordMetered meters one call in whatever units its work was measured in —
 // tokens, seconds of audio, images, characters spoken — and returns what the
 // caller was charged.
 func (s *Server) recordMetered(r *http.Request, prov, model string, m usage.Metered) float64 {
-	charged, providerCost := s.charge(r.Context(), false, s.usage.Cost(prov, model, m))
-	s.meter(r, s.project(r), prov, model, adminstore.UsageEntry{
+	return s.recordMeteredFor(r, s.project(r), prov, model, m)
+}
+
+func (s *Server) recordMeteredFor(r *http.Request, project, prov, model string, m usage.Metered) float64 {
+	list, priced := s.usage.PriceOf(prov, model, m)
+	charged, providerCost := s.charge(r.Context(), false, list)
+	s.meter(r, project, prov, model, adminstore.UsageEntry{
 		Requests:         1,
 		PromptTokens:     int64(m.Tokens.PromptTokens),
 		CompletionTokens: int64(m.Tokens.CompletionTokens),
 		CostUSD:          charged,
 		ProviderCostUSD:  providerCost,
+		// The unpriced flag is about the gateway's own books: a call served on
+		// the caller's vendor key cost the gateway nothing and was never going
+		// to be priced here, so it does not count as "nobody priced this".
+		Unpriced:     !priced && !servedByCaller(r.Context()),
+		Estimated:    m.Tokens.Estimated,
+		AudioSeconds: m.Seconds,
+		Images:       m.Images,
+		Characters:   m.Characters,
 	})
 	return charged
+}
+
+// recordFailedUsage books vendor work on a request that never completed — a
+// stream cut mid-flight, a tool loop that errored on a later step. The tokens
+// and the vendor cost are real and land on the books; the caller is charged
+// nothing and the request is not counted as served.
+func (s *Server) recordFailedUsage(r *http.Request, prov, model string, u provider.Usage) {
+	if prov == "" || (u.PromptTokens == 0 && u.CompletionTokens == 0) {
+		return
+	}
+	list, priced := s.usage.PriceOf(prov, model, usage.Tokens(u))
+	_, providerCost := s.charge(r.Context(), false, list)
+	s.meter(r, s.project(r), prov, model, adminstore.UsageEntry{
+		Requests:         0,
+		PromptTokens:     int64(u.PromptTokens),
+		CompletionTokens: int64(u.CompletionTokens),
+		CostUSD:          0,
+		ProviderCostUSD:  providerCost,
+		Unpriced:         !priced && !servedByCaller(r.Context()),
+		Estimated:        u.Estimated,
+		Failed:           true,
+	})
 }
 
 // charge splits a call's list cost into what the caller is charged and what the
@@ -380,21 +425,35 @@ func (s *Server) meter(r *http.Request, project, prov, model string, e adminstor
 		CompletionTokens: int(e.CompletionTokens),
 		TotalTokens:      int(e.PromptTokens + e.CompletionTokens),
 	}
-	s.usage.RecordAt(project, prov, model, e.Requests, u, e.CostUSD)
+	s.usage.RecordEntry(project, prov, model, usage.Entry{
+		Requests:         e.Requests,
+		PromptTokens:     int(e.PromptTokens),
+		CompletionTokens: int(e.CompletionTokens),
+		CostUSD:          e.CostUSD,
+		ProviderCostUSD:  e.ProviderCostUSD,
+		Unpriced:         e.Unpriced,
+		Estimated:        e.Estimated,
+		Failed:           e.Failed,
+		AudioSeconds:     e.AudioSeconds,
+		Images:           e.Images,
+		Characters:       e.Characters,
+	})
 	// Also accumulate into the persisted counters, so the console's numbers are
 	// real across restarts rather than resetting to zero on every redeploy.
 	if s.admin != nil {
 		s.admin.RecordUsage(project, prov, model, e)
 	}
 	s.requests.Add(adminstore.RequestEntry{
-		Project:  project,
-		Provider: prov,
-		Model:    model,
-		Tokens:   int64(u.TotalTokens),
-		CostUSD:  e.CostUSD,
+		Project:         project,
+		Provider:        prov,
+		Model:           model,
+		Tokens:          int64(u.TotalTokens),
+		CostUSD:         e.CostUSD,
+		ProviderCostUSD: e.ProviderCostUSD,
 	})
 	s.log.Info("billed", "project", project, "provider", prov, "model", model,
-		"total_tokens", u.TotalTokens, "cost_usd", e.CostUSD, "provider_cost_usd", e.ProviderCostUSD)
+		"total_tokens", u.TotalTokens, "cost_usd", e.CostUSD, "provider_cost_usd", e.ProviderCostUSD,
+		"unpriced", e.Unpriced, "estimated", e.Estimated, "failed", e.Failed)
 }
 
 // costHeader is what a metered response says the request cost, in dollars.
@@ -536,12 +595,116 @@ func (s *Server) handleModels(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"object": "list", "data": data})
 }
 
+// maxResponsesCapture caps how much of a proxied Responses body is kept aside
+// to pull the usage object out of. One mebibyte covers any sane final event.
+// The cap is on the capture side alone — the caller's copy streams whole, no
+// matter how long the body runs; what falls outside the cap is only the
+// vendor's usage object, and the request then meters by size instead.
+const maxResponsesCapture = 1 << 20
+
+// cappedWriter is the capture side of the metering tee: it keeps the first
+// cap bytes written to it and discards the rest, while every Write reports
+// the full length as consumed — so the tee it sits behind never throttles
+// what the caller receives. (An io.LimitReader on the upstream body would
+// have done the opposite: returned EOF at the cap and truncated the proxied
+// response itself.)
+type cappedWriter struct {
+	buf       bytes.Buffer
+	remaining int
+}
+
+func (c *cappedWriter) Write(p []byte) (int, error) {
+	if c.remaining > 0 {
+		keep := p
+		if len(keep) > c.remaining {
+			keep = keep[:c.remaining]
+		}
+		c.buf.Write(keep)
+		c.remaining -= len(keep)
+	}
+	return len(p), nil
+}
+
+// responsesUsageWire is the usage object the Responses API carries — in the
+// JSON body, and inside the response object of the "response.completed" SSE
+// event. input_tokens/output_tokens is OpenAI's spelling for this API;
+// prompt_tokens/completion_tokens is accepted as well because resellers that
+// proxy the endpoint have been seen emitting either.
+type responsesUsageWire struct {
+	InputTokens      int `json:"input_tokens"`
+	OutputTokens     int `json:"output_tokens"`
+	TotalTokens      int `json:"total_tokens"`
+	PromptTokens     int `json:"prompt_tokens"`
+	CompletionTokens int `json:"completion_tokens"`
+}
+
+func (u responsesUsageWire) usage() provider.Usage {
+	prompt, completion := u.InputTokens, u.OutputTokens
+	if prompt == 0 && completion == 0 {
+		prompt, completion = u.PromptTokens, u.CompletionTokens
+	}
+	// Some OpenAI-compatible servers report the split but omit the total; the
+	// sum is what the rest of the metering expects to see.
+	total := u.TotalTokens
+	if total == 0 {
+		total = prompt + completion
+	}
+	return provider.Usage{PromptTokens: prompt, CompletionTokens: completion, TotalTokens: total}
+}
+
+// parseResponsesUsage pulls the token usage out of a captured Responses body:
+// the "usage" object of a JSON response, or the one inside the final
+// "response.completed" event of an SSE stream. ok is false when neither is
+// found — the caller then meters the request by size instead of nothing.
+func parseResponsesUsage(captured []byte) (u provider.Usage, ok bool) {
+	trimmed := bytes.TrimLeft(captured, " \t\r\n")
+	if len(trimmed) == 0 {
+		return provider.Usage{}, false
+	}
+	if trimmed[0] != '{' {
+		// SSE: walk the data lines for the completion event, which is the one
+		// that carries the finished response's usage.
+		for _, line := range strings.Split(string(trimmed), "\n") {
+			line = strings.TrimSpace(line)
+			if !strings.HasPrefix(line, "data:") {
+				continue
+			}
+			var ev struct {
+				Type     string `json:"type"`
+				Response struct {
+					Usage *responsesUsageWire `json:"usage"`
+				} `json:"response"`
+			}
+			if json.Unmarshal([]byte(strings.TrimPrefix(line, "data:")), &ev) != nil {
+				continue
+			}
+			if ev.Type == "response.completed" && ev.Response.Usage != nil {
+				return ev.Response.Usage.usage(), true
+			}
+		}
+		return provider.Usage{}, false
+	}
+
+	var body struct {
+		Usage *responsesUsageWire `json:"usage"`
+	}
+	if json.Unmarshal(trimmed, &body) != nil || body.Usage == nil {
+		return provider.Usage{}, false
+	}
+	return body.Usage.usage(), true
+}
+
 // handleResponses proxies the OpenAI Responses API (POST /v1/responses). Like
 // chat, only "model" (a NabuGate alias or a "<provider>/<model>" passthrough)
 // is inspected and rewritten to the upstream model; the rest of the body is
 // forwarded verbatim, and the upstream response — JSON or streaming SSE — is
-// copied straight back. Token usage is not metered here (the gateway does not
-// parse the Responses schema); observability comes from the router's logs.
+// copied straight back, byte for byte.
+//
+// Metering reads the usage out of a capped copy of the upstream body kept
+// while the bytes stream past, so a served request lands on the books: the
+// vendor's own usage object when one is present, otherwise one request
+// estimated from the body sizes and flagged as a guess. Only a 2xx upstream
+// is metered — an error body carries no work worth billing.
 func (s *Server) handleResponses(w http.ResponseWriter, r *http.Request) {
 	var raw map[string]json.RawMessage
 	if err := json.NewDecoder(r.Body).Decode(&raw); err != nil {
@@ -592,23 +755,55 @@ func (s *Server) handleResponses(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(resp.StatusCode)
 
 	// Stream the upstream body through, flushing so SSE deltas reach the client
-	// as they arrive instead of buffering until the response completes.
+	// as they arrive instead of buffering until the response completes. A 2xx
+	// body is teed through a capped capture on the way out — the tee sits on
+	// the read side and the cap lives in the writer, so the caller's copy is
+	// byte-identical and complete however long the body runs — and the usage
+	// is metered afterwards.
+	capture := resp.StatusCode >= 200 && resp.StatusCode < 300
+	var captured cappedWriter
+	body := io.Reader(resp.Body)
+	if capture {
+		captured.remaining = maxResponsesCapture
+		body = io.TeeReader(resp.Body, &captured)
+	}
 	flusher, _ := w.(http.Flusher)
 	buf := make([]byte, 16<<10)
 	for {
-		n, rerr := resp.Body.Read(buf)
+		n, rerr := body.Read(buf)
 		if n > 0 {
 			if _, werr := w.Write(buf[:n]); werr != nil {
-				return
+				// The caller hung up; nothing more to proxy. Whatever was
+				// captured still meters below.
+				break
 			}
 			if flusher != nil {
 				flusher.Flush()
 			}
 		}
 		if rerr != nil {
-			return
+			break
 		}
 	}
+
+	if !capture {
+		return
+	}
+	if u, ok := parseResponsesUsage(captured.buf.Bytes()); ok && (u.PromptTokens > 0 || u.CompletionTokens > 0) {
+		s.record(r, prov, upstream, u)
+		return
+	}
+	// No usage object survived the trip: the request still cost the vendor
+	// something, so it is metered as one request estimated from the sizes of
+	// what went out and came back — a flagged guess rather than a silent zero.
+	pTok := provider.EstimateTokens(len(raw["input"]) + len(raw["instructions"]))
+	cTok := provider.EstimateTokens(captured.buf.Len())
+	s.record(r, prov, upstream, provider.Usage{
+		PromptTokens:     pTok,
+		CompletionTokens: cTok,
+		TotalTokens:      pTok + cTok,
+		Estimated:        true,
+	})
 }
 
 // handleChat accepts the full OpenAI-compatible chat body. Only "model" (a
@@ -814,6 +1009,21 @@ func (s *Server) streamChat(w http.ResponseWriter, r *http.Request, alias, route
 		writeSSE(streamChunk(id, created, alias, metaProvider, metaModel, map[string]any{"role": "assistant"}, nil))
 	}
 
+	// include_usage is OpenAI's own opt-in for a final usage chunk on the
+	// stream. When the caller asked for it (the gateway's adapters always do
+	// towards upstream), one standard-shaped chunk — empty choices, a usage
+	// object — closes the stream, so an OpenAI-SDK client that asked gets its
+	// numbers from the wire and every other caller gets not one extra byte.
+	var wantUsageChunk bool
+	var streamOpts struct {
+		IncludeUsage bool `json:"include_usage"`
+	}
+	if len(req.Raw["stream_options"]) > 0 {
+		if json.Unmarshal(req.Raw["stream_options"], &streamOpts) == nil {
+			wantUsageChunk = streamOpts.IncludeUsage
+		}
+	}
+
 	result, err := s.router.ChatStream(r.Context(), routeModel, req,
 		func(p, m string) { metaProvider, metaModel = p, m },
 		func(delta string) error {
@@ -834,15 +1044,19 @@ func (s *Server) streamChat(w http.ResponseWriter, r *http.Request, alias, route
 		startHeaders() // succeeded but produced no text; emit an empty stream
 	}
 
-	// Bill only successful generations, matching the non-streaming path. A
-	// mid-stream failure leaves result.Usage zero-valued and must not inflate
-	// per-project request/usage counters.
+	// Bill successful generations, matching the non-streaming path. A stream
+	// that broke mid-flight after the upstream had already metered work keeps
+	// its real token counts — booked as failed: vendor cost on the books, no
+	// charge to the caller, no served request counted.
+	var cost float64
 	if err == nil {
-		s.record(r, result.Provider, result.Model, result.Usage)
+		cost = s.record(r, result.Provider, result.Model, result.Usage)
 		// Store only a stream that produced something. A failed or empty
 		// generation is not a turn, and persisting it would replay an empty
 		// assistant message into every later call.
 		s.saveTurn(r, convID, newTurns, replyBuf.String())
+	} else if result.Provider != "" {
+		s.recordFailedUsage(r, result.Provider, result.Model, result.Usage)
 	}
 
 	finish := "stop"
@@ -850,6 +1064,20 @@ func (s *Server) streamChat(w http.ResponseWriter, r *http.Request, alias, route
 		finish = "error"
 	}
 	writeSSE(streamChunk(id, created, alias, result.Provider, result.Model, map[string]any{}, &finish))
+	if wantUsageChunk && err == nil {
+		// OpenAI's own shape for the terminal usage chunk: choices is empty,
+		// usage carries the token counts, and cost_usd rides alongside as the
+		// gateway's additive extra so the caller sees what they were charged.
+		chunk := streamChunk(id, created, alias, result.Provider, result.Model, nil, nil)
+		chunk["choices"] = []any{}
+		chunk["usage"] = map[string]any{
+			"prompt_tokens":     result.Usage.PromptTokens,
+			"completion_tokens": result.Usage.CompletionTokens,
+			"total_tokens":      result.Usage.TotalTokens,
+			"cost_usd":          cost,
+		}
+		writeSSE(chunk)
+	}
 	fmt.Fprint(w, "data: [DONE]\n\n")
 	flusher.Flush()
 }
@@ -1122,6 +1350,7 @@ func (s *Server) handleEmbeddings(w http.ResponseWriter, r *http.Request) {
 	// Gemini's embedding endpoint reports no usage at all, and 28,460 calls of
 	// it were metered at nothing before this was counted here.
 	usedTokens := result.Usage
+	estimatedUsage := false
 	if usedTokens.PromptTokens == 0 {
 		var inputBytes int
 		for _, in := range inputs {
@@ -1129,6 +1358,8 @@ func (s *Server) handleEmbeddings(w http.ResponseWriter, r *http.Request) {
 		}
 		usedTokens.PromptTokens = provider.EstimateTokens(inputBytes)
 		usedTokens.TotalTokens = usedTokens.PromptTokens
+		usedTokens.Estimated = true
+		estimatedUsage = true
 	}
 	cost := s.record(r, result.Provider, result.Model, usedTokens)
 
@@ -1144,17 +1375,24 @@ func (s *Server) handleEmbeddings(w http.ResponseWriter, r *http.Request) {
 			"embedding": encodeEmbedding(vec, body.EncodingFormat),
 		})
 	}
+	// The usage the caller sees is the usage that was metered: a count the
+	// gateway estimated is returned instead of the vendor's zero, flagged as
+	// such, so a client keeping its own books reads the same number we booked.
+	usageOut := map[string]any{
+		"prompt_tokens": usedTokens.PromptTokens,
+		"total_tokens":  usedTokens.TotalTokens,
+		"cost_usd":      cost,
+	}
+	if estimatedUsage {
+		usageOut["estimated"] = true
+	}
 	writeJSON(w, http.StatusOK, map[string]any{
 		"object":         "list",
 		"model":          result.Alias,
 		"provider":       result.Provider,
 		"upstream_model": result.Model,
 		"data":           data,
-		"usage": map[string]any{
-			"prompt_tokens": result.Usage.PromptTokens,
-			"total_tokens":  result.Usage.TotalTokens,
-			"cost_usd":      cost,
-		},
+		"usage":          usageOut,
 	})
 }
 

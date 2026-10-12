@@ -47,7 +47,9 @@ func consoleFlowServer(t *testing.T, upstreamURL string) (*httptest.Server, *Ser
 	}
 	r := router.New(adapters, models, nil, nil, nil, nil, map[string][]string{"parspack": nil}, discardLogger())
 
-	srv := New(r, policy.New(nil, nil), usage.New(nil), agents, discardLogger()).WithFlows(flow.NewRegistry())
+	// Priced, not nil: the flow test is billed at the model's list price, and
+	// the test that pins that booking needs a table to price it against.
+	srv := New(r, policy.New(nil, nil), usage.New(map[string]usage.Price{"parspack/openai/gpt-5.5": {Input: 1, Output: 1}}), agents, discardLogger()).WithFlows(flow.NewRegistry())
 	srv.SetAdminStore(store)
 
 	ts := httptest.NewServer(srv.Handler())

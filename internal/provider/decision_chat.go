@@ -87,7 +87,12 @@ func buildDecisionRequestFromChat(model string, req ChatRequest) (DecisionReques
 }
 
 // formatDecisionChatResponse converts a DecisionResponse into an OpenAI ChatResponse.
-func formatDecisionChatResponse(decResp DecisionResponse, originalPrompt string) ChatResponse {
+//
+// decReq rides along because the token estimate, when the upstream reported
+// none, has to cover the payload actually sent — the marshalled state and
+// questions, which dwarf the user's prompt on a free-form chat — not the
+// prompt alone.
+func formatDecisionChatResponse(decReq DecisionRequest, decResp DecisionResponse, originalPrompt string) ChatResponse {
 	var answers map[string]struct {
 		Type          string             `json:"type"`
 		Noul          *float64           `json:"noul"`
@@ -177,21 +182,28 @@ func formatDecisionChatResponse(decResp DecisionResponse, originalPrompt string)
 
 	content := sb.String()
 
-	// Calculate tokens accurately.
+	// Calculate tokens accurately, and say when the numbers are ours.
+	estimated := false
 	pTokens := decResp.Usage.PromptTokens
 	if pTokens <= 0 {
-		pTokens = max(1, EstimateTokens(len(originalPrompt)))
+		// The upstream reported no input count. Guess from the payload actually
+		// sent — state plus questions — not from the original prompt alone,
+		// which on a decision chat is a fraction of what went out.
+		pTokens = max(1, EstimateTokens(len(decReq.State)+len(decReq.Questions)))
+		estimated = true
 	}
 
 	cTokens := decResp.Usage.CompletionTokens
 	if cTokens <= 0 {
 		cTokens = max(1, EstimateTokens(len(content)))
+		estimated = true
 	}
 
 	usage := Usage{
 		PromptTokens:     pTokens,
 		CompletionTokens: cTokens,
 		TotalTokens:      pTokens + cTokens,
+		Estimated:        estimated,
 	}
 
 	return ChatResponse{

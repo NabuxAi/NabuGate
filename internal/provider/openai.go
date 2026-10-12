@@ -153,7 +153,7 @@ func (a *OpenAIAdapter) Chat(ctx context.Context, req ChatRequest) (ChatResponse
 		if err != nil {
 			return ChatResponse{}, err
 		}
-		return formatDecisionChatResponse(decResp, originalPrompt), nil
+		return formatDecisionChatResponse(decReq, decResp, originalPrompt), nil
 	}
 
 	body, err := a.buildBody(req, false)
@@ -182,15 +182,29 @@ func (a *OpenAIAdapter) Chat(ctx context.Context, req ChatRequest) (ChatResponse
 	}
 
 	choice := parsed.Choices[0]
+	usage := Usage{
+		PromptTokens:     parsed.Usage.PromptTokens,
+		CompletionTokens: parsed.Usage.CompletionTokens,
+		TotalTokens:      parsed.Usage.TotalTokens,
+	}
+	switch {
+	case usage.PromptTokens == 0 && usage.CompletionTokens == 0:
+		// The upstream said nothing about what this call spent. Guess from the
+		// bytes that actually moved — the same fallback the streaming path
+		// takes — so the call is billed for something rather than recorded as
+		// a free month, and flagged so the guess stays distinguishable from a
+		// vendor's count.
+		usage = estimateUsage(req, len(choice.Message.Content)+len(choice.Message.ToolCalls))
+	case usage.TotalTokens == 0:
+		// Some OpenAI-compatible servers report the split but omit the total;
+		// real counts are never replaced by a guess, only completed.
+		usage.TotalTokens = usage.PromptTokens + usage.CompletionTokens
+	}
 	return ChatResponse{
 		Content:      choice.Message.Content,
 		ToolCalls:    choice.Message.ToolCalls,
 		FinishReason: choice.FinishReason,
-		Usage: Usage{
-			PromptTokens:     parsed.Usage.PromptTokens,
-			CompletionTokens: parsed.Usage.CompletionTokens,
-			TotalTokens:      parsed.Usage.TotalTokens,
-		},
+		Usage:        usage,
 	}, nil
 }
 
@@ -265,7 +279,8 @@ func (a *OpenAIAdapter) ChatStream(ctx context.Context, req ChatRequest, onDelta
 		return false, nil
 	})
 
-	if usage.TotalTokens == 0 {
+	switch {
+	case usage.PromptTokens == 0 && usage.CompletionTokens == 0:
 		var promptBytes int
 		for _, m := range req.Messages {
 			promptBytes += len(m.Content) + len(m.Role) + 4
@@ -276,9 +291,33 @@ func (a *OpenAIAdapter) ChatStream(ctx context.Context, req ChatRequest, onDelta
 			PromptTokens:     pTok,
 			CompletionTokens: cTok,
 			TotalTokens:      pTok + cTok,
+			Estimated:        true,
 		}
+	case usage.TotalTokens == 0:
+		// The split is the vendor's own; only the sum was missing.
+		usage.TotalTokens = usage.PromptTokens + usage.CompletionTokens
 	}
 	return usage, err
+}
+
+// estimateUsage is the four-bytes-per-token fallback for a call whose upstream
+// reported no usage at all: the prompt is guessed from the request's messages
+// and the completion from the bytes of the reply that actually came back. The
+// result is flagged Estimated, so a metered guess never reads as a vendor's
+// count.
+func estimateUsage(req ChatRequest, outputBytes int) Usage {
+	var promptBytes int
+	for _, m := range req.Messages {
+		promptBytes += len(m.Content) + len(m.Role) + 4
+	}
+	pTok := EstimateTokens(promptBytes)
+	cTok := EstimateTokens(outputBytes)
+	return Usage{
+		PromptTokens:     pTok,
+		CompletionTokens: cTok,
+		TotalTokens:      pTok + cTok,
+		Estimated:        true,
+	}
 }
 
 func truncate(b []byte) string {

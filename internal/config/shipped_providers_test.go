@@ -3,6 +3,8 @@ package config
 import (
 	"os"
 	"testing"
+
+	"nabugate/internal/provider"
 )
 
 // The shipped configs must load and build the providers they declare. Both
@@ -38,6 +40,63 @@ func TestShippedConfigsBuildReplicateAndRunpod(t *testing.T) {
 		}
 		if _, ok := cfg.Passthroughs(adapters)["runpod"]; !ok {
 			t.Errorf("%s: runpod is not a passthrough", path)
+		}
+	}
+}
+
+// v1m (v1m.ir) rides the typesafe adapter with its own base_url, the way
+// arvan/9router ride the openai one. A typo in its base_url or type would not
+// fail the boot — the provider either builds against the wrong URL and every
+// call 404s, or falls to an unknown type and is skipped with a warning — so
+// pin what both shipped files declare, and that it builds as a TypeSafe
+// adapter with passthrough and a priced decision alias.
+func TestShippedConfigsBuildV1M(t *testing.T) {
+	t.Setenv("V1M_API_KEY", "v1m-test")
+
+	for _, path := range []string{"../../config.example.yaml", "../../config.default.yaml"} {
+		cfg, err := Load(path)
+		if err != nil {
+			t.Fatalf("%s: load: %v", path, err)
+		}
+		p, ok := cfg.Providers["v1m"]
+		if !ok {
+			t.Fatalf("%s: no v1m provider declared", path)
+		}
+		if p.Type != "typesafe" {
+			t.Errorf("%s: v1m type = %q, want typesafe", path, p.Type)
+		}
+		if p.BaseURL != "https://v1m.ir/v1" {
+			t.Errorf("%s: v1m base_url = %q, want https://v1m.ir/v1", path, p.BaseURL)
+		}
+		if !p.Passthrough {
+			t.Errorf("%s: v1m is not passthrough", path)
+		}
+		if p.APIKeyEnv != "V1M_API_KEY" {
+			t.Errorf("%s: v1m api_key_env = %q, want V1M_API_KEY", path, p.APIKeyEnv)
+		}
+
+		adapters, warnings := cfg.BuildAdapters()
+		a, ok := adapters["v1m"]
+		if !ok {
+			t.Fatalf("%s: v1m did not build; warnings: %v", path, warnings)
+		}
+		if _, isTypeSafe := a.(*provider.TypeSafeAdapter); !isTypeSafe {
+			t.Errorf("%s: v1m built as %T, want *provider.TypeSafeAdapter", path, a)
+		}
+
+		route, ok := cfg.Decisions["nabu-v1m"]
+		if !ok {
+			t.Fatalf("%s: no nabu-v1m decision alias declared", path)
+		}
+		if route.Primary.Provider != "v1m" || route.Primary.Model != "v1m-latest" {
+			t.Errorf("%s: nabu-v1m primary = %+v, want v1m/v1m-latest", path, route.Primary)
+		}
+		if len(route.Fallback) != 1 || route.Fallback[0].Provider != "typesafe" || route.Fallback[0].Model != "jev-latest" {
+			t.Errorf("%s: nabu-v1m fallback = %+v, want typesafe/jev-latest", path, route.Fallback)
+		}
+
+		if _, priced := cfg.Pricing["v1m/v1m-latest"]; !priced {
+			t.Errorf("%s: v1m/v1m-latest has no pricing entry", path)
 		}
 	}
 }

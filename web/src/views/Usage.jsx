@@ -26,6 +26,15 @@ const T = {
     key: 'کلید',
     emptyKeys: 'مصرفی برای کلیدها ثبت نشده است',
     emptyKeysHint: 'پس از اولین استفاده از کلیدها، آمار مصرف اینجا نمایش داده می‌شود.',
+    unpricedBadge: 'بی‌قیمت',
+    unpricedBadgeHint: 'برخی درخواست‌های این مدل بدون قیمت در پیکربندی سرو شده‌اند: مصرف ثبت شده ولی چیزی بابتش وصول نشده. نرخ مدل را در pricing اضافه کنید.',
+    estimatedBadge: 'تخمینی',
+    estimatedBadgeHint: 'بخشی از شمارش توکن‌های این مدل تخمین خودِ دروازه است چون ارائه‌دهنده مصرفی گزارش نکرده بود.',
+    audioSec: 'ثانیهٔ صدا',
+    imagesUnit: 'تصویر',
+    charsUnit: 'کاراکتر',
+    exportCsv: 'خروجی CSV',
+    exportCsvHint: 'دانلود جدول مصرف هر مدل با هر دو هزینه (کسرشده و هزینهٔ ارائه‌دهنده).',
   },
   en: {
     title: 'Usage',
@@ -48,6 +57,15 @@ const T = {
     key: 'Key',
     emptyKeys: 'No key usage recorded yet',
     emptyKeysHint: 'Usage stats appear here after your keys are first used.',
+    unpricedBadge: 'Unpriced',
+    unpricedBadgeHint: 'Some calls on this model were served with no price in the config: usage was recorded but nothing was billed for it. Add the model\'s rate under pricing.',
+    estimatedBadge: 'Estimated',
+    estimatedBadgeHint: 'Part of this model\'s token counts is the gateway\'s own estimate, because the upstream reported no usage.',
+    audioSec: 'Audio seconds',
+    imagesUnit: 'Images',
+    charsUnit: 'Characters',
+    exportCsv: 'Export CSV',
+    exportCsvHint: 'Download the per-model usage table with both costs (charged and provider cost).',
   },
 };
 
@@ -94,9 +112,41 @@ export default function Usage() {
 
   const totalTokens = total.prompt_tokens + total.completion_tokens;
 
+  // A row's honesty badges: a model nobody priced reads as zero billed unless
+  // it is called out, and a guessed token count should never pass for a
+  // vendor's number.
+  const badges = (v) => (
+    <>
+      {(v.unpriced_requests > 0) && <span className="badge badge-fail" title={t('unpricedBadgeHint')}>{t('unpricedBadge')}</span>}
+      {(v.estimated_requests > 0) && <span className="badge badge-muted" title={t('estimatedBadgeHint')}>{t('estimatedBadge')}</span>}
+    </>
+  );
+
+  // The physical units a non-token call consumed, shown only when the row
+  // actually carries them — a transcribe row speaks in seconds, an image row
+  // in images, a speech row in characters.
+  const units = (v) => (
+    <>
+      {(v.audio_seconds > 0) && <span className="mono" title={t('audioSec')}>⏱ {fmtInt(Math.round(v.audio_seconds))}s</span>}
+      {(v.images > 0) && <span className="mono" title={t('imagesUnit')}>🖼 {fmtInt(v.images)}</span>}
+      {(v.characters > 0) && <span className="mono" title={t('charsUnit')}>🔤 {fmtInt(v.characters)}</span>}
+    </>
+  );
+
   return (
     <Layout title={t('title')} subtitle={t('subtitle')}>
       {error && <div className="card banner-error">{error}</div>}
+
+      {/* The CSV export is admin-only server-side (requireAdmin), so the link
+          only shows to the caller who can actually use it — a non-admin's
+          scoped view has no deployment-wide table to export. */}
+      {!scoped && (
+        <div style={{ marginBottom: 12 }}>
+          <a className="btn btn-secondary" href="/api/usage/export" download title={t('exportCsvHint')}>
+            {t('exportCsv')}
+          </a>
+        </div>
+      )}
 
       {/* Six totals, as the same KPI tiles the dashboard uses so the two
           screens read as one console, and two to a row on a phone. */}
@@ -134,12 +184,14 @@ export default function Usage() {
             </div>
           ) : (
             <table className="tbl" style={{ border: 'none', margin: 0 }}>
-              <thead><tr><th>{t('provider')}</th><th>{t('tokensTotal')}</th><th>{t('cost')}</th></tr></thead>
+              <thead><tr><th>{t('provider')}</th><th>{t('requests')}</th><th>{t('tokensTotal')}</th><th>{t('providerCost')}</th><th>{t('cost')}</th></tr></thead>
               <tbody>
                 {provRows.map(([name, v]) => (
                   <tr key={name}>
-                    <td style={{ fontWeight: 700, color: 'var(--ng-heading)' }} dir="ltr">{name}</td>
+                    <td style={{ fontWeight: 700, color: 'var(--ng-heading)' }} dir="ltr">{name} {badges(v)}</td>
+                    <td className="mono">{fmtInt(v.requests || 0)}</td>
                     <td className="mono">{fmtInt((v.prompt_tokens || 0) + (v.completion_tokens || 0))}</td>
+                    <td className="mono ltr">{usd(v.provider_cost_usd || 0)}</td>
                     <td className="mono ltr">{usd(v.cost_usd)}</td>
                   </tr>
                 ))}
@@ -159,12 +211,17 @@ export default function Usage() {
             </div>
           ) : (
             <table className="tbl" style={{ border: 'none', margin: 0 }}>
-              <thead><tr><th>{t('model')}</th><th>{t('tokensTotal')}</th><th>{t('cost')}</th></tr></thead>
+              <thead><tr><th>{t('model')}</th><th>{t('requests')}</th><th>{t('tokensTotal')}</th><th></th><th>{t('providerCost')}</th><th>{t('cost')}</th></tr></thead>
               <tbody>
                 {modelRows.map(([name, v]) => (
                   <tr key={name}>
-                    <td style={{ fontWeight: 700, color: 'var(--ng-heading)' }} dir="ltr">{name}</td>
+                    <td style={{ fontWeight: 700, color: 'var(--ng-heading)' }} dir="ltr">
+                      {name} {badges(v)}
+                    </td>
+                    <td className="mono">{fmtInt(v.requests || 0)}</td>
                     <td className="mono">{fmtInt((v.prompt_tokens || 0) + (v.completion_tokens || 0))}</td>
+                    <td style={{ whiteSpace: 'nowrap', display: 'grid', gap: 2 }}>{units(v)}</td>
+                    <td className="mono ltr">{usd(v.provider_cost_usd || 0)}</td>
                     <td className="mono ltr">{usd(v.cost_usd)}</td>
                   </tr>
                 ))}

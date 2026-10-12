@@ -72,6 +72,11 @@ func (s *Server) completeAgentTools(w http.ResponseWriter, r *http.Request, alia
 
 	outcome, err := s.runToolLoop(r.Context(), ag, routeModel, req)
 	if err != nil {
+		// The steps that completed before the failure already spent the
+		// vendor's money — runToolLoop keeps their usage in the outcome. Book
+		// it as failed work: real tokens and vendor cost on the books, no
+		// charge to the caller, no served request counted.
+		s.recordFailedUsage(r, outcome.provider, outcome.model, outcome.usage)
 		writeError(w, aliasErrStatus(err, "unknown model alias"), err.Error())
 		return
 	}
@@ -147,6 +152,12 @@ func (s *Server) runToolLoop(ctx context.Context, ag agent.Agent, routeModel str
 		outcome.usage.PromptTokens += result.Response.Usage.PromptTokens
 		outcome.usage.CompletionTokens += result.Response.Usage.CompletionTokens
 		outcome.usage.TotalTokens += result.Response.Usage.TotalTokens
+		// One guessed step makes the whole loop's counts a guess: the flag has
+		// to survive the sum, or tokens that were estimated would book as if
+		// the vendor had counted them.
+		if result.Response.Usage.Estimated {
+			outcome.usage.Estimated = true
+		}
 
 		var calls []wireToolCall
 		if len(result.Response.ToolCalls) > 0 {

@@ -102,6 +102,147 @@ func TestTypeSafeDecideError(t *testing.T) {
 	}
 }
 
+// v1m (v1m.ir) answers an invalid /systemone body with FastAPI's validation
+// shape: {"detail":[{"type":…,"msg":…,"loc":[…]},…]}. The first msg is the
+// message the caller should see, not the whole JSON blob.
+func TestTypeSafeDecideV1MValidationDetailError(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusUnprocessableEntity)
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"detail": []map[string]any{
+				{"type": "missing", "msg": "Field required", "loc": []string{"body", "questions", "is_fraud", "instructions"}},
+				{"type": "value_error", "msg": "criteria needs at least 2 options", "loc": []string{"body", "questions", "action"}},
+			},
+		})
+	}))
+	defer ts.Close()
+
+	adapter := NewTypeSafeAdapter("v1m", ts.URL, "test-key")
+	_, err := adapter.Decide(context.Background(), DecisionRequest{
+		Model:     "v1m-latest",
+		State:     json.RawMessage(`"test"`),
+		Questions: json.RawMessage(`{"is_fraud":{"type":"noul"}}`),
+	})
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if want := "typesafe error (422): Field required"; err.Error() != want {
+		t.Errorf("expected %q, got %q", want, err.Error())
+	}
+}
+
+// v1m wraps runtime errors as {"detail":{"error":{"message":…}}} — neither of
+// the two shapes the adapter read before, which surfaced the raw body.
+func TestTypeSafeDecideV1MWrappedDetailError(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusBadRequest)
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"detail": map[string]any{
+				"error": map[string]any{
+					"message": "state must be a JSON value",
+					"type":    "invalid_request_error",
+				},
+			},
+		})
+	}))
+	defer ts.Close()
+
+	adapter := NewTypeSafeAdapter("v1m", ts.URL, "test-key")
+	_, err := adapter.Decide(context.Background(), DecisionRequest{
+		Model:     "v1m-latest",
+		State:     json.RawMessage(`"test"`),
+		Questions: json.RawMessage(`{"is_fraud":{"type":"noul","instructions":"fraud?"}}`),
+	})
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if want := "typesafe error (400): state must be a JSON value"; err.Error() != want {
+		t.Errorf("expected %q, got %q", want, err.Error())
+	}
+}
+
+// A recorded live v1m response (2026-10-11): answers carry fields the plain
+// TypeSafe shape does not (confidence, probabilities, legend) and the usage
+// block counts real output tokens. Answers must pass through untouched and
+// usage must map input/output onto prompt/completion.
+func TestTypeSafeDecideV1MShapeSuccess(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/systemone" {
+			http.NotFound(w, r)
+			return
+		}
+		var req map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		if req["model"] != "v1m-latest" {
+			http.Error(w, "wrong model", http.StatusBadRequest)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{
+			"model": "v1m-1.0",
+			"answers": {
+				"is_fraud": {"type": "noul", "noul": 0.88},
+				"action": {"type": "choice", "choice": "manual_review", "confidence": 0.81, "probabilities": {"manual_review": 0.81, "auto_approve": 0.19}},
+				"risk": {"type": "score", "score": 3.5, "confidence": 0.77, "legend": {"3": "high", "4": "critical"}, "probabilities": {"3": 0.4, "4": 0.6}}
+			},
+			"usage": {"input_tokens": 312, "output_tokens": 48}
+		}`))
+	}))
+	defer ts.Close()
+
+	adapter := NewTypeSafeAdapter("v1m", ts.URL, "test-key")
+	res, err := adapter.Decide(context.Background(), DecisionRequest{
+		Model:     "v1m-latest",
+		State:     json.RawMessage(`{"amount": 9900, "country": "IR"}`),
+		Questions: json.RawMessage(`{"is_fraud":{"type":"noul","instructions":"is this fraud?"}}`),
+	})
+	if err != nil {
+		t.Fatalf("Decide failed: %v", err)
+	}
+
+	if res.Model != "v1m-1.0" {
+		t.Errorf("expected model v1m-1.0, got %s", res.Model)
+	}
+	if res.Usage.PromptTokens != 312 || res.Usage.CompletionTokens != 48 || res.Usage.TotalTokens != 360 {
+		t.Errorf("unexpected usage: %+v", res.Usage)
+	}
+
+	var answers struct {
+		IsFraud struct {
+			Type string  `json:"type"`
+			Noul float64 `json:"noul"`
+		} `json:"is_fraud"`
+		Action struct {
+			Choice        string             `json:"choice"`
+			Confidence    float64            `json:"confidence"`
+			Probabilities map[string]float64 `json:"probabilities"`
+		} `json:"action"`
+		Risk struct {
+			Score         float64            `json:"score"`
+			Legend        map[string]string  `json:"legend"`
+			Probabilities map[string]float64 `json:"probabilities"`
+		} `json:"risk"`
+	}
+	if err := json.Unmarshal(res.Answers, &answers); err != nil {
+		t.Fatalf("failed to unmarshal answers: %v", err)
+	}
+	if answers.IsFraud.Noul != 0.88 {
+		t.Errorf("expected is_fraud noul 0.88, got %f", answers.IsFraud.Noul)
+	}
+	if answers.Action.Choice != "manual_review" || answers.Action.Confidence != 0.81 {
+		t.Errorf("unexpected action answer: %+v", answers.Action)
+	}
+	if answers.Action.Probabilities["auto_approve"] != 0.19 {
+		t.Errorf("expected action probabilities to pass through, got %v", answers.Action.Probabilities)
+	}
+	if answers.Risk.Legend["4"] != "critical" || answers.Risk.Probabilities["3"] != 0.4 {
+		t.Errorf("expected risk legend/probabilities to pass through, got %v / %v", answers.Risk.Legend, answers.Risk.Probabilities)
+	}
+}
+
 func TestTypeSafeChatAndStreamSuccess(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		resp := map[string]any{

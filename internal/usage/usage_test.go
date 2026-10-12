@@ -168,3 +168,86 @@ func TestEveryUnitIsBilledAtItsOwnRate(t *testing.T) {
 		}
 	}
 }
+
+// RecordEntry books one call's whole metered event — both costs, the honesty
+// flags and the physical units — into every snapshot the tracker keeps. The
+// flags are what keeps a metered-at-nothing call from reading as a free
+// month: the tokens are real, the vendor's charge is real, and each gap has
+// to stay visible in its own counter.
+func TestRecordEntryCarriesTheNewFields(t *testing.T) {
+	tr := New(map[string]Price{"anthropic/claude": {Input: 3, Output: 15}})
+
+	tr.RecordEntry("desk", "anthropic", "claude", Entry{
+		Requests:         1,
+		PromptTokens:     1_000_000,
+		CompletionTokens: 100_000,
+		CostUSD:          3,
+		ProviderCostUSD:  4.5,
+		Unpriced:         true,
+		Estimated:        true,
+		Failed:           true,
+		AudioSeconds:     90.5,
+		Images:           2,
+		Characters:       2000,
+	})
+
+	byProject, byModel := tr.Snapshot()
+	for name, got := range map[string]Stat{"desk": byProject["desk"], "anthropic/claude": byModel["anthropic/claude"]} {
+		if got.UnpricedRequests != 1 || got.EstimatedRequests != 1 || got.FailedRequests != 1 {
+			t.Errorf("%s honesty counters = %d/%d/%d, want 1/1/1", name,
+				got.UnpricedRequests, got.EstimatedRequests, got.FailedRequests)
+		}
+		if math.Abs(got.ProviderCostUSD-4.5) > 1e-9 || math.Abs(got.CostUSD-3) > 1e-9 {
+			t.Errorf("%s costs = %v charged / %v vendor, want 3 / 4.5", name, got.CostUSD, got.ProviderCostUSD)
+		}
+		if got.AudioSeconds != 90.5 || got.Images != 2 || got.Characters != 2000 {
+			t.Errorf("%s units = %vs/%d imgs/%d chars, want 90.5/2/2000", name, got.AudioSeconds, got.Images, got.Characters)
+		}
+	}
+
+	// Record and RecordAt keep their old behaviour through the same path: a
+	// plain record carries none of the flags and computes its own cost.
+	tr.Record("desk", "anthropic", "claude", provider.Usage{PromptTokens: 1_000_000})
+	tr.RecordAt("desk", "anthropic", "claude", 1, provider.Usage{PromptTokens: 1}, 0.25)
+	byProject, _ = tr.Snapshot()
+	s := byProject["desk"]
+	if s.UnpricedRequests != 1 || s.EstimatedRequests != 1 || s.FailedRequests != 1 {
+		t.Errorf("flag counters moved through Record/RecordAt: %+v", s)
+	}
+	if want := 3 + 3 + 0.25; math.Abs(s.CostUSD-want) > 1e-9 {
+		t.Errorf("cost = %v, want %v", s.CostUSD, want)
+	}
+	if got := tr.Cost("openai", "unlisted", Tokens(provider.Usage{PromptTokens: 1})); got != 0 {
+		t.Errorf("unpriced cost = %v, want 0", got)
+	}
+	if _, priced := tr.PriceOf("openai", "unlisted", Tokens(provider.Usage{PromptTokens: 1})); priced {
+		t.Error("PriceOf reports an unlisted model as priced")
+	}
+	if got, priced := tr.PriceOf("anthropic", "claude", Tokens(provider.Usage{PromptTokens: 1_000_000})); !priced || math.Abs(got-3) > 1e-9 {
+		t.Errorf("PriceOf = %v, %v; want 3, true", got, priced)
+	}
+}
+
+// Anthropic's cache tokens are billed at rates of their own on the real
+// invoice. Writing the rates prices them; leaving them out prices them at
+// zero, which is exactly what a deployment that has not opted in paid
+// yesterday — so no invoice moves without an operator deciding it should.
+func TestCacheTokenRatesAreOptIn(t *testing.T) {
+	m := Tokens(provider.Usage{
+		PromptTokens:       1_000_000,
+		CompletionTokens:   100_000,
+		CacheReadInput:     2_000_000,
+		CacheCreationInput: 500_000,
+	})
+
+	without := Price{Input: 3, Output: 15}
+	if got := without.Of(m); math.Abs(got-4.5) > 1e-9 {
+		t.Errorf("cache tokens priced without rates = %v, want 4.5 (the plain input/output charge)", got)
+	}
+
+	with := Price{Input: 3, Output: 15, InputCacheRead: 0.3, InputCacheWrite: 3.75}
+	want := 3 + 1.5 + 0.6 + 1.875
+	if got := with.Of(m); math.Abs(got-want) > 1e-9 {
+		t.Errorf("cache tokens priced with rates = %v, want %v", got, want)
+	}
+}

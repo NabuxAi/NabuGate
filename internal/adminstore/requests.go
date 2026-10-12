@@ -33,6 +33,10 @@ type RequestEntry struct {
 	Model    string    `json:"model"`
 	Tokens   int64     `json:"tokens"`
 	CostUSD  float64   `json:"cost_usd"`
+	// ProviderCostUSD is what the vendor charged the gateway for the same call,
+	// at list price — alongside CostUSD, which is what the caller was charged.
+	// Entries written before it existed carry none.
+	ProviderCostUSD float64 `json:"provider_cost_usd,omitempty"`
 
 	// Denied marks a request refused before a provider was reached — by the
 	// key's allow-list, its origin list or its rate limit. These are the rows

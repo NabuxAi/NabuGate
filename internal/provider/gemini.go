@@ -158,14 +158,26 @@ func (a *GeminiAdapter) Chat(ctx context.Context, req ChatRequest) (ChatResponse
 		text.WriteString(p.Text)
 	}
 
+	usage := Usage{
+		PromptTokens:     parsed.UsageMetadata.PromptTokenCount,
+		CompletionTokens: parsed.UsageMetadata.CandidatesTokenCount,
+		TotalTokens:      parsed.UsageMetadata.TotalTokenCount,
+	}
+	switch {
+	case usage.PromptTokens == 0 && usage.CompletionTokens == 0:
+		// Gemini answered with content but no usageMetadata. Guess from the
+		// bytes that moved, flagged as a guess, so the call is metered at
+		// something rather than recorded as a free month.
+		usage = estimateUsage(req, len(text.String()))
+	case usage.TotalTokens == 0:
+		// The split is the vendor's own; only the sum was missing.
+		usage.TotalTokens = usage.PromptTokens + usage.CompletionTokens
+	}
+
 	return ChatResponse{
 		Content:      text.String(),
 		FinishReason: mapGeminiFinish(parsed.Candidates[0].FinishReason),
-		Usage: Usage{
-			PromptTokens:     parsed.UsageMetadata.PromptTokenCount,
-			CompletionTokens: parsed.UsageMetadata.CandidatesTokenCount,
-			TotalTokens:      parsed.UsageMetadata.TotalTokenCount,
-		},
+		Usage:        usage,
 	}, nil
 }
 
@@ -209,6 +221,7 @@ func (a *GeminiAdapter) ChatStream(ctx context.Context, req ChatRequest, onDelta
 	defer resp.Body.Close()
 
 	var usage Usage
+	var outputBytes int
 	err = readSSE(resp.Body, func(data []byte) (bool, error) {
 		var chunk struct {
 			Candidates []struct {
@@ -228,6 +241,7 @@ func (a *GeminiAdapter) ChatStream(ctx context.Context, req ChatRequest, onDelta
 		for _, c := range chunk.Candidates {
 			for _, p := range c.Content.Parts {
 				if p.Text != "" {
+					outputBytes += len(p.Text)
 					if err := onDelta(p.Text); err != nil {
 						return true, err
 					}
@@ -243,5 +257,11 @@ func (a *GeminiAdapter) ChatStream(ctx context.Context, req ChatRequest, onDelta
 		}
 		return false, nil
 	})
+	if usage.TotalTokens == 0 {
+		// The stream carried no usageMetadata at any point — every chunk was
+		// silent about the token spend. Guess from the bytes on the wire,
+		// flagged as a guess, as the other streaming paths do.
+		usage = estimateUsage(req, outputBytes)
+	}
 	return usage, err
 }

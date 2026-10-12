@@ -10,7 +10,9 @@ import (
 	"strings"
 )
 
-// TypeSafeAdapter communicates with TypeSafe AI's System One API (and compatible endpoints).
+// TypeSafeAdapter communicates with TypeSafe AI's System One API and wire-
+// compatible endpoints (typesafe.ai, v1m.ir — the latter rides this adapter
+// with its own base_url the way arvan/9router ride the openai one).
 // It evaluates structured decisions (Noul, Choice, Score) for Jev models.
 type TypeSafeAdapter struct {
 	name    string
@@ -40,7 +42,7 @@ func (a *TypeSafeAdapter) Chat(ctx context.Context, req ChatRequest) (ChatRespon
 	if err != nil {
 		return ChatResponse{}, err
 	}
-	return formatDecisionChatResponse(decResp, originalPrompt), nil
+	return formatDecisionChatResponse(decReq, decResp, originalPrompt), nil
 }
 
 // ChatStream streams the evaluated decision in progressive chunks and reports token accounting.
@@ -114,6 +116,11 @@ func (a *TypeSafeAdapter) Decide(ctx context.Context, req DecisionRequest) (Deci
 			if errResp.Message != "" {
 				return DecisionResponse{}, fmt.Errorf("typesafe error (%d): %s", resp.StatusCode, errResp.Message)
 			}
+			// v1m carries the message under "detail" instead of the two shapes
+			// above, so the raw body would surface a JSON blob, not a reason.
+			if msg := detailErrorMessage(respBytes); msg != "" {
+				return DecisionResponse{}, fmt.Errorf("typesafe error (%d): %s", resp.StatusCode, msg)
+			}
 		}
 		return DecisionResponse{}, fmt.Errorf("typesafe error (%d): %s", resp.StatusCode, string(respBytes))
 	}
@@ -132,6 +139,41 @@ func (a *TypeSafeAdapter) Decide(ctx context.Context, req DecisionRequest) (Deci
 			TotalTokens:      parsed.Usage.InputTokens + parsed.Usage.OutputTokens,
 		},
 	}, nil
+}
+
+// detailErrorMessage extracts the human-readable message from the error
+// shapes that carry it under "detail" rather than "error"/"message": the v1m
+// endpoint wraps runtime errors as {"detail":{"error":{"message":…}}} and
+// answers invalid requests with FastAPI's validation shape
+// {"detail":[{"type":…,"msg":…,"loc":[…]},…]} (the first non-empty msg is the
+// one worth reading). Any other body returns "" so the caller falls back to
+// the raw body rather than guessing.
+func detailErrorMessage(body []byte) string {
+	var d struct {
+		Detail json.RawMessage `json:"detail"`
+	}
+	if err := json.Unmarshal(body, &d); err != nil || len(d.Detail) == 0 {
+		return ""
+	}
+	var wrapped struct {
+		Error struct {
+			Message string `json:"message"`
+		} `json:"error"`
+	}
+	if err := json.Unmarshal(d.Detail, &wrapped); err == nil && wrapped.Error.Message != "" {
+		return wrapped.Error.Message
+	}
+	var items []struct {
+		Msg string `json:"msg"`
+	}
+	if err := json.Unmarshal(d.Detail, &items); err == nil {
+		for _, it := range items {
+			if it.Msg != "" {
+				return it.Msg
+			}
+		}
+	}
+	return ""
 }
 
 // ListModels implements ModelLister for TypeSafe.

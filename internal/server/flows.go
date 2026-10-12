@@ -32,6 +32,11 @@ type stepOutcome struct {
 	Usage    provider.Usage `json:"usage"`
 	Skipped  bool           `json:"skipped,omitempty"`
 	Error    string         `json:"error,omitempty"`
+	// SubSteps carries the leaves of a step that ran another flow, so
+	// metering can bill every inner call at its own provider and model —
+	// the parent's Usage is their sum and is not booked twice. Additive in
+	// the trace JSON: clients that read steps ignore it.
+	SubSteps []stepOutcome `json:"sub_steps,omitempty"`
 }
 
 // flowResult is one whole chain.
@@ -141,6 +146,11 @@ func (s *Server) runStep(ctx context.Context, step flow.Step, req provider.ChatR
 		outcome.Output = inner.Output
 		outcome.Usage = inner.Usage
 		outcome.Model = nested.Name
+		// The leaves, kept so metering bills each inner call under the
+		// provider and model that actually served it — a nested step with an
+		// empty Provider used to be skipped by recordFlow, and a second-level
+		// flow's whole spend never appeared anywhere.
+		outcome.SubSteps = inner.Steps
 
 		return outcome, nil
 	}
@@ -228,14 +238,31 @@ func (s *Server) completeFlow(w http.ResponseWriter, r *http.Request, fl flow.Fl
 //
 // Per step rather than once for the flow: the whole reason to run four models
 // instead of one is that they are different models, and a bill that hid which
-// of them the money went to would make the choice unreviewable.
+// of them the money went to would make the choice unreviewable. A step that
+// ran another flow is replaced by that flow's own leaves, so the inner calls
+// land on their own provider/model rows and the parent is not booked twice.
 func (s *Server) recordFlow(r *http.Request, fl flow.Flow, result flowResult) {
-	for _, step := range result.Steps {
-		if step.Provider == "" {
-			continue
+	s.recordFlowFor(r, s.project(r), fl, result)
+}
+
+// recordFlowFor is recordFlow with the project named, for the console's flow
+// tests: they run on the gateway's own provider keys and are booked under
+// their own project so an operator can see what testing costs.
+func (s *Server) recordFlowFor(r *http.Request, project string, fl flow.Flow, result flowResult) {
+	var walk func(steps []stepOutcome)
+	walk = func(steps []stepOutcome) {
+		for _, step := range steps {
+			if len(step.SubSteps) > 0 {
+				walk(step.SubSteps)
+				continue
+			}
+			if step.Provider == "" {
+				continue
+			}
+			s.recordForProject(r, project, step.Provider, step.Model, step.Usage)
 		}
-		s.record(r, step.Provider, step.Model, step.Usage)
 	}
+	walk(result.Steps)
 	_ = fl
 }
 

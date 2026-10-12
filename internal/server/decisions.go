@@ -46,18 +46,42 @@ func (s *Server) handleDecisions(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	s.record(r, result.Provider, result.Model, result.Usage)
+	// The Decide route has no adapter-side fallback: an upstream that answered
+	// without a usage object would otherwise be metered at an indifferent
+	// zero. Estimate from the payload actually sent — state and questions —
+	// and the answers that came back, flagged as a guess.
+	usage := result.Usage
+	if usage.TotalTokens == 0 {
+		pTok := provider.EstimateTokens(len(body.State) + len(body.Questions))
+		cTok := provider.EstimateTokens(len(result.Answers))
+		usage = provider.Usage{
+			PromptTokens:     pTok,
+			CompletionTokens: cTok,
+			TotalTokens:      pTok + cTok,
+			Estimated:        true,
+		}
+	}
+	cost := s.record(r, result.Provider, result.Model, usage)
 
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("X-Nabu-Provider", result.Provider)
 	w.Header().Set("X-Nabu-Model", result.Model)
+	// The charged amount rides the same header every other metered response
+	// sets, so a caller reconciling their spend reads one place.
+	w.Header().Set(costHeader, formatCost(cost))
+	usageOut := map[string]any{
+		"input_tokens":  usage.PromptTokens,
+		"output_tokens": usage.CompletionTokens,
+		"total_tokens":  usage.TotalTokens,
+		// Additive: what the caller was charged, alongside the token counts.
+		"cost_usd": cost,
+	}
+	if usage.Estimated {
+		usageOut["estimated"] = true
+	}
 	writeJSON(w, http.StatusOK, map[string]any{
 		"model":   result.Model,
 		"answers": result.Answers,
-		"usage": map[string]any{
-			"input_tokens":  result.Usage.PromptTokens,
-			"output_tokens": result.Usage.CompletionTokens,
-			"total_tokens":  result.Usage.TotalTokens,
-		},
+		"usage":   usageOut,
 	})
 }

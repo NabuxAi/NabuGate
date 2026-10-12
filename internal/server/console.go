@@ -2,18 +2,22 @@ package server
 
 import (
 	"context"
+	"encoding/csv"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
 	"os"
+	"sort"
+	"strconv"
 	"strings"
 	"time"
 
 	"nabugate/internal/adminstore"
 	"nabugate/internal/nabupay"
 	"nabugate/internal/provider"
+	"nabugate/internal/usage"
 )
 
 const consoleCookie = "nabugate_console"
@@ -58,6 +62,7 @@ func (s *Server) mountConsoleAPI(mux *http.ServeMux) {
 
 	mux.Handle("GET /api/overview", s.consoleAuth(s.consoleOverview))
 	mux.Handle("GET /api/usage", s.consoleAuth(s.consoleUsage))
+	mux.Handle("GET /api/usage/export", s.consoleAuth(requireAdmin(s.exportUsage)))
 	mux.Handle("POST /api/usage/reset", s.consoleAuth(requireAdmin(s.resetUsage)))
 
 	mux.Handle("GET /api/admins", s.consoleAuth(requireAdmin(s.listAdmins)))
@@ -522,6 +527,58 @@ func (s *Server) consoleUsage(w http.ResponseWriter, r *http.Request) {
 		"by_model":    byModel,
 		"by_provider": byProv,
 	})
+}
+
+// exportUsage streams the deployment's per-model usage as CSV, for a
+// spreadsheet or a join against the price list.
+//
+// Rows come from the same persisted counters consoleUsage serves, so they
+// survive a restart and carry both sides of the money: cost_usd is what left
+// caller balances, provider_cost_usd is what the vendors charged the gateway.
+// The identity column is the model's list-price name (usage.Identity) — the
+// by_model key is the raw upstream name, while the in-memory tracker keys
+// "provider/model", and the identity is the join key that maps a row back to
+// one entry in the config's pricing block.
+func (s *Server) exportUsage(w http.ResponseWriter, r *http.Request) {
+	_, byModel, _ := s.admin.Usage()
+
+	names := make([]string, 0, len(byModel))
+	for name := range byModel {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+
+	w.Header().Set("Content-Type", "text/csv; charset=utf-8")
+	w.Header().Set("Content-Disposition", `attachment; filename="usage-export.csv"`)
+	w.WriteHeader(http.StatusOK)
+
+	out := csv.NewWriter(w)
+	_ = out.Write([]string{
+		"model", "identity", "requests",
+		"prompt_tokens", "completion_tokens",
+		"cost_usd", "provider_cost_usd",
+		"unpriced_requests", "estimated_requests", "failed_requests",
+		"audio_seconds", "images", "characters",
+	})
+	for _, name := range names {
+		c := byModel[name]
+		_ = out.Write([]string{
+			name,
+			usage.Identity(name),
+			strconv.FormatInt(c.Requests, 10),
+			strconv.FormatInt(c.PromptTokens, 10),
+			strconv.FormatInt(c.CompletionTokens, 10),
+			strconv.FormatFloat(c.CostUSD, 'f', 6, 64),
+			strconv.FormatFloat(c.ProviderCostUSD, 'f', 6, 64),
+			strconv.FormatInt(c.UnpricedRequests, 10),
+			strconv.FormatInt(c.EstimatedRequests, 10),
+			strconv.FormatInt(c.FailedRequests, 10),
+			strconv.FormatFloat(c.AudioSeconds, 'f', -1, 64),
+			strconv.FormatInt(c.Images, 10),
+			strconv.FormatInt(c.Characters, 10),
+		})
+	}
+	out.Flush()
 }
 
 func (s *Server) resetUsage(w http.ResponseWriter, r *http.Request) {
