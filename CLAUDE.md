@@ -103,7 +103,9 @@ config.example.yaml        # نمونهٔ پیکربندی (alias‌ها، provi
   `tool_result`، `image_url` ← بلوکِ image، `response_format` json_schema ← `output_config.format`،
   و در استریم `tool_use` ← deltaهای `tool_calls`. پس Claude در LangChain و Agents SDK با ابزار کار
   می‌کند (`SupportsTools`). نسلِ فعلیِ Claude فراخوانیِ اجباری (`any`/`tool`) را با ۴۰۰ رد می‌کند،
-  برای همین روی هدف‌های `param_style: reasoning` به `auto` تبدیل می‌شود. Gemini هنوز ابزار ندارد.
+  برای همین روی هدف‌های `param_style: reasoning` به `auto` تبدیل می‌شود. آداپترِ بومیِ Gemini ابزار ندارد؛
+  برای همین هر رینگِ چتِ گوگل از `gemini-openai` (endpointِ OpenAI-wireِ خودِ گوگل، همان کلید) می‌رود و
+  آداپترِ بومی فقط برای embedding (`outputDimensionality`) می‌ماند.
 - آداپتورِ `pexels` فقط تصویر است (`ImageAdapter`): برای promptِ کاربر در Pexels
   جست‌وجو می‌کند، عکس‌ها را دانلود و base64 می‌کند تا مثلِ یک تصویرِ تولیدی
   (`data[].b64_json`) برگردد. یک alias تصویری (`nabu-photo` یا fallbackِ

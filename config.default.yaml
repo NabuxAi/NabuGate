@@ -1240,7 +1240,7 @@ models:
       # every request while a keyed Gemini and two keyed OpenRouter accounts sat
       # unused. Probed 2026-08-15: gemini-2.5-flash answers on this key,
       # gemini-2.5-pro is already 429 on it.
-      - provider: gemini
+      - provider: gemini-openai
         model: "gemini-2.5-flash"
       - model: deepseek-v4.1-flash
       - model: gpt-oss-120b
@@ -1315,7 +1315,7 @@ models:
       # gpt-oss-20b was supposed to be the free floor here and never was — its
       # `serves` entries named registry models instead of providers, so the
       # router skipped them. These rungs resolve.
-      - provider: gemini
+      - provider: gemini-openai
         model: "gemini-2.5-flash-lite"
       - model: nemotron-3-super
       - model: laguna-s
@@ -1347,7 +1347,7 @@ models:
     primary:
       model: gpt-4o
     fallback:
-      - provider: gemini
+      - provider: gemini-openai
         model: "gemini-2.5-flash"
       # Gemini was the last rung, and on the free tier it answers 429 every
       # other call — so this alias died whenever the quota bit, with nothing
@@ -1382,7 +1382,7 @@ models:
       model: "nabu-ocr"
     fallback:
       - model: gpt-4o
-      - provider: gemini
+      - provider: gemini-openai
         model: "gemini-2.5-flash"
 
   nabu-minimax:
@@ -1475,12 +1475,16 @@ models:
   # bucket, so a 429 takes both. It is still worth having, because a 404 on a
   # retired preview id is the failure this alias is actually likely to see, and
   # that one the fallback does answer.
+  #
+  # Every chat rung on Google goes through gemini-openai, Google's OpenAI-wire
+  # endpoint on the same key: the native adapter cannot carry tools, so an
+  # agent that fell to a native rung lost its tools mid-chain.
   nabu-flash-lite:
     primary:
-      provider: gemini
+      provider: gemini-openai
       model: "gemini-3.1-flash-lite-preview"
     fallback:
-      - provider: gemini
+      - provider: gemini-openai
         model: "gemini-2.5-flash-lite"
       - model: gpt-4.1-nano
 
