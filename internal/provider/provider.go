@@ -99,6 +99,27 @@ type StreamAdapter interface {
 	ChatStream(ctx context.Context, req ChatRequest, onDelta DeltaFunc) (Usage, error)
 }
 
+// ToolDeltaFunc receives one streamed tool_calls delta exactly as the
+// upstream sent it: the OpenAI array of {index, id?, type?, function:{name?,
+// arguments}} fragments, which the client reassembles by index.
+type ToolDeltaFunc func(raw json.RawMessage) error
+
+type toolDeltaCtxKey struct{}
+
+// WithToolDeltas asks the stream adapters to hand tool-call deltas to fn. It
+// rides the context rather than DeltaFunc because only OpenAI-wire adapters
+// can produce them and only a caller that sent tools wants them; every other
+// stream keeps its text-only callback untouched.
+func WithToolDeltas(ctx context.Context, fn ToolDeltaFunc) context.Context {
+	return context.WithValue(ctx, toolDeltaCtxKey{}, fn)
+}
+
+// ToolDeltas returns the sink installed by WithToolDeltas, or nil.
+func ToolDeltas(ctx context.Context) ToolDeltaFunc {
+	fn, _ := ctx.Value(toolDeltaCtxKey{}).(ToolDeltaFunc)
+	return fn
+}
+
 // ImageRequest is a provider-agnostic image generation request.
 type ImageRequest struct {
 	Model       string

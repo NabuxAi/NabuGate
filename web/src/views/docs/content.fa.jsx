@@ -258,6 +258,87 @@ for chunk in stream:
         </section>
       )}
 
+      {active === 'frameworks' && (
+        <section>
+          <H1>LangChain و فریم‌ورک‌های هوش مصنوعی</H1>
+          <Lead>NabuGate با فرمتِ OpenAI حرف می‌زند، پس هر فریم‌ورکی که با OpenAI کار می‌کند با آن هم کار می‌کند: آدرسِ پایه را <code dir="ltr">{BASE}</code> بگذارید، کلیدتان را بدهید و نامِ یک alias را در نامِ مدل بنویسید. چت، استریم، فراخوانیِ ابزار (حتی استریم‌شده)، خروجیِ ساختاریافته، ایجنت‌ها و embedding با تک‌تکِ کتابخانه‌های زیر آزموده شده‌اند.</Lead>
+          <H2>LangChain (پایتون) و LangGraph</H2>
+          <CodeBlock code={`from langchain_openai import ChatOpenAI, OpenAIEmbeddings
+
+llm = ChatOpenAI(base_url="${BASE}", api_key="${KEY}", model="nabu-smart")
+print(llm.invoke("Hello!").content)
+
+# Tools, structured output and agents work as with OpenAI
+llm_with_tools = llm.bind_tools([get_weather])
+person = llm.with_structured_output(Person).invoke("…")
+
+# Embeddings: send text, not token ids
+emb = OpenAIEmbeddings(base_url="${BASE}", api_key="${KEY}",
+                       model="nabu-embed", check_embedding_ctx_length=False)`} label="python" />
+          <H2>LangChain.js</H2>
+          <CodeBlock code={`import { ChatOpenAI } from "@langchain/openai";
+
+const llm = new ChatOpenAI({
+  model: "nabu-smart",
+  apiKey: "${KEY}",
+  configuration: { baseURL: "${BASE}" },
+});
+const r = await llm.invoke("Hello!");`} label="node" />
+          <H2>OpenAI Agents SDK</H2>
+          <CodeBlock code={`from openai import AsyncOpenAI
+from agents import Agent, Runner, OpenAIChatCompletionsModel, set_tracing_disabled
+
+set_tracing_disabled(True)  # traces go to OpenAI otherwise
+client = AsyncOpenAI(base_url="${BASE}", api_key="${KEY}")
+agent = Agent(
+    name="assistant",
+    instructions="You are helpful.",
+    model=OpenAIChatCompletionsModel(model="nabu-smart", openai_client=client),
+    tools=[get_weather],
+)
+result = await Runner.run(agent, "Weather in Tehran?")`} label="python" />
+          <H2>Vercel AI SDK</H2>
+          <CodeBlock code={`import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
+import { streamText } from "ai";
+
+const nabu = createOpenAICompatible({
+  name: "nabugate",
+  baseURL: "${BASE}",
+  apiKey: "${KEY}",
+  includeUsage: true,
+});
+
+const result = streamText({ model: nabu("nabu-smart"), prompt: "Hello!", tools: { weather } });`} label="node" />
+          <H2>Pydantic AI، LiteLLM، CrewAI، LlamaIndex</H2>
+          <CodeBlock code={`# Pydantic AI
+from pydantic_ai import Agent
+from pydantic_ai.models.openai import OpenAIChatModel
+from pydantic_ai.providers.openai import OpenAIProvider
+agent = Agent(OpenAIChatModel("nabu-smart",
+    provider=OpenAIProvider(base_url="${BASE}", api_key="${KEY}")))
+
+# LiteLLM (and CrewAI, which uses it)
+import litellm
+litellm.completion(model="openai/nabu-smart", api_base="${BASE}",
+                   api_key="${KEY}", messages=[{"role": "user", "content": "Hi"}])
+
+# LlamaIndex
+from llama_index.llms.openai_like import OpenAILike
+llm = OpenAILike(model="nabu-smart", api_base="${BASE}", api_key="${KEY}",
+                 is_chat_model=True, is_function_calling_model=True)`} label="python" />
+          <H2>ابزارهای بدون‌کد: n8n، Dify، Flowise</H2>
+          <p>اعتبارنامهٔ OpenAI (یا «OpenAI-compatible») را انتخاب کنید، آدرسِ پایه را <code dir="ltr">{BASE}</code> بگذارید، کلید را بچسبانید و alias را به‌عنوانِ نامِ مدل بنویسید.</p>
+          <H2>نکته‌ها</H2>
+          <ul style={{ paddingInlineStart: 20, display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <li><strong>ابزار و ایجنت:</strong> aliasی بگیرید که مدل‌هایش فرمتِ ابزارِ OpenAI را می‌فهمند، مثلِ <code>nabu-smart</code> یا <code>nabu-fast</code>. aliasهای <code>nabu-claude*</code> فعلاً فقط متن جواب می‌دهند.</li>
+            <li><strong>Embedding در LangChain:</strong> <code>check_embedding_ctx_length=False</code> را بگذارید. وگرنه LangChain شناسهٔ توکن می‌فرستد که فقط برای توکنایزرِ یک فروشنده معنا دارد، و دروازه آن را با خطای <code>tokenized_input</code> رد می‌کند.</li>
+            <li><strong>OpenAI Agents SDK:</strong> مثلِ بالا از <code>OpenAIChatCompletionsModel</code> استفاده کنید. حالتِ پیش‌فرضش یعنی Responses API دست‌نخورده عبور می‌کند و مدلی می‌خواهد که فروشنده‌اش <code dir="ltr">/v1/responses</code> داشته باشد.</li>
+            <li><strong>فلوها</strong> (چند ایجنت پشتِ هم) یک‌جا جواب می‌دهند، نه به‌صورتِ استریم.</li>
+            <li>هر فراخوانی دقیقاً مثلِ فراخوانیِ مستقیم از موجودی‌تان کم می‌شود؛ فراخوانی با کلیدِ خودتان (<code dir="ltr">X-Nabu-Key-&lt;provider&gt;</code>) هزینه‌ای ندارد.</li>
+          </ul>
+        </section>
+      )}
+
       {active === 'curl' && (
         <section>
           <H1>cURL</H1>

@@ -18,6 +18,7 @@ export const GROUPS = [
     { id: 'codex', fa: 'Codex CLI', en: 'Codex CLI' },
     { id: 'vscode', fa: 'VS Code', en: 'VS Code' },
     { id: 'sdk', fa: 'SDK پایتون و Node', en: 'Python & Node SDKs' },
+    { id: 'frameworks', fa: 'LangChain و فریم‌ورک‌ها', en: 'LangChain & frameworks' },
     { id: 'curl', fa: 'cURL', en: 'cURL' },
   ] },
   { title: { fa: 'مرجع', en: 'Reference' }, icon: 'book', items: [

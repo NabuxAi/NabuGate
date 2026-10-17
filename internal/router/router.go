@@ -407,7 +407,16 @@ func (r *Router) ChatStream(ctx context.Context, alias string, req provider.Chat
 		req.ParamStyle = t.ParamStyle
 		started := false
 		start := time.Now()
-		usage, err := streamer.ChatStream(ctx, req, func(delta string) error {
+		attemptCtx := ctx
+		if onTools := provider.ToolDeltas(ctx); onTools != nil {
+			// A tool-call delta reaches the client like text does, so it ends
+			// the chance to fall back exactly as text does.
+			attemptCtx = provider.WithToolDeltas(ctx, func(raw json.RawMessage) error {
+				started = true
+				return onTools(raw)
+			})
+		}
+		usage, err := streamer.ChatStream(attemptCtx, req, func(delta string) error {
 			started = true
 			return onDelta(delta)
 		})

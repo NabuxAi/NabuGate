@@ -1057,7 +1057,24 @@ func (s *Server) streamChat(w http.ResponseWriter, r *http.Request, alias, route
 		}
 	}
 
-	result, err := s.router.ChatStream(r.Context(), routeModel, req,
+	// The caller's tools are theirs to run, so a streamed tool call is
+	// forwarded as OpenAI's own delta and the stream ends with finish_reason
+	// "tool_calls" — what LangGraph, the Vercel AI SDK and the Agents SDK wait
+	// for before they execute anything.
+	sawToolCalls := false
+	ctx := r.Context()
+	if clientSuppliesTools(req.Raw) {
+		ctx = provider.WithToolDeltas(ctx, func(raw json.RawMessage) error {
+			if !headersWritten {
+				startHeaders()
+			}
+			sawToolCalls = true
+			writeSSE(streamChunk(id, created, alias, metaProvider, metaModel, map[string]any{"tool_calls": raw}, nil))
+			return nil
+		})
+	}
+
+	result, err := s.router.ChatStream(ctx, routeModel, req,
 		func(p, m string) { metaProvider, metaModel = p, m },
 		func(delta string) error {
 			if !headersWritten {
@@ -1093,6 +1110,9 @@ func (s *Server) streamChat(w http.ResponseWriter, r *http.Request, alias, route
 	}
 
 	finish := "stop"
+	if sawToolCalls {
+		finish = "tool_calls"
+	}
 	if err != nil {
 		finish = "error"
 	}
@@ -1333,6 +1353,17 @@ func encodeEmbedding(vec []float64, format string) any {
 	return base64.StdEncoding.EncodeToString(buf)
 }
 
+// looksTokenized reports whether an embeddings input is OpenAI's
+// pre-tokenized form: an array of integers, or an array of such arrays.
+func looksTokenized(raw json.RawMessage) bool {
+	var flat []int
+	if json.Unmarshal(raw, &flat) == nil && len(flat) > 0 {
+		return true
+	}
+	var nested [][]int
+	return json.Unmarshal(raw, &nested) == nil && len(nested) > 0
+}
+
 func (s *Server) handleEmbeddings(w http.ResponseWriter, r *http.Request) {
 	var body embeddingRequestBody
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
@@ -1349,6 +1380,16 @@ func (s *Server) handleEmbeddings(w http.ResponseWriter, r *http.Request) {
 	if err := json.Unmarshal(body.Input, &inputs); err != nil {
 		var single string
 		if err2 := json.Unmarshal(body.Input, &single); err2 != nil {
+			if looksTokenized(body.Input) {
+				// Token ids are one vendor's tokenizer, and an alias may fall
+				// back to another vendor, where the same ids are different
+				// words: the vectors would be wrong without any error. This
+				// is LangChain's OpenAIEmbeddings default, so the fix is named.
+				writeErrorCode(w, http.StatusBadRequest, "tokenized_input",
+					"field 'input' must be text, not token ids: an alias can be served by a vendor with a different tokenizer. "+
+						"With LangChain's OpenAIEmbeddings set check_embedding_ctx_length=False; with LlamaIndex or LiteLLM send strings", nil)
+				return
+			}
 			writeError(w, http.StatusBadRequest, "field 'input' must be a string or array of strings")
 			return
 		}

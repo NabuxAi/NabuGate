@@ -245,11 +245,13 @@ func (a *OpenAIAdapter) ChatStream(ctx context.Context, req ChatRequest, onDelta
 
 	var usage Usage
 	var outputBytes int
+	onTools := ToolDeltas(ctx)
 	err = readSSE(resp.Body, func(data []byte) (bool, error) {
 		var chunk struct {
 			Choices []struct {
 				Delta struct {
-					Content string `json:"content"`
+					Content   string          `json:"content"`
+					ToolCalls json.RawMessage `json:"tool_calls"`
 				} `json:"delta"`
 			} `json:"choices"`
 			Usage *struct {
@@ -265,6 +267,15 @@ func (a *OpenAIAdapter) ChatStream(ctx context.Context, req ChatRequest, onDelta
 			if c.Delta.Content != "" {
 				outputBytes += len(c.Delta.Content)
 				if err := onDelta(c.Delta.Content); err != nil {
+					return true, err
+				}
+			}
+			// A tool call is output too: an agent's turn is often nothing
+			// but one, and dropping it left the stream "empty" and the agent
+			// with no call to run.
+			if len(c.Delta.ToolCalls) > 0 && string(c.Delta.ToolCalls) != "null" && onTools != nil {
+				outputBytes += len(c.Delta.ToolCalls)
+				if err := onTools(c.Delta.ToolCalls); err != nil {
 					return true, err
 				}
 			}

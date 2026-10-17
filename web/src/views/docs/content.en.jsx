@@ -258,6 +258,87 @@ for chunk in stream:
         </section>
       )}
 
+      {active === 'frameworks' && (
+        <section>
+          <H1>LangChain and AI frameworks</H1>
+          <Lead>NabuGate speaks the OpenAI wire format, so any framework that can talk to OpenAI talks to it: set the base URL to <code dir="ltr">{BASE}</code>, use your key, and put an alias in the model name. Chat, streaming, tool calling (streamed too), structured output, agents and embeddings were tested with each library below.</Lead>
+          <H2>LangChain (Python) and LangGraph</H2>
+          <CodeBlock code={`from langchain_openai import ChatOpenAI, OpenAIEmbeddings
+
+llm = ChatOpenAI(base_url="${BASE}", api_key="${KEY}", model="nabu-smart")
+print(llm.invoke("Hello!").content)
+
+# Tools, structured output and agents work as with OpenAI
+llm_with_tools = llm.bind_tools([get_weather])
+person = llm.with_structured_output(Person).invoke("…")
+
+# Embeddings: send text, not token ids
+emb = OpenAIEmbeddings(base_url="${BASE}", api_key="${KEY}",
+                       model="nabu-embed", check_embedding_ctx_length=False)`} label="python" />
+          <H2>LangChain.js</H2>
+          <CodeBlock code={`import { ChatOpenAI } from "@langchain/openai";
+
+const llm = new ChatOpenAI({
+  model: "nabu-smart",
+  apiKey: "${KEY}",
+  configuration: { baseURL: "${BASE}" },
+});
+const r = await llm.invoke("Hello!");`} label="node" />
+          <H2>OpenAI Agents SDK</H2>
+          <CodeBlock code={`from openai import AsyncOpenAI
+from agents import Agent, Runner, OpenAIChatCompletionsModel, set_tracing_disabled
+
+set_tracing_disabled(True)  # traces go to OpenAI otherwise
+client = AsyncOpenAI(base_url="${BASE}", api_key="${KEY}")
+agent = Agent(
+    name="assistant",
+    instructions="You are helpful.",
+    model=OpenAIChatCompletionsModel(model="nabu-smart", openai_client=client),
+    tools=[get_weather],
+)
+result = await Runner.run(agent, "Weather in Tehran?")`} label="python" />
+          <H2>Vercel AI SDK</H2>
+          <CodeBlock code={`import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
+import { streamText } from "ai";
+
+const nabu = createOpenAICompatible({
+  name: "nabugate",
+  baseURL: "${BASE}",
+  apiKey: "${KEY}",
+  includeUsage: true,
+});
+
+const result = streamText({ model: nabu("nabu-smart"), prompt: "Hello!", tools: { weather } });`} label="node" />
+          <H2>Pydantic AI, LiteLLM, CrewAI, LlamaIndex</H2>
+          <CodeBlock code={`# Pydantic AI
+from pydantic_ai import Agent
+from pydantic_ai.models.openai import OpenAIChatModel
+from pydantic_ai.providers.openai import OpenAIProvider
+agent = Agent(OpenAIChatModel("nabu-smart",
+    provider=OpenAIProvider(base_url="${BASE}", api_key="${KEY}")))
+
+# LiteLLM (and CrewAI, which uses it)
+import litellm
+litellm.completion(model="openai/nabu-smart", api_base="${BASE}",
+                   api_key="${KEY}", messages=[{"role": "user", "content": "Hi"}])
+
+# LlamaIndex
+from llama_index.llms.openai_like import OpenAILike
+llm = OpenAILike(model="nabu-smart", api_base="${BASE}", api_key="${KEY}",
+                 is_chat_model=True, is_function_calling_model=True)`} label="python" />
+          <H2>No-code tools: n8n, Dify, Flowise</H2>
+          <p>Choose the OpenAI (or “OpenAI-compatible”) credential, set the base URL to <code dir="ltr">{BASE}</code>, paste your key, and type the alias as the model name.</p>
+          <H2>Good to know</H2>
+          <ul style={{ paddingInlineStart: 20, display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <li><strong>Tools and agents:</strong> use an alias whose models speak the OpenAI tool format, such as <code>nabu-smart</code> or <code>nabu-fast</code>. The <code>nabu-claude*</code> aliases answer text only for now.</li>
+            <li><strong>Embeddings in LangChain:</strong> set <code>check_embedding_ctx_length=False</code>. Otherwise LangChain sends token ids, which are only valid for one vendor’s tokenizer, and the gateway refuses them with the <code>tokenized_input</code> error.</li>
+            <li><strong>OpenAI Agents SDK:</strong> use <code>OpenAIChatCompletionsModel</code> as above. Its default, the Responses API, is passed through as-is and needs a model whose vendor supports <code dir="ltr">/v1/responses</code>.</li>
+            <li><strong>Flows</strong> (several agents in a chain) answer in one piece, not as a stream.</li>
+            <li>Every call is metered against your balance exactly as a direct call is; a call made with your own vendor key (<code dir="ltr">X-Nabu-Key-&lt;provider&gt;</code>) costs nothing.</li>
+          </ul>
+        </section>
+      )}
+
       {active === 'curl' && (
         <section>
           <H1>cURL</H1>
