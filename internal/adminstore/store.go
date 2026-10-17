@@ -35,7 +35,7 @@ var (
 	ErrBadCredentials = errors.New("invalid username or password")
 	ErrNoSession      = errors.New("no valid session")
 	ErrTokenNotFound  = errors.New("token not found")
-	ErrNameTaken      = errors.New("a token with that name already exists")
+	ErrNameTaken      = errors.New("that name is taken or was used by an earlier key — pick another")
 )
 
 // pbkdf2 cost. 600k SHA-256 iterations is the OWASP figure; it costs a few
@@ -655,10 +655,23 @@ func (s *Store) NewToken(name string, allow []string, rateLimit int, origins []s
 		return Token{}, "", errors.New("an allow-list is required — a key that reaches everything is an admin key")
 	}
 
+	// Usage and debits are keyed by this name. A name in parentheses is the
+	// gateway's own bucket ("(admin)", "(flow-test)"), and a name that already
+	// has history belongs to a deleted key or a config project: a new key on
+	// it would inherit that history and be debited for traffic not its own.
+	if strings.HasPrefix(name, "(") {
+		return Token{}, "", ErrNameTaken
+	}
+
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	for _, t := range s.st.Tokens {
 		if strings.EqualFold(t.Name, name) {
+			return Token{}, "", ErrNameTaken
+		}
+	}
+	for used := range s.st.Usage {
+		if strings.EqualFold(used, name) {
 			return Token{}, "", ErrNameTaken
 		}
 	}

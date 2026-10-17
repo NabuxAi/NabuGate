@@ -1,6 +1,7 @@
 package adminstore
 
 import (
+	"errors"
 	"path/filepath"
 	"testing"
 )
@@ -76,5 +77,23 @@ func TestOwnerSpendIsBrokenDownByModelAndDay(t *testing.T) {
 	}
 	if len(days) != 1 || days[0].Requests != 3 {
 		t.Fatalf("by day: %+v", days)
+	}
+}
+
+// A new key on a deleted key's name would inherit its usage history and debits.
+func TestATokenNameWithHistoryCannotBeReused(t *testing.T) {
+	st := mustOpen(t, filepath.Join(t.TempDir(), "admin.json"))
+	tok, _, err := st.NewToken("shop", []string{"*"}, 0, nil, "a@example.com", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	st.RecordUsage(tok.Name, "p", "m", UsageEntry{Requests: 1, CostUSD: 3})
+	if err := st.DeleteToken("shop"); err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"shop", "SHOP", "(admin)"} {
+		if _, _, err := st.NewToken(name, []string{"*"}, 0, nil, "b@example.com", nil); !errors.Is(err, ErrNameTaken) {
+			t.Errorf("name %q: %v", name, err)
+		}
 	}
 }

@@ -428,7 +428,14 @@ func (s *Server) createToken(w http.ResponseWriter, r *http.Request) {
 		owner = sessionEmail
 	}
 
-	t, secret, err := s.admin.NewToken(req.Name, cleanList(req.Allow), req.RateLimit, cleanList(req.AllowedOrigins), owner, cleanList(req.Providers))
+	// A config project's name would share its usage bucket and debits.
+	for _, p := range s.policy.Projects() {
+		if strings.EqualFold(p, strings.TrimSpace(req.Name)) {
+			writeError(w, http.StatusConflict, adminstore.ErrNameTaken.Error())
+			return
+		}
+	}
+		t, secret, err := s.admin.NewToken(req.Name, cleanList(req.Allow), req.RateLimit, cleanList(req.AllowedOrigins), owner, cleanList(req.Providers))
 	if err != nil {
 		status := http.StatusBadRequest
 		if errors.Is(err, adminstore.ErrNameTaken) {
