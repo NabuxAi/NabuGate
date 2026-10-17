@@ -103,7 +103,22 @@ call):
 
 `seconds` is the cumulative duration, a snapshot rather than an increment, so a
 repeated or out-of-order report never bills twice. `final` closes the
-session; a session nobody finalises is forgotten after six hours. Only the
+session; a session nobody finalises is forgotten after six hours.
+
+The minutes are the caller's own report — only the vendor sees the audio — so
+the gateway bounds what a wrong or missing report can do:
+
+- **The first minute is prepaid** when the session is created; a call that
+  never reports still pays for one.
+- **A report is capped at the time elapsed** since creation plus five minutes,
+  so a bug cannot bill a call longer than the clock.
+- **Ten open sessions per key.** The eleventh answers `429` until one is
+  finalised.
+- **Quiet means abandoned.** A session with no report for ten minutes is
+  billed, once, up to when it went quiet plus those ten minutes, the next time
+  the same key touches `/v1/live`. It is kept: a call that was only quiet and
+  reports later is billed the rest and nothing twice. `packages/live-web`
+  reports every minute while connected, so a long call is billed exactly. Only the
 key that created a session may report on it — anything else is `404`.
 
 The registry of open sessions lives in `live-sessions.json` on the state volume

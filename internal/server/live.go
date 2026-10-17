@@ -32,6 +32,27 @@ import (
 // simply dropped, unbilled beyond what was reported.
 const liveSessionTTL = 6 * time.Hour
 
+// The minutes of a live call are reported by the caller, because only the
+// vendor sees the audio. These bound what a caller who reports wrongly — or
+// not at all — can do with that trust:
+const (
+	// livePrepaidSeconds is billed when the session is created, so a call
+	// that never reports is not a free one.
+	livePrepaidSeconds = 60
+	// liveStaleAfter is how long an open session may go without a report
+	// before it is treated as abandoned and billed, once, until it went quiet
+	// plus this window — the next time its key touches live. The session is
+	// kept, so a call that was only quiet and reports later is billed the rest
+	// and nothing twice: reports are cumulative snapshots.
+	liveStaleAfter = 10 * time.Minute
+	// liveClockSlack is how far a report may run ahead of the wall clock
+	// since creation. Beyond it the report is a bug, and billing a customer
+	// for a call longer than the time that has passed is not on.
+	liveClockSlack = 5 * time.Minute
+	// liveMaxOpen is how many sessions one key may hold open at once.
+	liveMaxOpen = 10
+)
+
 type liveSession struct {
 	project  string
 	provider string
@@ -46,6 +67,11 @@ type liveSession struct {
 	// are snapshots, not increments, so a repeated or out-of-order report can
 	// never double-bill.
 	billedSeconds int64
+	// lastSeen is the last time the session was created or reported on.
+	lastSeen time.Time
+	// reaped marks a session already billed as abandoned, so it is billed
+	// that way once and no longer counts as open.
+	reaped bool
 }
 
 // liveSessionRecord is a session as it is kept on disk.
@@ -58,6 +84,8 @@ type liveSessionRecord struct {
 	Created       time.Time `json:"created"`
 	ByCaller      bool      `json:"by_caller,omitempty"`
 	BilledSeconds int64     `json:"billed_seconds"`
+	LastSeen      time.Time `json:"last_seen,omitempty"`
+	Reaped        bool      `json:"reaped,omitempty"`
 }
 
 type liveSessions struct {
@@ -90,11 +118,15 @@ func (l *liveSessions) take(id, project string, seconds int64, final bool) (live
 	if !ok || s.project != project {
 		return liveSession{}, 0, false, nil
 	}
+	if ceiling := int64(time.Since(s.created).Seconds() + liveClockSlack.Seconds()); seconds > ceiling {
+		seconds = ceiling
+	}
 	delta := seconds - s.billedSeconds
 	if delta < 0 {
 		delta = 0
 	}
 	s.billedSeconds += delta
+	s.lastSeen = time.Now()
 	snapshot := *s
 	if final {
 		delete(l.sessions, id)
@@ -104,6 +136,52 @@ func (l *liveSessions) take(id, project string, seconds int64, final bool) (live
 		err = l.saveLocked()
 	}
 	return snapshot, delta, true, err
+}
+
+// reaped is an abandoned session and the seconds still owed on it.
+type reaped struct {
+	id      string
+	session liveSession
+	owed    int64
+}
+
+// reap bills a project's sessions that have gone quiet past liveStaleAfter
+// and returns what each owes: from creation until it went quiet plus the
+// stale window, less what was already billed. Each session is reaped once.
+func (l *liveSessions) reap(project string, now time.Time) ([]reaped, error) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	var out []reaped
+	for id, s := range l.sessions {
+		if s.project != project || s.reaped || now.Sub(s.lastSeen) <= liveStaleAfter {
+			continue
+		}
+		until := int64(s.lastSeen.Add(liveStaleAfter).Sub(s.created).Seconds())
+		owed := until - s.billedSeconds
+		if owed < 0 {
+			owed = 0
+		}
+		s.billedSeconds += owed
+		s.reaped = true
+		out = append(out, reaped{id: id, session: *s, owed: owed})
+	}
+	if len(out) == 0 {
+		return nil, nil
+	}
+	return out, l.saveLocked()
+}
+
+// open counts a project's sessions that are still live.
+func (l *liveSessions) open(project string) int {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	n := 0
+	for _, s := range l.sessions {
+		if s.project == project && !s.reaped {
+			n++
+		}
+	}
+	return n
 }
 
 func (l *liveSessions) prune() {
@@ -147,6 +225,11 @@ func (l *liveSessions) persistTo(path string) error {
 				created:       rec.Created,
 				byCaller:      rec.ByCaller,
 				billedSeconds: rec.BilledSeconds,
+				lastSeen:      rec.LastSeen,
+				reaped:        rec.Reaped,
+			}
+			if l.sessions[rec.ID].lastSeen.IsZero() {
+				l.sessions[rec.ID].lastSeen = rec.Created
 			}
 		}
 	}
@@ -170,6 +253,8 @@ func (l *liveSessions) saveLocked() error {
 			Created:       s.created,
 			ByCaller:      s.byCaller,
 			BilledSeconds: s.billedSeconds,
+			LastSeen:      s.lastSeen,
+			Reaped:        s.reaped,
 		})
 	}
 	raw, err := json.Marshal(records)
@@ -254,6 +339,13 @@ func (s *Server) handleLiveSession(w http.ResponseWriter, r *http.Request) {
 	if !s.aliasAllowed(w, r, alias) {
 		return
 	}
+	project := s.project(r)
+	s.reapLive(r, project)
+	if s.live.open(project) >= liveMaxOpen {
+		writeError(w, http.StatusTooManyRequests, fmt.Sprintf(
+			"this key already has %d live sessions open; finalise one (POST /v1/live/sessions/{id}/usage with \"final\": true) before opening another", liveMaxOpen))
+		return
+	}
 
 	result, err := s.router.LiveSession(r.Context(), alias, body)
 	if err != nil {
@@ -261,22 +353,25 @@ func (s *Server) handleLiveSession(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	project := s.project(r)
-	if err := s.live.put(result.ID, &liveSession{
-		project:  project,
-		provider: result.Provider,
-		model:    result.Model,
-		alias:    alias,
-		created:  time.Now(),
-		byCaller: servedByCaller(r.Context()),
-	}); err != nil {
+	now := time.Now()
+	session := &liveSession{
+		project:       project,
+		provider:      result.Provider,
+		model:         result.Model,
+		alias:         alias,
+		created:       now,
+		byCaller:      servedByCaller(r.Context()),
+		billedSeconds: livePrepaidSeconds,
+		lastSeen:      now,
+	}
+	if err := s.live.put(result.ID, session); err != nil {
 		// The call is already open at the vendor; failing the caller now would
 		// strand it. Said out loud so an unwritable volume gets noticed.
 		s.log.Warn("persist live sessions", "error", err)
 	}
-	// The creation itself is a request on the books with no cost yet; the
-	// minutes follow through usage reports.
-	s.record(r, result.Provider, result.Model, provider.Usage{})
+	// The creation is the call's one request on the books, and pays its
+	// first minute; the rest follows through usage reports.
+	s.billLive(r, project, *session, livePrepaidSeconds, true)
 
 	w.Header().Set("X-Nabu-Provider", result.Provider)
 	w.Header().Set("X-Nabu-Model", result.Model)
@@ -316,6 +411,7 @@ func (s *Server) handleLiveUsage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	project := s.project(r)
+	s.reapLive(r, project)
 	session, delta, ok, saveErr := s.live.take(id, project, body.Seconds, body.Final)
 	if saveErr != nil {
 		s.log.Warn("persist live sessions", "error", saveErr)
@@ -327,19 +423,10 @@ func (s *Server) handleLiveUsage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	list, priced := s.usage.PriceOf(session.provider, session.model, usage.Metered{Seconds: float64(delta)})
-	cost, providerCost := s.charge(r.Context(), session.byCaller, list)
-	if delta > 0 {
-		// The call was counted as one request when it was signalled; a report of
-		// its clock only adds minutes and money. Counting each one made a
-		// two-minute call nine requests in the console.
-		s.meter(r, project, session.provider, session.model, adminstore.UsageEntry{
-			CostUSD:         cost,
-			ProviderCostUSD: providerCost,
-			Unpriced:        !priced && !servedByCaller(r.Context()),
-			AudioSeconds:    float64(delta),
-		})
-	}
+	// The call was counted as one request when it was signalled; a report of
+	// its clock only adds minutes and money. Counting each one made a
+	// two-minute call nine requests in the console.
+	cost := s.billLive(r, project, session, delta, false)
 
 	writeJSON(w, http.StatusOK, liveUsageResponse{
 		SessionID:     id,
@@ -348,4 +435,41 @@ func (s *Server) handleLiveUsage(w http.ResponseWriter, r *http.Request) {
 		CostUSD:       cost,
 		Final:         body.Final,
 	})
+}
+
+// billLive charges seconds of a live call to the key's owner at the model's
+// per-minute price (times the plan rate, like every other metered call).
+// request counts the call itself, once, when it is signalled.
+func (s *Server) billLive(r *http.Request, project string, session liveSession, seconds int64, request bool) float64 {
+	if seconds <= 0 && !request {
+		return 0
+	}
+	list, priced := s.usage.PriceOf(session.provider, session.model, usage.Metered{Seconds: float64(seconds)})
+	cost, providerCost := s.charge(r.Context(), session.byCaller, list)
+	e := adminstore.UsageEntry{
+		CostUSD:         cost,
+		ProviderCostUSD: providerCost,
+		Unpriced:        !priced && !session.byCaller,
+		AudioSeconds:    float64(seconds),
+	}
+	if request {
+		e.Requests = 1
+	}
+	s.meter(r, project, session.provider, session.model, e)
+	return cost
+}
+
+// reapLive bills and forgets this key's abandoned sessions. It runs on the
+// key's own live requests, so the bill lands with the key that ran the call
+// and no background job has to impersonate one.
+func (s *Server) reapLive(r *http.Request, project string) {
+	gone, err := s.live.reap(project, time.Now())
+	if err != nil {
+		s.log.Warn("persist live sessions", "error", err)
+	}
+	for _, g := range gone {
+		cost := s.billLive(r, project, g.session, g.owed, false)
+		s.log.Warn("live session went quiet without a final report; billed until it went quiet plus the grace window",
+			"session", g.id, "project", project, "seconds", g.owed, "cost_usd", cost)
+	}
 }

@@ -186,6 +186,11 @@ function waitForIceGathering(pc, timeoutMs = 1500) {
  *   by `item` keeps the transcript in the order things were said. `final` closes a turn; one of
  *   the caller's that closes empty was noise.
  * @param {(seconds:number) => void} [o.onUsage]
+ *   Cumulative seconds of the call, to relay to the gateway. Fires on the vendor's usage events,
+ *   every `usageEverySeconds` while connected (the browser's own clock), and once on hang-up.
+ * @param {number} [o.usageEverySeconds] Heartbeat interval for onUsage; 0 turns it off. Default 60.
+ *   The gateway treats a session that has not reported for ten minutes as abandoned and bills it
+ *   up to then, so a long call needs these reports to be billed exactly.
  * @param {(speaking:boolean) => void} [o.onSpeaking]
  * @param {() => void} [o.onConnect]
  * @param {(reason:string) => void} [o.onClose]
@@ -205,6 +210,7 @@ export async function connectLive({
     onError,
     onEvent,
     speakFirst = false,
+    usageEverySeconds = 60,
     iceServers = [{ urls: "stun:stun.l.google.com:19302" }],
     audioElement,
 } = {}) {
@@ -224,6 +230,10 @@ export async function connectLive({
     let resolveClosed;
     const closedPromise = new Promise((r) => (resolveClosed = r));
     let speakingTimer;
+    // The call's own clock, from the moment audio can flow.
+    let connectedAt = 0;
+    let usageTimer;
+    const elapsed = () => (connectedAt ? Math.floor((Date.now() - connectedAt) / 1000) : 0);
     // "realtime" or "gpt-live", read off the call's first event.
     let dialect = null;
     // The caller's Realtime turns whose words have streamed in, so the full
@@ -237,6 +247,8 @@ export async function connectLive({
         if (closed) return;
         closed = true;
         clearTimeout(speakingTimer);
+        clearInterval(usageTimer);
+        if (connectedAt) onUsage?.(elapsed());
         try {
             channel.close();
         } catch {}
@@ -310,6 +322,10 @@ export async function connectLive({
         if (type === REALTIME_EVENTS.created || type === EVENTS.started) {
             dialect = type === EVENTS.started ? "gpt-live" : "realtime";
             onConnect?.();
+            if (!connectedAt) {
+                connectedAt = Date.now();
+                if (usageEverySeconds > 0) usageTimer = setInterval(() => onUsage?.(elapsed()), usageEverySeconds * 1000);
+            }
             if (speakFirst && dialect === "realtime") send({ type: REALTIME_EVENTS.responseCreate });
             return;
         }

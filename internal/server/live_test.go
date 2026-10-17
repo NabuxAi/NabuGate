@@ -10,7 +10,9 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 
 	"nabugate/internal/config"
 	"nabugate/internal/policy"
@@ -70,7 +72,22 @@ func newLiveServer(t *testing.T, upstreamURL string, o liveServerOpts) (*httptes
 			t.Fatal(err)
 		}
 	}
-	return httptest.NewServer(srv.Handler()), tracker
+	ts := httptest.NewServer(srv.Handler())
+	liveTestServers.Store(ts, srv)
+	return ts, tracker
+}
+
+// liveTestServers maps a test server to the Server behind it, for tests that
+// age a session rather than wait ten minutes.
+var liveTestServers sync.Map
+
+func liveServerOf(t *testing.T, ts *httptest.Server) *Server {
+	t.Helper()
+	v, ok := liveTestServers.Load(ts)
+	if !ok {
+		t.Fatal("not a live test server")
+	}
+	return v.(*Server)
 }
 
 func newLiveTestServer(t *testing.T, upstreamURL string) (*httptest.Server, *usage.Tracker) {
@@ -204,9 +221,13 @@ func TestLiveUsageBillsSnapshotsOnce(t *testing.T) {
 		return out
 	}
 
-	// 60 s at $0.06/min.
+	// The first minute was prepaid when the session was created, at
+	// $0.06/min, so reporting it charges nothing more.
+	if _, byModel := tracker.Snapshot(); byModel["openai/gpt-live-1"].CostUSD < 0.0599 {
+		t.Fatalf("creation did not prepay the first minute: %+v", byModel)
+	}
 	first := report(`{"seconds":60}`)
-	if first.CostUSD < 0.0599 || first.CostUSD > 0.0601 || first.BilledSeconds != 60 {
+	if first.CostUSD != 0 || first.BilledSeconds != 60 {
 		t.Fatalf("first report: %+v", first)
 	}
 	// A repeated snapshot charges nothing more.
@@ -430,5 +451,71 @@ func TestModelsOfferTheLiveAliasOnlyToKeysAllowedIt(t *testing.T) {
 	}
 	if !lists("voice") {
 		t.Fatal("nabu-live hidden from a key allowed nabu-*")
+	}
+}
+
+// A session that is never finalised is billed until it went quiet plus the
+// stale window, the next time its key touches live — not dropped unbilled.
+func TestAnAbandonedLiveSessionIsBilledWhenItsKeyComesBack(t *testing.T) {
+	up, _ := liveUpstream(t)
+	defer up.Close()
+	ts, tracker := newLiveTestServer(t, up.URL)
+	defer ts.Close()
+	if status, body := postLive(t, ts, "/v1/live/sessions", `{"model":"nabu-live","transport":{"sdp":"o"}}`); status != http.StatusCreated {
+		t.Fatalf("create: %d %s", status, body)
+	}
+
+	// Never reported. Age it past the stale window.
+	srv := liveServerOf(t, ts)
+	srv.live.mu.Lock()
+	sess := srv.live.sessions["live_123"]
+	sess.created = sess.created.Add(-30 * time.Minute)
+	sess.lastSeen = sess.created
+	srv.live.mu.Unlock()
+
+	// The same key reports on any session: the abandoned one is billed first.
+	postLive(t, ts, "/v1/live/sessions/some_other/usage", `{"seconds":1}`)
+	_, byModel := tracker.Snapshot()
+	// The prepaid minute, then up to the stale window: 600 s at $0.06/min.
+	if got := byModel["openai/gpt-live-1"].CostUSD; got < 0.599 || got > 0.601 {
+		t.Fatalf("billed %v, want 0.60", got)
+	}
+
+	// It was only quiet: its final report, at 25 minutes, bills the rest and
+	// nothing twice — 25 − 10 = 15 more minutes.
+	postLive(t, ts, "/v1/live/sessions/live_123/usage", `{"seconds":1500,"final":true}`)
+	_, byModel = tracker.Snapshot()
+	if got := byModel["openai/gpt-live-1"].CostUSD; got < 1.499 || got > 1.501 {
+		t.Fatalf("after the late final report billed %v, want 0.60 + 0.90 = 1.50", got)
+	}
+}
+
+// One key cannot hold an unbounded number of calls open.
+func TestLiveSessionsPerKeyAreCapped(t *testing.T) {
+	up, _ := liveUpstream(t)
+	defer up.Close()
+	ts, _ := newLiveTestServer(t, up.URL)
+	defer ts.Close()
+	srv := liveServerOf(t, ts)
+	for i := 0; i < liveMaxOpen; i++ {
+		srv.live.put(fmt.Sprintf("open_%d", i), &liveSession{project: srv.project(httptest.NewRequest("GET", "/", nil)), created: time.Now(), lastSeen: time.Now()})
+	}
+	if status, _ := postLive(t, ts, "/v1/live/sessions", `{"model":"nabu-live","transport":{"sdp":"o"}}`); status != http.StatusTooManyRequests {
+		t.Fatalf("an eleventh open session got %d", status)
+	}
+}
+
+// A report cannot bill more time than has passed since the call began.
+func TestALiveReportCannotOutrunTheClock(t *testing.T) {
+	up, _ := liveUpstream(t)
+	defer up.Close()
+	ts, _ := newLiveTestServer(t, up.URL)
+	defer ts.Close()
+	postLive(t, ts, "/v1/live/sessions", `{"model":"nabu-live","transport":{"sdp":"o"}}`)
+	_, body := postLive(t, ts, "/v1/live/sessions/live_123/usage", `{"seconds":999999999,"final":true}`)
+	var out liveUsageResponse
+	json.Unmarshal([]byte(body), &out)
+	if out.BilledSeconds > int64(liveClockSlack.Seconds())+5 {
+		t.Fatalf("billed %d seconds of a call that began moments ago", out.BilledSeconds)
 	}
 }

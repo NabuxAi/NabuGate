@@ -109,11 +109,17 @@ Route::post('/api/voice/usage', function (Request $r) {
 });
 ```
 
-`onUsage` fires when the vendor's `session.*` events carry a duration. The
-vendor documents a `usage` object on `session.closed` without naming its field,
-so the SDK reads several spellings and stays silent on one it does not know.
-If you already time the call yourself — NabuCRM does — report your own clock
-instead; the gateway bills the highest snapshot it has seen, never twice.
+`onUsage` fires with the call's cumulative seconds: every minute while it is
+connected (the browser's clock; `usageEverySeconds` changes it), on hang-up,
+and whenever the vendor's `session.*` events carry a duration. If you already
+time the call yourself — NabuCRM does — report your own clock instead; the
+gateway bills the highest snapshot it has seen, never twice.
+
+Report while the call runs, not only at the end. The gateway prepays the
+first minute when the session opens, caps each report at the time actually
+elapsed, allows ten open sessions per key, and bills a session that has not
+reported for ten minutes as abandoned — up to when it went quiet plus those
+ten minutes. A later report on it still bills only what is left.
 
 Same three in Next.js route handlers, an Express router or a Go handler —
 the bodies are identical. NabuGate meters the minutes against the key's
