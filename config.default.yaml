@@ -2502,4 +2502,10 @@ plans:
     # and any multiple of zero is zero — without this, a month of transcription
     # on the gateway's own keys would bill nothing at all.
     min_charge_usd: 0.0002
+    # Usage credit added with each term. "Pay the difference and activate"
+    # charges exactly the price, so without it a new subscriber's balance is
+    # zero and their first call is a 402 — a plan that was just paid for and
+    # does not work. Granted in the same write as the charge, as a
+    # plan-credit row in their history.
+    includes_credit_usd: 2
     popular: true
