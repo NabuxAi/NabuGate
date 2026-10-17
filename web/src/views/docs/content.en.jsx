@@ -330,7 +330,7 @@ llm = OpenAILike(model="nabu-smart", api_base="${BASE}", api_key="${KEY}",
           <p>Choose the OpenAI (or “OpenAI-compatible”) credential, set the base URL to <code dir="ltr">{BASE}</code>, paste your key, and type the alias as the model name.</p>
           <H2>Good to know</H2>
           <ul style={{ paddingInlineStart: 20, display: 'flex', flexDirection: 'column', gap: 8 }}>
-            <li><strong>Tools and agents:</strong> use an alias whose models speak the OpenAI tool format, such as <code>nabu-smart</code> or <code>nabu-fast</code>. The <code>nabu-claude*</code> aliases answer text only for now.</li>
+            <li><strong>Tools, agents and images</strong> work on every chat alias, the <code>nabu-claude*</code> ones included: the gateway translates OpenAI tools, tool results and images to Claude’s format and back. The current Claude models choose for themselves whether to call a tool, so <code>tool_choice: "required"</code> is treated as <code>"auto"</code> there; ask for the tool in the prompt.</li>
             <li><strong>Embeddings in LangChain:</strong> set <code>check_embedding_ctx_length=False</code>. Otherwise LangChain sends token ids, which are only valid for one vendor’s tokenizer, and the gateway refuses them with the <code>tokenized_input</code> error.</li>
             <li><strong>OpenAI Agents SDK:</strong> use <code>OpenAIChatCompletionsModel</code> as above. Its default, the Responses API, is passed through as-is and needs a model whose vendor supports <code dir="ltr">/v1/responses</code>.</li>
             <li><strong>Flows</strong> (several agents in a chain) answer in one piece, not as a stream.</li>

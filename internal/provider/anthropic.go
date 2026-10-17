@@ -11,8 +11,9 @@ import (
 )
 
 // AnthropicAdapter speaks the Anthropic Messages API. It differs from the
-// OpenAI shape in three ways: the system prompt is a top-level field, max_tokens
-// is required, and auth uses the x-api-key header.
+// OpenAI shape in that the system prompt is a top-level field, max_tokens is
+// required, auth uses the x-api-key header, and tools, tool calls, tool
+// results and images are content blocks; anthropic_wire.go translates.
 type AnthropicAdapter struct {
 	name    string
 	baseURL string
@@ -32,25 +33,13 @@ func NewAnthropicAdapter(name, baseURL, apiKey string) *AnthropicAdapter {
 
 func (a *AnthropicAdapter) Name() string { return a.name }
 
-type anthropicRequest struct {
-	Model         string             `json:"model"`
-	MaxTokens     int                `json:"max_tokens"`
-	System        string             `json:"system,omitempty"`
-	Messages      []anthropicMessage `json:"messages"`
-	Temperature   *float64           `json:"temperature,omitempty"`
-	TopP          *float64           `json:"top_p,omitempty"`
-	StopSequences []string           `json:"stop_sequences,omitempty"`
-}
-
-type anthropicMessage struct {
-	Role    string `json:"role"` // "user" | "assistant"
-	Content string `json:"content"`
-}
+// SupportsTools implements ToolCapableAdapter: OpenAI tools, tool_choice, tool
+// calls and tool results are translated to and from Anthropic's tool_use and
+// tool_result blocks (anthropic_wire.go).
+func (a *AnthropicAdapter) SupportsTools() bool { return true }
 
 type anthropicResponse struct {
-	Content []struct {
-		Text string `json:"text"`
-	} `json:"content"`
+	Content    []anthropicBlock  `json:"content"`
 	StopReason string            `json:"stop_reason"`
 	Usage      anthropicUsageRaw `json:"usage"`
 	Error      *struct {
@@ -102,36 +91,9 @@ func mapAnthropicFinish(r string) string {
 }
 
 func (a *AnthropicAdapter) Chat(ctx context.Context, req ChatRequest) (ChatResponse, error) {
-	// Anthropic carries the system prompt outside the messages array.
-	var system strings.Builder
-	msgs := make([]anthropicMessage, 0, len(req.Messages))
-	for _, m := range req.Messages {
-		if m.Role == "system" {
-			if system.Len() > 0 {
-				system.WriteString("\n\n")
-			}
-			system.WriteString(m.Content)
-			continue
-		}
-		msgs = append(msgs, anthropicMessage{Role: m.Role, Content: m.Content})
-	}
-
-	maxTokens := 1024
-	if req.MaxTokens != nil && *req.MaxTokens > 0 {
-		maxTokens = *req.MaxTokens
-	}
-
-	body, err := json.Marshal(anthropicRequest{
-		Model:         req.Model,
-		MaxTokens:     maxTokens,
-		System:        system.String(),
-		Messages:      msgs,
-		Temperature:   anthropicSampling(req, req.Temperature),
-		TopP:          anthropicSampling(req, req.TopP),
-		StopSequences: stopToSlice(req.Stop),
-	})
+	body, err := buildAnthropicBody(req, false)
 	if err != nil {
-		return ChatResponse{}, err
+		return ChatResponse{}, fmt.Errorf("%s: %w", a.name, err)
 	}
 
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, a.baseURL+"/messages", bytes.NewReader(body))
@@ -166,19 +128,23 @@ func (a *AnthropicAdapter) Chat(ctx context.Context, req ChatRequest) (ChatRespo
 
 	var text strings.Builder
 	for _, c := range parsed.Content {
-		text.WriteString(c.Text)
+		if c.Type == "" || c.Type == "text" {
+			text.WriteString(c.Text)
+		}
 	}
+	toolCalls := openAIToolCalls(parsed.Content)
 
 	usage := parsed.Usage.usage()
 	if usage.TotalTokens == 0 && usage.CacheReadInput == 0 && usage.CacheCreationInput == 0 {
 		// Anthropic answered with content but no usage object. Guess from the
 		// bytes that moved, flagged as a guess, so the call is metered at
 		// something rather than passed off as a free month.
-		usage = estimateUsage(req, len(text.String()))
+		usage = estimateUsage(req, len(text.String())+len(toolCalls))
 	}
 
 	return ChatResponse{
 		Content:      text.String(),
+		ToolCalls:    toolCalls,
 		FinishReason: mapAnthropicFinish(parsed.StopReason),
 		Usage:        usage,
 	}, nil
@@ -186,44 +152,9 @@ func (a *AnthropicAdapter) Chat(ctx context.Context, req ChatRequest) (ChatRespo
 
 // ChatStream implements StreamAdapter for the Anthropic Messages API.
 func (a *AnthropicAdapter) ChatStream(ctx context.Context, req ChatRequest, onDelta DeltaFunc) (Usage, error) {
-	var system strings.Builder
-	msgs := make([]anthropicMessage, 0, len(req.Messages))
-	for _, m := range req.Messages {
-		if m.Role == "system" {
-			if system.Len() > 0 {
-				system.WriteString("\n\n")
-			}
-			system.WriteString(m.Content)
-			continue
-		}
-		msgs = append(msgs, anthropicMessage{Role: m.Role, Content: m.Content})
-	}
-	maxTokens := 1024
-	if req.MaxTokens != nil && *req.MaxTokens > 0 {
-		maxTokens = *req.MaxTokens
-	}
-
-	payload := map[string]any{
-		"model":      req.Model,
-		"max_tokens": maxTokens,
-		"messages":   msgs,
-		"stream":     true,
-	}
-	if system.Len() > 0 {
-		payload["system"] = system.String()
-	}
-	if t := anthropicSampling(req, req.Temperature); t != nil {
-		payload["temperature"] = *t
-	}
-	if p := anthropicSampling(req, req.TopP); p != nil {
-		payload["top_p"] = *p
-	}
-	if stops := stopToSlice(req.Stop); len(stops) > 0 {
-		payload["stop_sequences"] = stops
-	}
-	body, err := json.Marshal(payload)
+	body, err := buildAnthropicBody(req, true)
 	if err != nil {
-		return Usage{}, err
+		return Usage{}, fmt.Errorf("%s: %w", a.name, err)
 	}
 
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, a.baseURL+"/messages", bytes.NewReader(body))
@@ -243,11 +174,19 @@ func (a *AnthropicAdapter) ChatStream(ctx context.Context, req ChatRequest, onDe
 
 	var usage Usage
 	var outputBytes int
+	onTools := ToolDeltas(ctx)
+	// Anthropic numbers every content block; OpenAI numbers tool calls only.
+	// toolIndex maps one to the other for the deltas the caller reassembles.
+	toolIndex := map[int]int{}
 	err = readSSE(resp.Body, func(data []byte) (bool, error) {
 		var ev struct {
-			Type  string `json:"type"`
-			Delta struct {
+			Type         string         `json:"type"`
+			Index        int            `json:"index"`
+			ContentBlock anthropicBlock `json:"content_block"`
+			Delta        struct {
+				Type         string `json:"type"`
 				Text         string `json:"text"`
+				PartialJSON  string `json:"partial_json"`
 				OutputTokens int    `json:"output_tokens"`
 			} `json:"delta"`
 			Message struct {
@@ -261,7 +200,35 @@ func (a *AnthropicAdapter) ChatStream(ctx context.Context, req ChatRequest, onDe
 			return false, nil
 		}
 		switch ev.Type {
+		case "content_block_start":
+			if ev.ContentBlock.Type == "tool_use" && onTools != nil {
+				i := len(toolIndex)
+				toolIndex[ev.Index] = i
+				start, _ := json.Marshal([]map[string]any{{
+					"index": i, "id": ev.ContentBlock.ID, "type": "function",
+					"function": map[string]any{"name": ev.ContentBlock.Name, "arguments": ""},
+				}})
+				outputBytes += len(ev.ContentBlock.Name)
+				if err := onTools(start); err != nil {
+					return true, err
+				}
+			}
 		case "content_block_delta":
+			if ev.Delta.Type == "input_json_delta" {
+				i, ok := toolIndex[ev.Index]
+				if !ok || onTools == nil || ev.Delta.PartialJSON == "" {
+					return false, nil
+				}
+				part, _ := json.Marshal([]map[string]any{{"index": i, "function": map[string]any{"arguments": ev.Delta.PartialJSON}}})
+				outputBytes += len(ev.Delta.PartialJSON)
+				if err := onTools(part); err != nil {
+					return true, err
+				}
+				return false, nil
+			}
+			if ev.Delta.Type != "" && ev.Delta.Type != "text_delta" {
+				return false, nil // thinking and signature deltas are not the answer
+			}
 			if ev.Delta.Text != "" {
 				outputBytes += len(ev.Delta.Text)
 				if err := onDelta(ev.Delta.Text); err != nil {

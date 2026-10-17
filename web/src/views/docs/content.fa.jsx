@@ -330,7 +330,7 @@ llm = OpenAILike(model="nabu-smart", api_base="${BASE}", api_key="${KEY}",
           <p>اعتبارنامهٔ OpenAI (یا «OpenAI-compatible») را انتخاب کنید، آدرسِ پایه را <code dir="ltr">{BASE}</code> بگذارید، کلید را بچسبانید و alias را به‌عنوانِ نامِ مدل بنویسید.</p>
           <H2>نکته‌ها</H2>
           <ul style={{ paddingInlineStart: 20, display: 'flex', flexDirection: 'column', gap: 8 }}>
-            <li><strong>ابزار و ایجنت:</strong> aliasی بگیرید که مدل‌هایش فرمتِ ابزارِ OpenAI را می‌فهمند، مثلِ <code>nabu-smart</code> یا <code>nabu-fast</code>. aliasهای <code>nabu-claude*</code> فعلاً فقط متن جواب می‌دهند.</li>
+            <li><strong>ابزار، ایجنت و تصویر</strong> روی همهٔ aliasهای چت کار می‌کنند، از جمله <code>nabu-claude*</code>: دروازه ابزارها، نتیجهٔ ابزار و تصویرِ فرمتِ OpenAI را به فرمتِ Claude و برعکس ترجمه می‌کند. مدل‌های فعلیِ Claude خودشان تصمیم می‌گیرند ابزار را صدا بزنند یا نه، پس آن‌جا <code>tool_choice: "required"</code> مثلِ <code>"auto"</code> رفتار می‌کند؛ ابزار را در پرامپت بخواهید.</li>
             <li><strong>Embedding در LangChain:</strong> <code>check_embedding_ctx_length=False</code> را بگذارید. وگرنه LangChain شناسهٔ توکن می‌فرستد که فقط برای توکنایزرِ یک فروشنده معنا دارد، و دروازه آن را با خطای <code>tokenized_input</code> رد می‌کند.</li>
             <li><strong>OpenAI Agents SDK:</strong> مثلِ بالا از <code>OpenAIChatCompletionsModel</code> استفاده کنید. حالتِ پیش‌فرضش یعنی Responses API دست‌نخورده عبور می‌کند و مدلی می‌خواهد که فروشنده‌اش <code dir="ltr">/v1/responses</code> داشته باشد.</li>
             <li><strong>فلوها</strong> (چند ایجنت پشتِ هم) یک‌جا جواب می‌دهند، نه به‌صورتِ استریم.</li>

@@ -97,7 +97,13 @@ config.example.yaml        # نمونهٔ پیکربندی (alias‌ها، provi
   توکنایزرِ یک فروشنده معنا دارد و alias ممکن است به فروشندهٔ دیگری fallback کند و بردارِ غلط
   بی‌صدا بسازد. پیغام راه‌حلِ LangChain (`check_embedding_ctx_length=False`) را می‌گوید.
 - آداپتورهای Anthropic/Gemini سازگارِ wire نیستند؛ پارامترهای typed (temperature,
-  top_p, max_tokens, stop) به فرمتِ بومی نگاشت می‌شوند.
+  top_p, max_tokens, stop) به فرمتِ بومی نگاشت می‌شوند. آداپترِ Anthropic علاوه بر این کلِ
+  گفت‌وگو را از `Raw["messages"]` می‌خواند (`anthropic_wire.go`): `tools`/`tool_choice`/
+  `parallel_tool_calls` ← tool definitions، `tool_calls` ← `tool_use`، نقشِ `tool` ←
+  `tool_result`، `image_url` ← بلوکِ image، `response_format` json_schema ← `output_config.format`،
+  و در استریم `tool_use` ← deltaهای `tool_calls`. پس Claude در LangChain و Agents SDK با ابزار کار
+  می‌کند (`SupportsTools`). نسلِ فعلیِ Claude فراخوانیِ اجباری (`any`/`tool`) را با ۴۰۰ رد می‌کند،
+  برای همین روی هدف‌های `param_style: reasoning` به `auto` تبدیل می‌شود. Gemini هنوز ابزار ندارد.
 - آداپتورِ `pexels` فقط تصویر است (`ImageAdapter`): برای promptِ کاربر در Pexels
   جست‌وجو می‌کند، عکس‌ها را دانلود و base64 می‌کند تا مثلِ یک تصویرِ تولیدی
   (`data[].b64_json`) برگردد. یک alias تصویری (`nabu-photo` یا fallbackِ

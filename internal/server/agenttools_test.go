@@ -391,13 +391,15 @@ func TestAgentToolLoopStreamShaped(t *testing.T) {
 }
 
 // TestAgentToolLoopRefusesNonOpenAIRoute: an agent with tools whose model
-// routes only to a non-OpenAI-wire provider fails loudly at request time.
+// routes only to a provider that cannot carry tools (Gemini's native adapter;
+// Anthropic translates them since anthropic_wire.go) fails loudly at request
+// time.
 func TestAgentToolLoopRefusesNonOpenAIRoute(t *testing.T) {
 	adapters := map[string]provider.Adapter{
-		"anth": provider.NewAnthropicAdapter("anth", "http://127.0.0.1:1", "k"),
+		"gem": provider.NewGeminiAdapter("gem", "http://127.0.0.1:1", "k"),
 	}
 	models := map[string]config.ModelRoute{
-		"nabu-claude": {Primary: config.Target{Provider: "anth", Model: "claude-sonnet"}},
+		"nabu-claude": {Primary: config.Target{Provider: "gem", Model: "gemini-2.5-flash"}},
 	}
 	r := router.New(adapters, models, nil, nil, nil, nil, nil, discardLogger())
 
