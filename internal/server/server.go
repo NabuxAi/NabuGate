@@ -84,6 +84,9 @@ type Server struct {
 	pay *nabupay.Client
 	// gateways caches the bridge's method list for the status endpoint.
 	gateways gatewayCache
+	// reserved is the money held against owners' balances for their
+	// requests in flight; see reserve.go.
+	reserved reservations
 
 	// payGateway is the bridge gateway slug used when the panel does not name
 	// one — the deployment's default way to take money.
@@ -1608,6 +1611,20 @@ func (s *Server) auth(next http.HandlerFunc) http.HandlerFunc {
 			w.Header().Set("Retry-After", "1")
 			writeError(w, http.StatusTooManyRequests, "rate limit exceeded")
 			return
+		}
+		if owner != "" && !spendsOwnKeysOnly(callerKeysFrom(r)) {
+			if u := s.admin.GetUser(owner); u != nil {
+				if !s.reserved.hold(owner, u.Balance) {
+					s.requests.Add(adminstore.RequestEntry{
+						Project: pol.Project, Denied: true,
+						Reason: "balance held by requests in flight",
+					})
+					w.Header().Set("Retry-After", "1")
+					writeError(w, http.StatusPaymentRequired, "insufficient balance for another concurrent request: wait for the running ones to finish, or top up")
+					return
+				}
+				defer s.reserved.release(owner)
+			}
 		}
 		ctx := context.WithValue(r.Context(), policyCtxKey{}, pol)
 		ctx = context.WithValue(ctx, router.AllowedProvidersCtxKey{}, pol.Providers)
