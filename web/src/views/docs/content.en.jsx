@@ -73,6 +73,15 @@ X-Nabu-Balance-Warning: low       # only when the balance is below $1`} label="r
           <Faq q="The message “no payment gateway is configured on this deployment”">
             This deployment has no payment gateway; the payment buttons won’t work until an admin sets <code>NABUPAY_URL</code> and <code>NABUPAY_SECRET</code>. Contact support for a manual top-up.
           </Faq>
+          <Faq q="The payment shows “Underpaid”">
+            The bank or crypto gateway reported collecting less than the invoice asked for, so nothing was credited automatically. Send the invoice ID to support; they will credit what actually arrived or arrange the rest.
+          </Faq>
+          <Faq q="The payment shows “Expired”">
+            The invoice was never confirmed within seven days, so it is no longer checked. Nothing was charged to your balance. If money did leave your card, the bank returns it; if not, send the invoice ID to support.
+          </Faq>
+          <Faq q="My balance is less than the plan’s price">
+            Press “Pay the difference and activate”: you pay only the shortfall (at least $1), and the plan is activated as soon as the payment is confirmed — no second step.
+          </Faq>
           <Faq q="I paid twice">
             Each invoice is credited to your balance only once, and refreshing the page never counts anything twice. If you really do have two successful transactions at the bank, both appear in “Payments” with separate IDs, and both have been credited to your balance. To get one of them refunded, give the invoice ID to support.
           </Faq>
@@ -97,7 +106,7 @@ X-Nabu-Balance-Warning: low       # only when the balance is below $1`} label="r
           <H2>Three kinds of names</H2>
           <ul style={{ paddingInlineStart: 20, display: 'flex', flexDirection: 'column', gap: 8 }}>
             <li><strong>Aliases</strong> such as <code>nabu-fast</code>, <code>nabu-smart</code>, <code>nabu-embed</code>: a chain across several providers, with fallback. Choose these for everyday work.</li>
-            <li><strong>Direct models</strong> such as <code dir="ltr">openai/gpt-…</code> or <code dir="ltr">anthropic/claude-…</code>: no fallback, exactly that model. Use these when you need reproducible results.</li>
+            <li><strong>Direct models</strong> such as <code dir="ltr">openai/gpt-…</code>, <code dir="ltr">openrouter/…</code> (the whole OpenRouter catalogue) or <code dir="ltr">huggingface/…</code> (Hugging Face Inference Providers): no fallback, exactly that model. Use these when you need reproducible results.</li>
             <li><strong>Agents / flows</strong> such as <code>cine-motion-designer</code>: an assistant with a ready-made system prompt, called just like a model.</li>
           </ul>
           <Callout kind="warn" icon="⚠️">Don’t use an alias with fallback to <strong>build a vector index</strong>: vector width differs between providers. Use an alias without fallback, such as <code>write-embed</code>.</Callout>

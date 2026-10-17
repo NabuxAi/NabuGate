@@ -82,6 +82,8 @@ type Server struct {
 	// deployment has no gateway configured, in which case the panel says
 	// recharging is unavailable rather than pretending to take money.
 	pay *nabupay.Client
+	// gateways caches the bridge's method list for the status endpoint.
+	gateways gatewayCache
 
 	// payGateway is the bridge gateway slug used when the panel does not name
 	// one — the deployment's default way to take money.
@@ -212,6 +214,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /v1/embeddings", s.auth(s.handleEmbeddings))
 	mux.HandleFunc("POST /v1/systemone", s.auth(s.handleDecisions))
 	mux.HandleFunc("POST /v1/decisions", s.auth(s.handleDecisions))
+	mux.HandleFunc("POST /v1/decisions/calibrate", s.auth(s.handleDecisionCalibrate))
 	mux.HandleFunc("GET /v1/usage", s.auth(s.handleUsage))
 	mux.HandleFunc("GET /v1/photos/search", s.auth(s.handlePhotoSearch))
 
@@ -326,6 +329,22 @@ func (s *Server) project(r *http.Request) string {
 // record attributes a call's usage to the project/model and logs the cost.
 // lookupConsoleToken resolves a console-minted token, if the console state is
 // attached at all.
+// isConfigKey reports whether token is one of the deployment's config keys,
+// whose rate limit RateOK already applied.
+func isConfigKey(s *Server, token string) bool {
+	_, ok := s.policy.Lookup(token)
+	return ok
+}
+
+// authEnforced reports whether requests must carry a key. Open (development)
+// mode is a checkout with no keys at all: none in config and none minted in
+// the console. It used to follow config alone, so a deployment whose config
+// keys were all unset served every caller unauthenticated and unbilled while
+// its customers' console keys sat unused.
+func (s *Server) authEnforced() bool {
+	return s.policy.Enabled() || (s.admin != nil && s.admin.HasTokens())
+}
+
 func (s *Server) lookupConsoleToken(token string) (adminstore.Token, bool) {
 	if s.admin == nil {
 		return adminstore.Token{}, false
@@ -376,6 +395,20 @@ func (s *Server) recordMeteredFor(r *http.Request, project, prov, model string, 
 		Characters:   m.Characters,
 	})
 	return charged
+}
+
+// recordBrokenUsage books a request that ended before it completed, and
+// decides who pays by who ended it. The upstream breaking is the vendor's
+// failure and is not the caller's bill. The caller hanging up is the caller's
+// choice: the tokens delivered up to then were generated for them on the
+// gateway's credential, and booking those as failed made "read the answer,
+// drop the connection before the last chunk" a way to use the gateway free.
+func (s *Server) recordBrokenUsage(r *http.Request, prov, model string, u provider.Usage) {
+	if r.Context().Err() != nil && (u.PromptTokens > 0 || u.CompletionTokens > 0) {
+		s.record(r, prov, model, u)
+		return
+	}
+	s.recordFailedUsage(r, prov, model, u)
 }
 
 // recordFailedUsage books vendor work on a request that never completed — a
@@ -472,7 +505,7 @@ func (s *Server) handleUsage(w http.ResponseWriter, r *http.Request) {
 	pol, hasPol := r.Context().Value(policyCtxKey{}).(policy.Policy)
 	// Admin is granted only to the simple full-access api_keys, not to any rich
 	// key that merely omits `project:` (which would leak every project's usage).
-	admin := !s.policy.Enabled() || (hasPol && pol.Admin)
+	admin := !s.authEnforced() || (hasPol && pol.Admin)
 	if admin {
 		byProject, byModel := s.usage.Snapshot()
 		writeJSON(w, http.StatusOK, map[string]any{"by_project": byProject, "by_model": byModel})
@@ -499,7 +532,7 @@ func (s *Server) handleHealth(w http.ResponseWriter, _ *http.Request) {
 // key's business — and the warnings name providers.
 func (s *Server) handleKeyHealth(w http.ResponseWriter, r *http.Request) {
 	pol, hasPol := r.Context().Value(policyCtxKey{}).(policy.Policy)
-	scoped := s.policy.Enabled() && hasPol
+	scoped := s.authEnforced() && hasPol
 
 	aliases := make([]router.AliasHealth, 0)
 	degraded := 0
@@ -583,7 +616,7 @@ func (s *Server) handleModels(w http.ResponseWriter, r *http.Request) {
 		if seen[a.ID] {
 			continue
 		}
-		if s.policy.Enabled() && hasPol && !pol.Allows(a.ID) {
+		if s.authEnforced() && hasPol && !pol.Allows(a.ID) {
 			continue // hide models this key may not use
 		}
 		if hasPol && len(pol.Providers) > 0 && a.Owner != "agent" && a.Owner != "flow" && !contains(pol.Providers, a.Owner) {
@@ -1056,7 +1089,7 @@ func (s *Server) streamChat(w http.ResponseWriter, r *http.Request, alias, route
 		// assistant message into every later call.
 		s.saveTurn(r, convID, newTurns, replyBuf.String())
 	} else if result.Provider != "" {
-		s.recordFailedUsage(r, result.Provider, result.Model, result.Usage)
+		s.recordBrokenUsage(r, result.Provider, result.Model, result.Usage)
 	}
 
 	finish := "stop"
@@ -1451,7 +1484,7 @@ func (s *Server) auth(next http.HandlerFunc) http.HandlerFunc {
 		// not this deployment enforces its own keys.
 		keyCtx, _ := withCallerKeys(r.Context(), r)
 		r = r.WithContext(keyCtx)
-		if !s.policy.Enabled() {
+		if !s.authEnforced() {
 			next(w, r)
 			return
 		}
@@ -1477,6 +1510,13 @@ func (s *Server) auth(next http.HandlerFunc) http.HandlerFunc {
 					s.log.Warn("origin refused", "project", t.Name,
 						"origin", requestOriginHost(r), "allowed", t.AllowedOrigins)
 					writeError(w, http.StatusForbidden, "this key is not permitted from this origin")
+					return
+				}
+				if t.Owner != "" && s.admin.GetUser(t.Owner) == nil {
+					// The account the key bills is gone. Serving it would be
+					// serving a key nobody pays for.
+					s.admin.RecordDenied(t.Name)
+					writeError(w, http.StatusForbidden, "the account this key belongs to no longer exists")
 					return
 				}
 				if t.Owner != "" {
@@ -1513,7 +1553,13 @@ func (s *Server) auth(next http.HandlerFunc) http.HandlerFunc {
 			writeError(w, http.StatusUnauthorized, "invalid or missing API key")
 			return
 		}
-		if !s.policy.RateOK(token) {
+		limited := !s.policy.RateOK(token)
+		if !limited && !isConfigKey(s, token) {
+			// A console token's limit lives in the admin store, which the
+			// enforcer was never configured with; it used to be ignored.
+			limited = !s.policy.RateOKLimit(pol.Project, pol.RateLimit)
+		}
+		if limited {
 			s.requests.Add(adminstore.RequestEntry{
 				Project: pol.Project, Denied: true,
 				Reason: "rate limit exceeded",
@@ -1532,7 +1578,7 @@ func (s *Server) auth(next http.HandlerFunc) http.HandlerFunc {
 // aliasAllowed reports whether the request's key may use the given alias, and
 // writes a 403 if not. Returns true when policy is disabled.
 func (s *Server) aliasAllowed(w http.ResponseWriter, r *http.Request, alias string) bool {
-	if !s.policy.Enabled() {
+	if !s.authEnforced() {
 		return true
 	}
 	pol, ok := r.Context().Value(policyCtxKey{}).(policy.Policy)
@@ -1560,6 +1606,18 @@ func writeError(w http.ResponseWriter, status int, msg string) {
 	writeJSON(w, status, map[string]any{
 		"error": map[string]string{"message": msg},
 	})
+}
+
+// writeErrorCode is writeError with a stable machine code, plus any facts the
+// client needs to act on it. The message stays English; the console translates
+// by code, because a sentence from here reaching a Persian page verbatim is a
+// broken page, and a code survives every wording change.
+func writeErrorCode(w http.ResponseWriter, status int, code, msg string, extra map[string]any) {
+	e := map[string]any{"message": msg, "code": code}
+	for k, v := range extra {
+		e[k] = v
+	}
+	writeJSON(w, status, map[string]any{"error": e})
 }
 
 func contains(slice []string, val string) bool {

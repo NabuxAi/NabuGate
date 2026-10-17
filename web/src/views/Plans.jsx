@@ -2,8 +2,10 @@ import { navigate } from '../nav.js';
 import { useEffect, useState } from 'react';
 import Layout from '../components/Layout.jsx';
 import * as api from '../api.js';
-import { usd, fmtInt, fmtDate, useT } from '../i18n/index.jsx';
-import { usePayment } from '../components/usePayment.js';
+import { usd, fmtInt, fmtNum, fmtDate, useT } from '../i18n/index.jsx';
+import { usePayment, MIN_USD, MAX_USD } from '../components/usePayment.js';
+import { PayError, SettleBanners, PaymentsDisabled, GatewayPicker, BankRateNote, newIdempotencyKey } from '../components/PaymentNotices.jsx';
+import { Skeleton } from '../components/Skeleton.jsx';
 import Icon from '../components/Icon.jsx';
 
 /*
@@ -42,8 +44,15 @@ const T = {
     subtitle: 'پرداخت به‌ازای مصرف؛ موجودی منقضی نمی‌شود',
     subActivated: 'اشتراک فعال شد تا {date}.',
     subEnded: 'اشتراک همین حالا پایان یافت. کلیدهای خودت بدون تغییر کار می‌کنند.',
-    credited: 'پرداخت تأیید شد و موجودی اضافه شد.',
-    disabled: () => <><strong>درگاه پرداخت در این استقرار فعال نیست.</strong> دکمه‌های پرداخت کار نمی‌کنند تا مدیر متغیرهای <code dir="ltr">NABUPAY_URL</code> و <code dir="ltr">NABUPAY_SECRET</code> را تنظیم کند. برای شارژ دستی با پشتیبانی تماس بگیرید.</>,
+    plansLoadErr: 'فهرست اشتراک‌ها بارگیری نشد. اتصال را بررسی کنید و دوباره تلاش کنید.',
+    retry: 'تلاش دوباره',
+    payDiff: 'پرداخت مابه‌التفاوت و فعال‌سازی',
+    payDiffShort: 'پرداخت {amount} و فعال‌سازی',
+    shortNote: 'موجودی فعلی‌ات {balance} است؛ فقط کسریِ {amount} را می‌پردازی و اشتراک بعد از تأیید پرداخت خودکار فعال می‌شود.',
+    confirmTitle: 'تعویض اشتراک؟',
+    confirmBody: 'اشتراکِ فعلیِ «{name}» هنوز {days} روز اعتبار دارد. با فعال‌کردنِ «{next}» این روزها از بین می‌رود و برگشت داده نمی‌شود.',
+    confirmYes: 'بله، تعویض کن',
+    cancel: 'انصراف',
     recommended: 'پیشنهاد ما',
     credit: 'اعتبار',
     redirecting: 'در حال انتقال به درگاه…',
@@ -65,7 +74,7 @@ const T = {
     activate: 'فعال‌سازی — {price}',
     fromBalance: 'از موجودی حسابت کم می‌شود، نه از کارت. اگر موجودی کافی نداری، اول از همین صفحه شارژ کن.',
     customTitle: 'مبلغ دلخواه',
-    customRange: 'حداقل ۱ و حداکثر ۵٬۰۰۰ دلار',
+    customRange: 'حداقل {min} و حداکثر {max} دلار',
     dollars: 'دلار',
     pay: 'پرداخت',
     howTitle: 'پرداخت چطور انجام می‌شود؟',
@@ -112,8 +121,15 @@ const T = {
     subtitle: 'Pay as you go; credit never expires',
     subActivated: 'Subscription active until {date}.',
     subEnded: 'Subscription ended just now. Your own keys keep working unchanged.',
-    credited: 'Payment confirmed and your balance has been credited.',
-    disabled: () => <><strong>The payment gateway is not enabled on this deployment.</strong> Payment buttons won’t work until an admin sets <code dir="ltr">NABUPAY_URL</code> and <code dir="ltr">NABUPAY_SECRET</code>. Contact support for a manual top-up.</>,
+    plansLoadErr: 'Could not load the plans. Check your connection and try again.',
+    retry: 'Try again',
+    payDiff: 'Pay the difference and activate',
+    payDiffShort: 'Pay {amount} and activate',
+    shortNote: 'Your balance is {balance}; you pay only the {amount} shortfall and the plan activates by itself once the payment is confirmed.',
+    confirmTitle: 'Switch plans?',
+    confirmBody: 'Your current plan “{name}” still has {days} days left. Activating “{next}” forfeits those days; they are not refunded.',
+    confirmYes: 'Yes, switch',
+    cancel: 'Cancel',
     recommended: 'Recommended',
     credit: 'credit',
     redirecting: 'Redirecting to the gateway…',
@@ -135,7 +151,7 @@ const T = {
     activate: 'Activate — {price}',
     fromBalance: 'Paid from your account balance, not your card. If your balance is too low, top up on this page first.',
     customTitle: 'Custom amount',
-    customRange: 'Min $1, max $5,000',
+    customRange: 'Min ${min}, max ${max}',
     dollars: 'USD',
     pay: 'Pay',
     howTitle: 'How does payment work?',
@@ -165,36 +181,56 @@ const T = {
 
 const QUICK = [5, 10, 25, 50, 100];
 
+// What the plan still needs over the balance, as the server charges it: the
+// difference in cents, never under the $1 minimum a payment may be.
+const shortfallOf = (price, balance) => Math.max(MIN_USD, Math.ceil((Number(price) - Number(balance)) * 100) / 100);
+
 export default function Plans() {
   const t = useT(T);
   const [selected, setSelected] = useState(null);
   const [custom, setCustom] = useState(25);
+  const [gateway, setGateway] = useState('');
   const [status, setStatus] = useState(null);
   const [subs, setSubs] = useState(null); // { plans, subscription, active, balance }
+  const [subsFailed, setSubsFailed] = useState(false);
   const [subBusy, setSubBusy] = useState(null);
-  const [subError, setSubError] = useState(null);
+  const [subError, setSubError] = useState(null); // Error with .code, plus .planId
   const [subNotice, setSubNotice] = useState(null);
-  const payment = usePayment(() => navigate('account'));
+  const [confirm, setConfirm] = useState(null); // { id, name, current, days }
 
-  const loadSubs = () => api.listPlans().then(setSubs).catch(() => setSubs({ plans: [] }));
+  const loadSubs = () => {
+    setSubsFailed(false);
+    return api.listPlans().then(setSubs).catch(() => setSubsFailed(true));
+  };
+
+  // A credit or a plan bought on arrival changes the balance and the active
+  // plan shown right here, so reload in place. Navigating away used to hide the
+  // very banner that said the payment had landed.
+  const payment = usePayment(() => { loadSubs(); });
 
   useEffect(() => {
     api.status().then(setStatus).catch(() => setStatus({}));
     loadSubs();
   }, []);
 
-  const buyPlan = async (id) => {
-    setSubBusy(id);
+  const buyPlan = async (pl, confirmSwitch = false) => {
+    setSubBusy(pl.id);
     setSubError(null);
     setSubNotice(null);
     try {
-      const r = await api.subscribe(id);
-      setSubNotice(
-        t('subActivated', { date: fmtDate(r.subscription.expires_at) }),
-      );
+      // Fresh per click: a double click is one charge, and the confirmed retry
+      // after a 409 is a new decision, not a replay of the refused one.
+      const r = await api.subscribe(pl.id, { confirmSwitch, idempotencyKey: newIdempotencyKey() });
+      setSubNotice(t('subActivated', { date: fmtDate(r.subscription.expires_at) }));
       await loadSubs();
     } catch (e) {
-      setSubError(e.message);
+      if (e.code === 'plan_switch_needs_confirm') {
+        const d = e.details || {};
+        setConfirm({ pl, current: d.current_name || d.current_plan || '', days: d.days_left });
+      } else {
+        e.planId = pl.id;
+        setSubError(e);
+      }
     } finally {
       setSubBusy(null);
     }
@@ -208,34 +244,39 @@ export default function Plans() {
       setSubNotice(t('subEnded'));
       await loadSubs();
     } catch (e) {
-      setSubError(e.message);
+      setSubError(e);
     } finally {
       setSubBusy(null);
     }
   };
 
-  const enabled = status?.payments_enabled !== false;
+  // Unknown (still loading, or the status call failed) counts as off: a
+  // button that sends the payer to a gateway that is not there is worse than
+  // one that waits a moment.
+  const enabled = status?.payments_enabled === true;
+  const gateways = status?.payment_gateways;
 
   const buy = (id, amount) => {
     setSelected(id);
-    payment.pay(amount);
+    payment.pay({ amount, gateway });
   };
 
-  const customOk = Number(custom) >= 1 && Number(custom) <= 5000;
+  const payDiff = (planId) => {
+    setSelected('plan:' + planId);
+    payment.pay({ plan: planId, gateway });
+  };
+
+  const customOk = Number(custom) >= MIN_USD && Number(custom) <= MAX_USD;
+  const balance = typeof subs?.balance === 'number' ? subs.balance : null;
+  const busyLabel = (id, idle) => (payment.busy && selected === id ? t('redirecting') : idle);
 
   return (
     <Layout title={t('title')} subtitle={t('subtitle')}>
-      {payment.error && <div className="card banner-error"><span>⚠️</span>{payment.error}</div>}
-      {payment.settled?.credited && <div className="card banner-ok"><span>✓</span>{t('credited')}</div>}
+      <PayError error={payment.error} />
+      <SettleBanners result={payment.settled} />
 
-      {status && !enabled && (
-        <div className="callout warn">
-          <span className="ci">⏸</span>
-          <div>
-            {t('disabled')}
-          </div>
-        </div>
-      )}
+      {status && !enabled && <PaymentsDisabled />}
+      {enabled && <GatewayPicker gateways={gateways} value={gateway} onChange={setGateway} />}
 
       <div className="plan-grid stagger" style={{ paddingTop: 14 }}>
         {PLANS.map((plan) => (
@@ -251,11 +292,32 @@ export default function Plans() {
               onClick={() => buy(plan.id, plan.amount)}
               disabled={payment.busy || !enabled}
             >
-              {payment.busy && selected === plan.id ? t('redirecting') : t('payAmount', { amount: usd(plan.amount) })}
+              {busyLabel(plan.id, t('payAmount', { amount: usd(plan.amount) }))}
             </button>
+            <BankRateNote />
           </div>
         ))}
       </div>
+
+      {subs === null && !subsFailed && (
+        <div className="card">
+          <div className="card-head"><h3><Icon name="key" size={17} />{t('subsTitle')}</h3></div>
+          <Skeleton w="70%" h={12} />
+          <div className="plan-grid sub-plans" style={{ marginTop: 14 }}>
+            {[0, 1, 2].map((i) => <Skeleton key={i} w="100%" h={180} />)}
+          </div>
+        </div>
+      )}
+
+      {subsFailed && (
+        <div className="card">
+          <div className="card-head">
+            <h3><Icon name="key" size={17} />{t('subsTitle')}</h3>
+            <button className="btn btn-outline btn-sm" onClick={loadSubs}><Icon name="refresh" size={14} />{t('retry')}</button>
+          </div>
+          <div className="banner-error" style={{ marginBottom: 0 }}><Icon name="alert" size={18} /><div>{t('plansLoadErr')}</div></div>
+        </div>
+      )}
 
       {subs?.plans?.length > 0 && (
         <div className="card">
@@ -267,19 +329,30 @@ export default function Plans() {
             {t('subsIntro')}
           </p>
 
-          {subError && <div className="banner-error" style={{ marginBottom: 10 }}>{subError}</div>}
-          {subNotice && <div className="banner-ok" style={{ marginBottom: 10 }}>{subNotice}</div>}
+          <PayError
+            error={subError}
+            action={
+              subError?.code === 'insufficient_balance' && subError.planId ? (
+                <button
+                  className="btn btn-primary btn-sm"
+                  disabled={payment.busy || !enabled}
+                  onClick={() => payDiff(subError.planId)}
+                >
+                  {busyLabel('plan:' + subError.planId, t('payDiff'))}
+                </button>
+              ) : null
+            }
+          />
+          {subNotice && <div className="banner-ok" style={{ marginBottom: 10 }}><Icon name="check" size={18} /><div>{subNotice}</div></div>}
 
           {subs.subscription && (
             <div className={subs.active ? 'callout ok' : 'callout warn'} style={{ marginBottom: 12 }}>
-              <span className="ci">{subs.active ? '✓' : '⏸'}</span>
+              <span className="ci"><Icon name={subs.active ? 'check' : 'pause'} size={18} /></span>
               <div className="sub-live">
                 <div>
                   <strong>{subs.subscription.name || subs.subscription.plan_id}</strong>{' '}
                   {subs.active ? t('activeUntil') : t('expiredOn')}{' '}
-                  <span className="ltr">
-                    {fmtDate(subs.subscription.expires_at)}
-                  </span>
+                  <span>{fmtDate(subs.subscription.expires_at)}</span>
                 </div>
                 {subs.active && (
                   <button className="btn btn-sm btn-ghost" disabled={subBusy === 'cancel'} onClick={endPlan}>
@@ -291,50 +364,75 @@ export default function Plans() {
           )}
 
           <div className="plan-grid sub-plans stagger">
-            {subs.plans.map((pl) => (
-              <div key={pl.id} className={'plan sub-card' + (pl.popular ? ' featured' : '')}>
-                {pl.popular && <div className="ribbon">{t('recommended')}</div>}
-                <h3>{pl.name}</h3>
-                <div className="price" dir="ltr">{usd(pl.price_usd)}<small>{t('perDays', { n: fmtInt(pl.days) })}</small></div>
-                {pl.description && (
-                  <p className="muted" style={{ fontSize: 13, lineHeight: 1.7, margin: 0 }}>{pl.description}</p>
-                )}
-                <ul className="sub-terms">
-                  <li>
-                    <b>{pl.unlocks_all ? t('allServices') : t('nServices', { n: fmtInt(pl.unlocks) })}</b>
-                    <span>{t('withOurKey')}</span>
-                  </li>
-                  <li>
-                    <b dir="ltr">×{pl.markup}</b>
-                    <span>{t('markup')}</span>
-                  </li>
-                  {pl.includes_credit_usd > 0 && (
-                    <li><b dir="ltr">{usd(pl.includes_credit_usd)}</b><span>{t('giftCredit')}</span></li>
+            {subs.plans.map((pl) => {
+              const short = balance !== null && balance < Number(pl.price_usd);
+              const need = short ? shortfallOf(pl.price_usd, balance) : 0;
+              return (
+                <div key={pl.id} className={'plan sub-card' + (pl.popular ? ' featured' : '')}>
+                  {pl.popular && <div className="ribbon">{t('recommended')}</div>}
+                  <h3>{pl.name}</h3>
+                  <div className="price" dir="ltr">{usd(pl.price_usd)}<small>{t('perDays', { n: fmtInt(pl.days) })}</small></div>
+                  {pl.description && (
+                    <p className="muted" style={{ fontSize: 13, lineHeight: 1.7, margin: 0 }}>{pl.description}</p>
                   )}
-                </ul>
-                <div className="spacer" />
-                <button
-                  className={'btn btn-lg ' + (pl.popular ? 'btn-primary' : 'btn-outline')}
-                  disabled={subBusy === pl.id}
-                  onClick={() => buyPlan(pl.id)}
-                >
-                  {subBusy === pl.id
-                    ? t('activating')
-                    : subs.active && subs.subscription?.plan_id === pl.id
-                      ? t('renew', { n: fmtInt(pl.days) })
-                      : t('activate', { price: usd(pl.price_usd) })}
-                </button>
-                <p className="muted" style={{ fontSize: 11.5, lineHeight: 1.9, margin: 0 }}>
-                  {t('fromBalance')}
-                </p>
-              </div>
-            ))}
+                  <ul className="sub-terms">
+                    <li>
+                      <b>{pl.unlocks_all ? t('allServices') : t('nServices', { n: fmtInt(pl.unlocks) })}</b>
+                      <span>{t('withOurKey')}</span>
+                    </li>
+                    <li>
+                      <b>×{fmtNum(pl.markup, { maximumFractionDigits: 2 })}</b>
+                      <span>{t('markup')}</span>
+                    </li>
+                    {pl.includes_credit_usd > 0 && (
+                      <li><b dir="ltr">{usd(pl.includes_credit_usd)}</b><span>{t('giftCredit')}</span></li>
+                    )}
+                  </ul>
+                  <div className="spacer" />
+                  {short ? (
+                    <>
+                      <button
+                        className={'btn btn-lg ' + (pl.popular ? 'btn-primary' : 'btn-outline')}
+                        disabled={payment.busy || !enabled}
+                        onClick={() => payDiff(pl.id)}
+                      >
+                        {busyLabel('plan:' + pl.id, t('payDiffShort', { amount: usd(need) }))}
+                      </button>
+                      <p className="muted" style={{ fontSize: 11.5, lineHeight: 1.9, margin: 0 }}>
+                        {t('shortNote', { balance: usd(balance), amount: usd(need) })}
+                      </p>
+                      <BankRateNote />
+                    </>
+                  ) : (
+                    <>
+                      <button
+                        className={'btn btn-lg ' + (pl.popular ? 'btn-primary' : 'btn-outline')}
+                        disabled={subBusy !== null}
+                        onClick={() => buyPlan(pl)}
+                      >
+                        {subBusy === pl.id
+                          ? t('activating')
+                          : subs.active && subs.subscription?.plan_id === pl.id
+                            ? t('renew', { n: fmtInt(pl.days) })
+                            : t('activate', { price: usd(pl.price_usd) })}
+                      </button>
+                      <p className="muted" style={{ fontSize: 11.5, lineHeight: 1.9, margin: 0 }}>
+                        {t('fromBalance')}
+                      </p>
+                    </>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
 
       <div className="card" style={{ marginTop: 6 }}>
-        <div className="card-head"><h3><Icon name="wallet" size={17} />{t('customTitle')}</h3><span className="badge badge-muted">{t('customRange')}</span></div>
+        <div className="card-head">
+          <h3><Icon name="wallet" size={17} />{t('customTitle')}</h3>
+          <span className="badge badge-muted">{t('customRange', { min: fmtInt(MIN_USD), max: fmtInt(MAX_USD) })}</span>
+        </div>
         <div className="chips" style={{ marginBottom: 14 }}>
           {QUICK.map((a) => (
             <button key={a} type="button" className={'chip' + (Number(custom) === a ? ' active' : '')} onClick={() => setCustom(a)} dir="ltr">
@@ -346,12 +444,13 @@ export default function Plans() {
           onSubmit={(e) => { e.preventDefault(); if (customOk) buy('custom', Number(custom)); }}
           style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}
         >
-          <input type="number" className="input" value={custom} onChange={(e) => setCustom(e.target.value)} min="1" max="5000" step="1" style={{ width: 140 }} dir="ltr" />
+          <input type="number" className="input" value={custom} onChange={(e) => setCustom(e.target.value)} min={MIN_USD} max={MAX_USD} step="1" style={{ width: 140 }} dir="ltr" />
           <span className="muted" style={{ fontSize: 13 }}>{t('dollars')}</span>
           <button className="btn btn-primary" disabled={payment.busy || !enabled || !customOk}>
-            {payment.busy && selected === 'custom' ? t('redirecting') : t('pay')}
+            {busyLabel('custom', t('pay'))}
           </button>
         </form>
+        <BankRateNote />
       </div>
 
       <div className="card">
@@ -375,6 +474,26 @@ export default function Plans() {
       <p className="muted" style={{ fontSize: 12, lineHeight: 1.8 }}>
         {t('footer', { zero: fmtInt(0) })}
       </p>
+
+      {confirm && (
+        <div className="modal-backdrop" onClick={(e) => { if (e.target === e.currentTarget) setConfirm(null); }}>
+          <div className="card modal" role="dialog" aria-modal="true" aria-labelledby="switch-title">
+            <h3 id="switch-title"><Icon name="alert" size={17} /> {t('confirmTitle')}</h3>
+            <p style={{ lineHeight: 1.9, margin: 0 }}>
+              {t('confirmBody', { name: confirm.current, days: fmtInt(confirm.days), next: confirm.pl.name })}
+            </p>
+            <div className="modal-actions">
+              <button className="btn btn-ghost" onClick={() => setConfirm(null)}>{t('cancel')}</button>
+              <button
+                className="btn btn-primary"
+                onClick={() => { const pl = confirm.pl; setConfirm(null); buyPlan(pl, true); }}
+              >
+                {t('confirmYes')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </Layout>
   );
 }

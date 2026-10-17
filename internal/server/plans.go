@@ -2,6 +2,8 @@ package server
 
 import (
 	"encoding/json"
+	"errors"
+	"math"
 	"net/http"
 	"strings"
 	"time"
@@ -88,45 +90,52 @@ func (s *Server) listPlans(w http.ResponseWriter, r *http.Request) {
 // subscribe buys one term against the user's balance.
 func (s *Server) subscribe(w http.ResponseWriter, r *http.Request) {
 	email, _ := r.Context().Value(consoleEmailCtxKey{}).(string)
-	id := strings.ToLower(strings.TrimSpace(r.PathValue("id")))
 
-	var plan config.Plan
-	found := false
-	for _, p := range s.plans {
-		if strings.EqualFold(strings.TrimSpace(p.ID), id) {
-			plan, found = p, true
-			break
-		}
+	var body struct {
+		// ConfirmSwitch is the buyer accepting that a different plan ends the
+		// current one now, with its remaining days.
+		ConfirmSwitch bool `json:"confirm_switch"`
+		// IdempotencyKey makes a double click one purchase.
+		IdempotencyKey string `json:"idempotency_key"`
 	}
+	// An empty body is the old client and means no confirmation and no key.
+	_ = json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<16)).Decode(&body)
+
+	plan, found := s.planByID(r.PathValue("id"))
 	if !found {
-		writeError(w, http.StatusNotFound, "no such plan")
+		writeErrorCode(w, http.StatusNotFound, "no_such_plan", "no such plan", nil)
 		return
 	}
 	if len(plan.Providers) == 0 {
 		// A plan that unlocks nothing is a configuration mistake, and selling
 		// it would take the money and change nothing the buyer could see.
-		writeError(w, http.StatusServiceUnavailable, "that plan is not available right now")
+		writeErrorCode(w, http.StatusServiceUnavailable, "plan_unavailable", "that plan is not available right now", nil)
 		return
 	}
 
-	sub, err := s.admin.Subscribe(email, adminstore.Subscription{
-		PlanID:       plan.ID,
-		Name:         plan.Name,
-		PriceUSD:     plan.PriceUSD,
-		Markup:       plan.Rate(),
-		MinChargeUSD: plan.MinChargeUSD,
-		Providers:    plan.Providers,
-	}, plan.Term())
-	if err != nil {
-		if err == adminstore.ErrInsufficientBalance {
-			writeError(w, http.StatusPaymentRequired, "top up your balance first — this plan costs more than you have")
-			return
+	sub, err := s.buyPlan(email, plan, body.ConfirmSwitch, body.IdempotencyKey)
+	switch {
+	case errors.Is(err, errPlanSwitch):
+		writeErrorCode(w, http.StatusConflict, "plan_switch_needs_confirm",
+			"buying a different plan ends your current one now; confirm to continue",
+			map[string]any{"current_plan": sub.PlanID, "current_name": sub.Name, "days_left": daysLeft(sub, time.Now().UTC())})
+		return
+	case errors.Is(err, adminstore.ErrInsufficientBalance):
+		var balance float64
+		if u := s.admin.GetUser(email); u != nil {
+			balance = u.Balance
 		}
+		writeErrorCode(w, http.StatusPaymentRequired, "insufficient_balance",
+			"top up your balance first — this plan costs more than you have",
+			map[string]any{
+				"price_usd":     plan.PriceUSD,
+				"balance_usd":   balance,
+				"shortfall_usd": math.Max(math.Ceil((plan.PriceUSD-balance)*100)/100, minTopUpUSD),
+			})
+		return
+	case err != nil:
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
-	}
-	if plan.IncludesCreditUSD > 0 {
-		_ = s.admin.AddPayment(email, plan.IncludesCreditUSD, "plan-credit", "plan:"+plan.ID)
 	}
 	s.log.Info("subscribed", "owner", email, "plan", plan.ID, "price", plan.PriceUSD, "until", sub.ExpiresAt)
 	writeJSON(w, http.StatusOK, map[string]any{"subscription": sub})

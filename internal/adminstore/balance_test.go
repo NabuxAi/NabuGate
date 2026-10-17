@@ -54,3 +54,27 @@ func mustOpen(t *testing.T, path string) *Store {
 	}
 	return st
 }
+
+// A customer's spend is split by model and day under their own email, so the
+// panel can say where the credit went.
+func TestOwnerSpendIsBrokenDownByModelAndDay(t *testing.T) {
+	st := mustOpen(t, filepath.Join(t.TempDir(), "admin.json"))
+	if err := st.SignupUser("buyer@example.com", "a-long-password"); err != nil {
+		t.Fatal(err)
+	}
+	tok, _, err := st.NewToken("buyer-key", []string{"*"}, 0, nil, "buyer@example.com", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	st.RecordUsage(tok.Name, "anthropic", "claude-haiku-5-5", UsageEntry{Requests: 1, PromptTokens: 10, CostUSD: 0.5})
+	st.RecordUsage(tok.Name, "anthropic", "claude-haiku-5-5", UsageEntry{Requests: 1, PromptTokens: 5, CostUSD: 0.25})
+	st.RecordUsage(tok.Name, "openrouter", "gpt-oss-120b", UsageEntry{Requests: 1, CostUSD: 0.1})
+
+	byModel, days := st.OwnerBreakdown("Buyer@Example.com", 30)
+	if c := byModel["claude-haiku-5-5"]; c.Requests != 2 || c.CostUSD != 0.75 {
+		t.Fatalf("by model: %+v", byModel)
+	}
+	if len(days) != 1 || days[0].Requests != 3 {
+		t.Fatalf("by day: %+v", days)
+	}
+}

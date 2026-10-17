@@ -126,30 +126,94 @@ type StartOptions struct {
 	CallbackURL string // where the gateway returns the payer
 }
 
-// Confirm asks the bridge whether the money for an invoice actually moved.
+// Verdict is the bridge's answer about one invoice.
+type Verdict struct {
+	// Status is the bridge's word, lower-cased: "paid", "pending", "failed",
+	// "expired", "cancelled", or one this version does not know.
+	Status string
+	// Paid is true only for "paid" on a successful answer.
+	Paid bool
+	// AmountUSD is what the bridge says was collected, in USD. Zero means the
+	// bridge did not say, which is not the same fact as "nothing was paid".
+	AmountUSD float64
+	// Gateway is the slug the payer actually used, when the bridge reports it.
+	Gateway string
+}
+
+// Final reports whether the invoice can no longer become paid, so the wallet
+// can stop asking about it.
+func (v Verdict) Final() bool {
+	switch v.Status {
+	case "failed", "expired", "cancelled", "canceled", "rejected", "refunded":
+		return true
+	}
+	return false
+}
+
+// Verify asks the bridge whether the money for an invoice actually moved.
 //
 // The answer is the bridge's, which is in turn the gateway's — nothing the
 // payer's browser carries is evidence, so nothing from the return URL other
 // than the invoice number is passed on or believed.
-func (c *Client) Confirm(ctx context.Context, invoice string) (paid bool, err error) {
+func (c *Client) Verify(ctx context.Context, invoice string) (Verdict, error) {
 	if c == nil {
-		return false, ErrNotConfigured
+		return Verdict{}, ErrNotConfigured
 	}
 	if strings.TrimSpace(invoice) == "" {
-		return false, errors.New("no invoice number to confirm")
+		return Verdict{}, errors.New("no invoice number to confirm")
 	}
 
 	var out struct {
-		Success bool   `json:"success"`
-		Status  string `json:"status"`
+		Success   bool    `json:"success"`
+		Status    string  `json:"status"`
+		AmountUSD float64 `json:"amount_usd"`
+		Gateway   string  `json:"gateway"`
 	}
 	path := "/api/v1/pay/verify/" + url.PathEscape(invoice) + "?status=success"
 	if err := c.get(ctx, path, &out); err != nil {
-		return false, err
+		return Verdict{}, err
+	}
+	v := Verdict{
+		Status:    strings.ToLower(strings.TrimSpace(out.Status)),
+		AmountUSD: out.AmountUSD,
+		Gateway:   out.Gateway,
 	}
 	// "paid" is the bridge's word for settled. Anything else — pending, failed,
 	// or a status this version does not know — is not a payment.
-	return out.Success && strings.EqualFold(out.Status, "paid"), nil
+	v.Paid = out.Success && v.Status == "paid"
+	return v, nil
+}
+
+// Confirm is Verify reduced to paid-or-not.
+func (c *Client) Confirm(ctx context.Context, invoice string) (paid bool, err error) {
+	v, err := c.Verify(ctx, invoice)
+	return v.Paid, err
+}
+
+// Gateway is one payment method the bridge currently offers.
+type Gateway struct {
+	Slug  string `json:"slug"`
+	Label string `json:"label"`
+}
+
+// Gateways lists the methods the bridge offers right now. Enabling one (a
+// Zarinpal merchant id, say) happens in NabuDesk, and shows up here without a
+// release of this gateway.
+func (c *Client) Gateways(ctx context.Context) ([]Gateway, error) {
+	if c == nil {
+		return nil, ErrNotConfigured
+	}
+	var out struct {
+		Success  bool      `json:"success"`
+		Gateways []Gateway `json:"gateways"`
+	}
+	if err := c.get(ctx, "/api/v1/pay/gateways", &out); err != nil {
+		return nil, err
+	}
+	if !out.Success {
+		return nil, errors.New("payment bridge did not list its gateways")
+	}
+	return out.Gateways, nil
 }
 
 func (c *Client) post(ctx context.Context, path string, body []byte, out any) error {

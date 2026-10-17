@@ -2,6 +2,7 @@ package server
 
 import (
 	"net/http"
+	"sort"
 	"strings"
 
 	"nabugate/internal/adminstore"
@@ -30,6 +31,36 @@ func (s *Server) accountUsage(w http.ResponseWriter, r *http.Request) {
 		cost += c.CostUSD
 		providerCost += c.ProviderCostUSD
 	}
+	// Where the credit went: per model, most expensive first, and per day for
+	// the last thirty.
+	byModel, days := s.admin.OwnerBreakdown(email, 30)
+	type modelRow struct {
+		Model            string  `json:"model"`
+		Requests         int64   `json:"requests"`
+		PromptTokens     int64   `json:"prompt_tokens"`
+		CompletionTokens int64   `json:"completion_tokens"`
+		CostUSD          float64 `json:"cost_usd"`
+	}
+	byModelRows := make([]modelRow, 0, len(byModel))
+	for m, c := range byModel {
+		byModelRows = append(byModelRows, modelRow{m, c.Requests, c.PromptTokens, c.CompletionTokens, c.CostUSD})
+	}
+	sort.Slice(byModelRows, func(i, j int) bool {
+		if byModelRows[i].CostUSD != byModelRows[j].CostUSD {
+			return byModelRows[i].CostUSD > byModelRows[j].CostUSD
+		}
+		return byModelRows[i].Model < byModelRows[j].Model
+	})
+	type dayRow struct {
+		Date     string  `json:"date"`
+		Requests int64   `json:"requests"`
+		CostUSD  float64 `json:"cost_usd"`
+	}
+	dailyRows := make([]dayRow, 0, len(days))
+	for _, d := range days {
+		dailyRows = append(dailyRows, dayRow{d.Date, d.Requests, d.CostUSD})
+	}
+
 	writeJSON(w, http.StatusOK, map[string]any{
 		"projects":          perProject,
 		"requests":          requests,
@@ -44,6 +75,8 @@ func (s *Server) accountUsage(w http.ResponseWriter, r *http.Request) {
 		// the operator's own dashboard can read both sides of the ledger. The
 		// panel of a plain customer ignores it.
 		"provider_cost_usd": providerCost,
+		"by_model":          byModelRows,
+		"daily":             dailyRows,
 	})
 }
 

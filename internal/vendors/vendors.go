@@ -127,6 +127,13 @@ var catalogue = map[string]Vendor{
 		Color: "#6467F2",
 		Icon:  "M2 8.7h4.3c1.5 0 2.2.4 3.3 1.2l1.6 1.2c.9.7 1.4.9 2.5.9h2.7v2.3h-2.7c-1.7 0-2.6-.4-3.9-1.4l-1.5-1.1c-.8-.6-1.3-.7-2-.7H2V8.7Zm14.4-3.1L23 9.4l-6.6 3.8V5.6ZM2 15.3h4.3c.7 0 1.2-.1 2-.7l.6-.4c.7.5 1.3.9 2 1.1l-1.3 1c-1.1.8-1.8 1.2-3.3 1.2H2v-2.2Zm14.4-.5L23 18.6l-6.6 3.8v-7.6Z",
 	},
+	"huggingface": {
+		Label: "Hugging Face", Blurb: "یک توکن جلوی ده‌ها سرورِ مدلِ باز (Novita، DeepInfra، Together، Groq…) با انتخابِ ارزان‌ترین.",
+		BlurbEn:      "One token in front of dozens of open-model hosts (Novita, DeepInfra, Together, Groq…), with cheapest-host routing.",
+		Capabilities: []string{CapChat},
+		Site:         "https://huggingface.co", KeysURL: "https://huggingface.co/settings/tokens",
+		Color: "#FFD21E",
+	},
 	"mistral": {
 		Label: "Mistral", Blurb: "مدل‌های اروپایی، و Voxtral که دقیق‌ترین رونویسیِ ارزان بازار است.",
 		BlurbEn:      "European models, plus Voxtral — the most accurate low-cost transcription on the market.",

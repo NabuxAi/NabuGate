@@ -73,6 +73,15 @@ X-Nabu-Balance-Warning: low       # فقط وقتی موجودی زیر ۱ دل�
           <Faq q="پیام «no payment gateway is configured on this deployment»">
             این استقرار درگاه پرداخت ندارد؛ دکمه‌های پرداخت کار نمی‌کنند تا مدیر متغیرهای <code>NABUPAY_URL</code> و <code>NABUPAY_SECRET</code> را تنظیم کند. برای شارژ دستی با پشتیبانی تماس بگیرید.
           </Faq>
+          <Faq q="وضعیتِ پرداخت «کم‌پرداخت» است">
+            بانک یا درگاهِ رمزارزی گزارش داده کمتر از مبلغِ فاکتور دریافت کرده، پس چیزی خودکار اضافه نشد. شناسهٔ فاکتور را برای پشتیبانی بفرستید تا همان مبلغی که واقعاً رسیده اضافه شود یا باقی‌اش پیگیری شود.
+          </Faq>
+          <Faq q="وضعیتِ پرداخت «منقضی» است">
+            فاکتور ظرف هفت روز تأیید نشد و دیگر بررسی نمی‌شود. چیزی از موجودی‌تان کم نشده. اگر پولی از کارت رفته باشد بانک برمی‌گرداند؛ وگرنه شناسهٔ فاکتور را به پشتیبانی بدهید.
+          </Faq>
+          <Faq q="موجودی‌ام از قیمتِ پلن کمتر است">
+            «پرداخت مابه‌التفاوت و فعال‌سازی» را بزنید: فقط کسری را می‌پردازید (حداقل ۱ دلار) و پلن به‌محضِ تأییدِ پرداخت فعال می‌شود — قدمِ دومی لازم نیست.
+          </Faq>
           <Faq q="دو بار پرداخت کردم">
             هر فاکتور فقط یک‌بار به موجودی اضافه می‌شود و رفرش‌کردن صفحه چیزی را دوبار حساب نمی‌کند. اگر واقعاً دو تراکنش موفق در بانک دارید، هر دو در «پرداخت‌ها» با شناسهٔ جدا دیده می‌شوند و هر دو به موجودی اضافه شده‌اند. برای بازگشت یکی، شناسهٔ فاکتور را به پشتیبانی بدهید.
           </Faq>
@@ -97,7 +106,7 @@ X-Nabu-Balance-Warning: low       # فقط وقتی موجودی زیر ۱ دل�
           <H2>سه نوع نام</H2>
           <ul style={{ paddingInlineStart: 20, display: 'flex', flexDirection: 'column', gap: 8 }}>
             <li><strong>alias</strong> مثل <code>nabu-fast</code>، <code>nabu-smart</code>، <code>nabu-embed</code>: زنجیرهٔ چند ارائه‌دهنده با fallback. برای کار روزمره این را انتخاب کنید.</li>
-            <li><strong>مدل مستقیم</strong> مثل <code dir="ltr">openai/gpt-…</code> یا <code dir="ltr">anthropic/claude-…</code>: بدون fallback، دقیقاً همان مدل. وقتی نتیجهٔ تکرارپذیر می‌خواهید.</li>
+            <li><strong>مدل مستقیم</strong> مثل <code dir="ltr">openai/gpt-…</code>، <code dir="ltr">openrouter/…</code> (کلِ کاتالوگِ OpenRouter) یا <code dir="ltr">huggingface/…</code> (Inference Providersِ Hugging Face): بدون fallback، دقیقاً همان مدل. وقتی نتیجهٔ تکرارپذیر می‌خواهید.</li>
             <li><strong>ایجنت / فلو</strong> مثل <code>cine-motion-designer</code>: یک دستیار با system prompt آماده که مثل یک مدل صدا زده می‌شود.</li>
           </ul>
           <Callout kind="warn" icon="⚠️">برای <strong>ساخت ایندکس برداری</strong> از alias با fallback استفاده نکنید؛ عرض بردار بین ارائه‌دهنده‌ها فرق دارد. alias بدون fallback مثل <code>write-embed</code> را بگیرید.</Callout>

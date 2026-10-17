@@ -76,7 +76,7 @@ func (s *Server) completeAgentTools(w http.ResponseWriter, r *http.Request, alia
 		// vendor's money — runToolLoop keeps their usage in the outcome. Book
 		// it as failed work: real tokens and vendor cost on the books, no
 		// charge to the caller, no served request counted.
-		s.recordFailedUsage(r, outcome.provider, outcome.model, outcome.usage)
+		s.recordBrokenUsage(r, outcome.provider, outcome.model, outcome.usage)
 		writeError(w, aliasErrStatus(err, "unknown model alias"), err.Error())
 		return
 	}
@@ -293,7 +293,7 @@ func (s *Server) streamToolOutcome(w http.ResponseWriter, alias string, outcome 
 // key's allow-list like every other catalogue endpoint.
 func (s *Server) handleAgents(w http.ResponseWriter, r *http.Request) {
 	pol, hasPol := r.Context().Value(policyCtxKey{}).(policy.Policy)
-	scoped := s.policy.Enabled() && hasPol
+	scoped := s.authEnforced() && hasPol
 
 	type agentInfo struct {
 		Name         string   `json:"name"`

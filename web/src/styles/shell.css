@@ -518,6 +518,8 @@ html[lang="en"] .tbl thead th { text-transform: uppercase; letter-spacing: 0.05e
   .code-wrap .copy { min-height: 32px; padding: 5px 12px; font-size: 12px; }
   .linklike { padding-block: 6px; margin-block: -6px; }
   .auth-top .auth-home { min-height: 40px; }
+  .chip, .btn-sm { min-height: 36px; }
+  .err-details summary { min-height: 36px; display: flex; align-items: center; }
 }
 @media (hover: none) {
   /* Always shown, so it gets a strip of its own above the first line instead
@@ -543,3 +545,22 @@ html[lang="en"] .tbl thead th { text-transform: uppercase; letter-spacing: 0.05e
 .onboard-body h2 { font-size: 21px; font-weight: 800; margin-bottom: 10px; color: var(--ng-heading); }
 .onboard-body p { color: var(--ng-muted); line-height: 1.9; font-size: 14px; }
 .onboard-foot { padding: 12px 28px 26px; }
+
+/* ---- payments: notices, gateway picker, daily spend ----------------------- */
+.banner-warn { display: flex; align-items: center; gap: 10px; }
+.banner-ok > .ico, .banner-error > .ico, .banner-warn > .ico { flex: 0 0 auto; }
+.pay-msg { flex: 1; min-width: 0; }
+.err-details { margin-block-start: 6px; font-size: 12px; color: var(--ng-muted); }
+.err-details summary { cursor: pointer; inline-size: fit-content; }
+.err-details span { display: block; margin-block-start: 4px; overflow-wrap: anywhere; }
+.pay-action { margin-block-start: 10px; }
+.pay-note { margin: 8px 0 0; font-size: 11.5px; line-height: 1.8; }
+.gw-pick { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-block-end: 12px; font-size: 13px; }
+.gw-pick .input { inline-size: auto; min-inline-size: min(260px, 100%); max-inline-size: 100%; }
+.debit { color: var(--ng-danger-text, #c53030); }
+.day-bars { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; max-block-size: 420px; overflow-y: auto; }
+.day-bars li { display: grid; grid-template-columns: minmax(0, 7.5em) minmax(0, 1fr) auto; align-items: center; gap: 10px; font-size: 12px; }
+.day-date { color: var(--ng-muted); white-space: nowrap; }
+.day-track { block-size: 8px; border-radius: 99px; background: var(--ng-border-card); overflow: hidden; }
+.day-fill { display: block; block-size: 100%; border-radius: inherit; background: var(--ng-accent); }
+.day-cost { font-weight: 700; text-align: end; }

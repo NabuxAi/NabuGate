@@ -85,6 +85,26 @@ func servedByCaller(ctx context.Context) bool {
 	return rec.Caller()
 }
 
+// freshKeySource gives one router call its own recorder. A request that makes
+// several calls — a flow's steps, a calibration's samples — must decide who
+// pays per call: the recorder keeps only its first answer, so sharing the
+// request's one billed every later step the way the first was served.
+func freshKeySource(ctx context.Context) context.Context {
+	return context.WithValue(ctx, router.KeySourceCtxKey{}, router.NewKeySource())
+}
+
+// servedAs returns r carrying a recorder that already says who served, for
+// billing a call after the fact from what its own recorder found.
+func servedAs(r *http.Request, byCaller bool) *http.Request {
+	rec := router.NewKeySource()
+	if byCaller {
+		rec.Set("caller")
+	} else {
+		rec.Set("gateway")
+	}
+	return r.WithContext(context.WithValue(r.Context(), router.KeySourceCtxKey{}, rec))
+}
+
 // withOwnerCredentials layers a console user's saved state onto the request:
 // the upstream keys they stored, and the providers whose gateway credential
 // they are not (yet) allowed to spend.

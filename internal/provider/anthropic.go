@@ -79,6 +79,16 @@ func (u anthropicUsageRaw) usage() Usage {
 	}
 }
 
+// anthropicSampling drops a sampling parameter for reasoning-style targets:
+// Claude Opus 5.5 / Fable 5.1 reject temperature and top_p outright, and
+// Sonnet 5.5 / Haiku 5.5 reject any non-default value.
+func anthropicSampling(req ChatRequest, v *float64) *float64 {
+	if req.ParamStyle == ParamStyleReasoning {
+		return nil
+	}
+	return v
+}
+
 // mapAnthropicFinish normalizes Anthropic's stop_reason to the OpenAI vocabulary.
 func mapAnthropicFinish(r string) string {
 	switch r {
@@ -116,8 +126,8 @@ func (a *AnthropicAdapter) Chat(ctx context.Context, req ChatRequest) (ChatRespo
 		MaxTokens:     maxTokens,
 		System:        system.String(),
 		Messages:      msgs,
-		Temperature:   req.Temperature,
-		TopP:          req.TopP,
+		Temperature:   anthropicSampling(req, req.Temperature),
+		TopP:          anthropicSampling(req, req.TopP),
 		StopSequences: stopToSlice(req.Stop),
 	})
 	if err != nil {
@@ -202,11 +212,11 @@ func (a *AnthropicAdapter) ChatStream(ctx context.Context, req ChatRequest, onDe
 	if system.Len() > 0 {
 		payload["system"] = system.String()
 	}
-	if req.Temperature != nil {
-		payload["temperature"] = *req.Temperature
+	if t := anthropicSampling(req, req.Temperature); t != nil {
+		payload["temperature"] = *t
 	}
-	if req.TopP != nil {
-		payload["top_p"] = *req.TopP
+	if p := anthropicSampling(req, req.TopP); p != nil {
+		payload["top_p"] = *p
 	}
 	if stops := stopToSlice(req.Stop); len(stops) > 0 {
 		payload["stop_sequences"] = stops

@@ -126,6 +126,25 @@ func (e *Enforcer) RateOK(key string) bool {
 	return b.allow(e.now())
 }
 
+// RateOKLimit is RateOK for a key the enforcer was not configured with — a
+// console-minted token, whose limit lives in the admin store. The bucket is
+// keyed apart from config keys, so the two can never share one.
+func (e *Enforcer) RateOKLimit(key string, limit int) bool {
+	if limit <= 0 {
+		return true
+	}
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	id := "console:" + key
+	b := e.buckets[id]
+	if b == nil || b.capacity != float64(limit) {
+		capacity := float64(limit)
+		b = &bucket{tokens: capacity, capacity: capacity, refill: capacity / 60.0, last: e.now()}
+		e.buckets[id] = b
+	}
+	return b.allow(e.now())
+}
+
 // bucket is a simple token bucket refilling at refill tokens/second.
 type bucket struct {
 	tokens   float64

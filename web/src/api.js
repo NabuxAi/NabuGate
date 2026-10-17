@@ -32,14 +32,26 @@ async function req(path, options = {}) {
   }
   if (!res.ok) {
     let message = res.statusText;
+    let extra = {};
     try {
       const body = await res.json();
-      message = body?.error?.message || body?.error || message;
+      const e = body?.error;
+      if (e && typeof e === 'object') {
+        message = e.message || message;
+        extra = e;
+      } else {
+        message = e || message;
+      }
     } catch {
       /* non-JSON error body */
     }
-    const err = new Error(message);
+    // The message is the server's English fallback. Screens translate by
+    // `code` and keep the message only as a detail; the extra fields
+    // (min_usd, shortfall_usd, days_left …) ride along on `details`.
+    const err = new Error(typeof message === 'string' ? message : String(message));
     err.status = res.status;
+    err.code = typeof extra.code === 'string' ? extra.code : undefined;
+    err.details = extra;
     throw err;
   }
   return res.status === 204 ? null : res.json();
@@ -165,11 +177,17 @@ export const getMe = () => req('/me');
 // Starts a real payment: answers with an invoice number and the gateway's
 // checkout URL, not with a new balance. Nothing is credited until the payer
 // comes back and settleMyPayment confirms with the gateway.
-export const rechargeMe = (amount, gateway) =>
-  req('/me/recharge', {
-    method: 'POST',
-    body: JSON.stringify({ amount: Number(amount), gateway }),
-  });
+//
+// With `plan` the server ignores `amount`, charges exactly what the plan still
+// needs over the current balance, and buys the plan once the payment lands.
+// An empty `gateway` means NabuPay's own page, where the payer picks one.
+export const rechargeMe = ({ amount, gateway, plan } = {}) => {
+  const body = {};
+  if (plan) body.plan = plan;
+  else body.amount = Number(amount);
+  if (gateway) body.gateway = gateway;
+  return req('/me/recharge', { method: 'POST', body: JSON.stringify(body) });
+};
 
 // Finishes whatever this account left pending at the gateway. Takes no
 // invoice number: the server knows which invoices this caller started, and
@@ -231,8 +249,16 @@ export const requestProvider = (name, note) =>
 
 export const listPlans = () => req('/plans');
 
-export const subscribe = (id) =>
-  req(`/plans/${encodeURIComponent(id)}/subscribe`, { method: 'POST' });
+// idempotencyKey is fresh per click, so a double click charges once;
+// confirmSwitch answers the server's 409 about losing the current plan's days.
+export const subscribe = (id, { confirmSwitch, idempotencyKey } = {}) =>
+  req(`/plans/${encodeURIComponent(id)}/subscribe`, {
+    method: 'POST',
+    body: JSON.stringify({
+      ...(confirmSwitch ? { confirm_switch: true } : {}),
+      ...(idempotencyKey ? { idempotency_key: idempotencyKey } : {}),
+    }),
+  });
 
 export const cancelSubscription = () => req('/subscription', { method: 'DELETE' });
 

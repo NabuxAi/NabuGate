@@ -37,6 +37,10 @@ type stepOutcome struct {
 	// the parent's Usage is their sum and is not booked twice. Additive in
 	// the trace JSON: clients that read steps ignore it.
 	SubSteps []stepOutcome `json:"sub_steps,omitempty"`
+	// byCaller is who paid for this step's call: the caller's own key or the
+	// gateway's. Per step, because one step may fall back to the gateway's
+	// credential while the next is served on the caller's.
+	byCaller bool
 }
 
 // flowResult is one whole chain.
@@ -161,11 +165,13 @@ func (s *Server) runStep(ctx context.Context, step flow.Step, req provider.ChatR
 		routeModel = ag.Model
 	}
 
-	res, err := s.router.Chat(ctx, routeModel, req)
+	stepCtx := freshKeySource(ctx)
+	res, err := s.router.Chat(stepCtx, routeModel, req)
 	if err != nil {
 		return outcome, err
 	}
 
+	outcome.byCaller = servedByCaller(stepCtx)
 	outcome.Output = res.Response.Content
 	outcome.Provider = res.Provider
 	outcome.Model = res.Model
@@ -259,7 +265,7 @@ func (s *Server) recordFlowFor(r *http.Request, project string, fl flow.Flow, re
 			if step.Provider == "" {
 				continue
 			}
-			s.recordForProject(r, project, step.Provider, step.Model, step.Usage)
+			s.recordForProject(servedAs(r, step.byCaller), project, step.Provider, step.Model, step.Usage)
 		}
 	}
 	walk(result.Steps)

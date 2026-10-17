@@ -164,6 +164,13 @@ func main() {
 		log.Info("conversation memory enabled", "dir", filepath.Join(stateDir, "conversations"))
 	}
 	adminState, err := adminstore.Open(filepath.Join(stateDir, "console.json"))
+	if errors.Is(err, adminstore.ErrStoreLocked) {
+		// Fatal, unlike every other store error below: a second instance on the
+		// same state file is two wallets that overwrite each other, and serving
+		// traffic from it would bill into the one that loses.
+		log.Error("another instance holds the console state; stop it before starting this one", "dir", stateDir)
+		os.Exit(1)
+	}
 	if err != nil {
 		adminState = nil
 		// Not fatal: the gateway's own routing does not depend on it, and

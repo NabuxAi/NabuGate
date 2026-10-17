@@ -7,6 +7,7 @@ import Dashboard from './views/Dashboard.jsx';
 import Providers from './views/Providers.jsx';
 import ProviderRequests from './views/ProviderRequests.jsx';
 import Models from './views/Models.jsx';
+import Decisions from './views/Decisions.jsx';
 import Keys from './views/Keys.jsx';
 import Usage from './views/Usage.jsx';
 import Agents from './views/Agents.jsx';
@@ -38,6 +39,7 @@ const VIEWS = {
   'provider-requests': () => <ProviderRequests />,
   opsless: () => <Opsless />,
   models: () => <Models />,
+  decisions: () => <Decisions />,
   keys: () => <Keys />,
   tokens: () => <Tokens />,
   usage: () => <Usage />,
@@ -60,7 +62,7 @@ export default function Console({ view, session, navigate, isPanel, isAdminPath 
   // rendered an apology.
   let allowed = [
     'dashboard', 'account', 'plans', 'payments',
-    'tokens', 'models', 'providers', 'requests', 'integration', 'docs',
+    'tokens', 'models', 'decisions', 'providers', 'requests', 'integration', 'docs',
     'profile', 'security',
   ];
 

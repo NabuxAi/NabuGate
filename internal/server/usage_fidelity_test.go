@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"nabugate/internal/adminstore"
 	"nabugate/internal/agent"
@@ -751,5 +752,53 @@ func TestUnpricedModelOnTheCallersOwnKeyIsNotTheGatewaysHole(t *testing.T) {
 	}
 	if row.UnpricedRequests != 0 {
 		t.Errorf("unpriced_requests = %d, want 0 — the gateway never paid for this call", row.UnpricedRequests)
+	}
+}
+
+// The caller hanging up mid-stream is not the vendor failing: the tokens
+// delivered until then were made for the caller, and are charged.
+func TestACallerWhoHangsUpMidStreamPaysForWhatWasDelivered(t *testing.T) {
+	release := make(chan struct{})
+	up := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		fmt.Fprint(w, "data: {\"choices\":[{\"delta\":{\"content\":\""+strings.Repeat("word ", 400)+"\"}}]}\n\n")
+		if f, ok := w.(http.Flusher); ok {
+			f.Flush()
+		}
+		select {
+		case <-r.Context().Done():
+		case <-release:
+		}
+	}))
+	defer up.Close()
+	defer close(release)
+	ts, _ := fidelityServer(t, up.URL, nil, nil)
+	defer ts.Close()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	req, _ := http.NewRequestWithContext(ctx, http.MethodPost, ts.URL+"/v1/chat/completions",
+		strings.NewReader(`{"model":"nabu-fast","stream":true,"messages":[{"role":"user","content":"hi"}]}`))
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	buf := make([]byte, 512)
+	if _, err := resp.Body.Read(buf); err != nil {
+		t.Fatal(err)
+	}
+	cancel()
+	resp.Body.Close()
+
+	var row usage.Stat
+	for i := 0; i < 50; i++ {
+		_, byModel := usageSnapshot(t, ts)
+		if row = byModel[modelKey]; row.Requests > 0 || row.FailedRequests > 0 {
+			break
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	if row.Requests != 1 || row.CostUSD <= 0 {
+		t.Fatalf("a caller who hung up was not charged: %+v", row)
 	}
 }

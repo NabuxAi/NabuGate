@@ -52,6 +52,14 @@ type Subscription struct {
 	// Renewals counts terms bought, so the console can say "since March"
 	// without keeping every past term.
 	Renewals int `json:"renewals,omitempty"`
+
+	// IncludesCreditUSD is usage credit the term bundles, added to the balance
+	// in the same write that charges for the term.
+	IncludesCreditUSD float64 `json:"includes_credit_usd,omitempty"`
+	// PurchaseKey is the buyer's idempotency key for the purchase that made
+	// this term. A second request carrying the same key is the same click
+	// arriving twice, and is answered with this term instead of a second one.
+	PurchaseKey string `json:"purchase_key,omitempty"`
 }
 
 // Active reports whether the subscription is in force at t.
@@ -114,6 +122,9 @@ func (s *Store) Subscribe(owner string, p Subscription, days int) (Subscription,
 	if u == nil {
 		return Subscription{}, fmt.Errorf("adminstore: no such user %q", owner)
 	}
+	if p.PurchaseKey != "" && u.Subscription != nil && u.Subscription.PurchaseKey == p.PurchaseKey {
+		return *u.Subscription, nil
+	}
 	// Only a purchase checks the balance. A grant — an admin making good on an
 	// outage, or a customer who paid another way — passes a zero price, and the
 	// customer owed a term is exactly the one whose balance went negative on
@@ -141,10 +152,29 @@ func (s *Store) Subscribe(owner string, p Subscription, days int) (Subscription,
 		}
 	}
 
-	u.Balance -= p.PriceUSD
+	// The charge, the bundled credit and their history rows land in one write,
+	// so a buyer's history always explains their balance: money never leaves
+	// without a row saying what for.
+	prevBalance, prevSub, prevRows := u.Balance, u.Subscription, len(u.Payments)
+	stamp := now.UnixNano()
+	if p.PriceUSD > 0 {
+		u.Balance -= p.PriceUSD
+		u.Payments = append(u.Payments, Payment{
+			ID: fmt.Sprintf("plan-%s-%d", p.PlanID, stamp), Amount: -p.PriceUSD,
+			Status: "success", Kind: "plan", PlanID: p.PlanID, CreatedAt: now,
+		})
+	}
+	if p.IncludesCreditUSD > 0 {
+		u.Balance += p.IncludesCreditUSD
+		u.Payments = append(u.Payments, Payment{
+			ID: fmt.Sprintf("plan-credit-%s-%d", p.PlanID, stamp), Amount: p.IncludesCreditUSD,
+			Status: "success", Kind: "plan-credit", PlanID: p.PlanID, CreatedAt: now,
+		})
+	}
 	u.Subscription = &next
 	s.dirty = true
 	if err := s.save(); err != nil {
+		u.Balance, u.Subscription, u.Payments = prevBalance, prevSub, u.Payments[:prevRows]
 		return Subscription{}, err
 	}
 	return next, nil

@@ -127,9 +127,9 @@ export default function Usage() {
   // in images, a speech row in characters.
   const units = (v) => (
     <>
-      {(v.audio_seconds > 0) && <span className="mono" title={t('audioSec')}>⏱ {fmtInt(Math.round(v.audio_seconds))}s</span>}
-      {(v.images > 0) && <span className="mono" title={t('imagesUnit')}>🖼 {fmtInt(v.images)}</span>}
-      {(v.characters > 0) && <span className="mono" title={t('charsUnit')}>🔤 {fmtInt(v.characters)}</span>}
+      {(v.audio_seconds > 0) && <span className="mono" title={t('audioSec')}><Icon name="clock" size={12} /> {fmtInt(Math.round(v.audio_seconds))}s</span>}
+      {(v.images > 0) && <span className="mono" title={t('imagesUnit')}><Icon name="image" size={12} /> {fmtInt(v.images)}</span>}
+      {(v.characters > 0) && <span className="mono" title={t('charsUnit')}><Icon name="type" size={12} /> {fmtInt(v.characters)}</span>}
     </>
   );
 

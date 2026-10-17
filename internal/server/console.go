@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"net/http"
 	"net/url"
 	"os"
@@ -127,7 +128,7 @@ func (s *Server) consoleStatus(w http.ResponseWriter, r *http.Request) {
 	if c, err := r.Cookie(consoleCookie); err == nil {
 		info, authed = s.admin.ValidSession(c.Value)
 	}
-	writeJSON(w, http.StatusOK, map[string]any{
+	body := map[string]any{
 		"needs_setup":   s.admin.NeedsSetup(),
 		"authenticated": authed,
 		"is_admin":      info.IsAdmin,
@@ -135,7 +136,18 @@ func (s *Server) consoleStatus(w http.ResponseWriter, r *http.Request) {
 		// three places that "the payment gateway is not connected yet", and
 		// kept saying so after it was.
 		"payments_enabled": s.pay.Configured(),
-	})
+	}
+	// Asked only of a signed-in visitor: the method list is for the buy
+	// screen, and an anonymous page load should not be a call to the bridge.
+	if authed && s.pay.Configured() {
+		list, healthy := s.paymentGateways(r.Context())
+		if list == nil {
+			list = []nabupay.Gateway{}
+		}
+		body["payment_gateways"] = list
+		body["payments_healthy"] = healthy
+	}
+	writeJSON(w, http.StatusOK, body)
 }
 
 type credentials struct {
@@ -725,19 +737,51 @@ func (s *Server) rechargeMe(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Amount  float64 `json:"amount"`
 		Gateway string  `json:"gateway"`
+		// Plan is "pay the difference and activate": the amount is computed
+		// here from the plan's price and the balance, and the plan is bought
+		// the moment the payment is credited.
+		Plan string `json:"plan"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid amount")
-		return
-	}
-	if req.Amount <= 0 {
-		writeError(w, http.StatusBadRequest, "a payment must be for more than nothing")
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<16)).Decode(&req); err != nil {
+		writeErrorCode(w, http.StatusBadRequest, "amount_out_of_range", "invalid amount",
+			map[string]any{"min_usd": minTopUpUSD, "max_usd": maxTopUpUSD})
 		return
 	}
 	if !s.pay.Configured() {
 		// 501 rather than 500: nothing is broken, the deployment simply has no
 		// gateway, and the panel renders that as a sentence instead of an error.
-		writeError(w, http.StatusNotImplemented, nabupay.ErrNotConfigured.Error())
+		writeErrorCode(w, http.StatusNotImplemented, "payments_disabled", nabupay.ErrNotConfigured.Error(), nil)
+		return
+	}
+
+	amount := roundCents(req.Amount)
+	description := fmt.Sprintf("NabuGate wallet top-up for %s", email)
+	planID := ""
+	if strings.TrimSpace(req.Plan) != "" {
+		plan, ok := s.planByID(req.Plan)
+		if !ok {
+			writeErrorCode(w, http.StatusNotFound, "no_such_plan", "no such plan", nil)
+			return
+		}
+		if len(plan.Providers) == 0 || plan.PriceUSD <= 0 {
+			writeErrorCode(w, http.StatusServiceUnavailable, "plan_unavailable", "that plan is not available right now", nil)
+			return
+		}
+		var balance float64
+		if u := s.admin.GetUser(email); u != nil {
+			balance = u.Balance
+		}
+		// Rounded up to the cent, so the credited amount always covers the
+		// price; floored at the minimum top-up, whose remainder stays in the
+		// wallet for the metered calls the plan exists for.
+		amount = math.Max(math.Ceil((plan.PriceUSD-balance)*100)/100, minTopUpUSD)
+		planID = plan.ID
+		description = fmt.Sprintf("NabuGate plan %s for %s", plan.ID, email)
+	}
+	if amount < minTopUpUSD || amount > maxTopUpUSD {
+		writeErrorCode(w, http.StatusBadRequest, "amount_out_of_range",
+			fmt.Sprintf("a top-up must be between $%.0f and $%.0f", minTopUpUSD, maxTopUpUSD),
+			map[string]any{"min_usd": minTopUpUSD, "max_usd": maxTopUpUSD})
 		return
 	}
 	// Deliberately NOT defaulted to s.payGateway any more. Naming a gateway
@@ -748,30 +792,37 @@ func (s *Server) rechargeMe(w http.ResponseWriter, r *http.Request) {
 	// working. A caller that really does want one can still pass it.
 
 	checkout, err := s.pay.Start(r.Context(), nabupay.StartOptions{
-		AmountUSD:   req.Amount,
-		Gateway:     req.Gateway,
-		Description: fmt.Sprintf("NabuGate wallet top-up for %s", email),
+		AmountUSD:   amount,
+		Gateway:     strings.TrimSpace(req.Gateway),
+		Description: description,
 		// The payer returns to the panel, which then asks us to settle. The
 		// query the gateway appends is not read: only the invoice number is,
 		// and only to ask the bridge what really happened.
 		CallbackURL: s.publicURL(r) + "/panel/account",
 	})
 	if err != nil {
-		writeError(w, http.StatusBadGateway, err.Error())
+		s.log.Warn("payment bridge refused a checkout", "account", email, "amount", amount, "error", err)
+		code := "gateway_refused"
+		if !strings.Contains(err.Error(), "refused the request") && !strings.Contains(err.Error(), "could not start") {
+			code = "bridge_unreachable"
+		}
+		writeErrorCode(w, http.StatusBadGateway, code, err.Error(), nil)
 		return
 	}
 
 	// Recorded before the payer leaves, which is what binds this invoice to
 	// this account. Settling later cannot then take the payer's word for whose
 	// invoice it is.
-	if err := s.admin.StartPayment(email, req.Amount, checkout.Invoice); err != nil {
+	if err := s.admin.StartPaymentFor(email, amount, checkout.Invoice, planID); err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
+	s.log.Info("checkout started", "account", email, "invoice", checkout.Invoice, "amount", amount, "plan", planID)
 
 	writeJSON(w, http.StatusOK, map[string]any{
 		"invoice":      checkout.Invoice,
 		"checkout_url": checkout.URL,
+		"amount":       amount,
 	})
 }
 
@@ -793,44 +844,93 @@ func (s *Server) settleMyPayments(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Abandoned checkouts past the point a bank would still confirm are closed
+	// first, so they stop taking places in the bounded list below.
+	if n := s.admin.ExpireStalePayments(email, time.Now()); n > 0 {
+		s.log.Info("stale invoices expired", "account", email, "count", n)
+	}
+
 	// Bounded: somebody who started several checkouts and abandoned them should
 	// not turn one page load into an unbounded run of calls to the bridge.
-	pending := s.admin.PendingPayments(email, 10)
+	pending := s.admin.PendingPayments(email, 20)
 
 	type result struct {
 		Invoice string  `json:"invoice"`
 		Paid    bool    `json:"paid"`
 		Amount  float64 `json:"amount"`
+		Status  string  `json:"status"`
+		PlanID  string  `json:"plan_id,omitempty"`
 	}
 	out := make([]result, 0, len(pending))
 	var balance float64
 	credited := false
+	failed := 0
+	var subscribed map[string]any
 
 	for _, p := range pending {
-		paid, err := s.pay.Confirm(r.Context(), p.ID)
+		v, err := s.pay.Verify(r.Context(), p.ID)
 		if err != nil {
 			// One unreachable invoice must not hide the others, and it is not
 			// a failed payment — the bridge simply did not answer.
 			s.log.Warn("could not confirm a payment", "invoice", p.ID, "error", err)
 			continue
 		}
-		if !paid {
-			out = append(out, result{Invoice: p.ID, Paid: false, Amount: p.Amount})
+		if !v.Paid {
+			status := "pending"
+			if v.Final() {
+				// The bridge says this one cannot be paid any more. Closing it
+				// is what keeps it from being asked about on every visit and
+				// from pushing a real payment out of the list.
+				if err := s.admin.FailPayment(email, p.ID); err == nil {
+					status = "failed"
+					failed++
+				}
+			}
+			out = append(out, result{Invoice: p.ID, Paid: false, Amount: p.Amount, Status: status, PlanID: p.PlanID})
 			continue
 		}
-		b, err := s.admin.SettlePayment(email, p.ID)
-		if err != nil && !errors.Is(err, adminstore.ErrPaymentAlreadySettled) {
+		b, settled, err := s.admin.SettleVerified(email, p.ID, v.AmountUSD, v.Gateway)
+		switch {
+		case errors.Is(err, adminstore.ErrPaymentUnderpaid):
+			s.log.Error("gateway collected less than the invoice; not credited",
+				"account", email, "invoice", p.ID, "invoiced", p.Amount, "paid", v.AmountUSD)
+			out = append(out, result{Invoice: p.ID, Paid: false, Amount: p.Amount, Status: "underpaid", PlanID: p.PlanID})
+			continue
+		case err != nil && !errors.Is(err, adminstore.ErrPaymentAlreadySettled):
 			s.log.Error("confirmed payment could not be credited", "invoice", p.ID, "error", err)
 			continue
 		}
 		balance, credited = b, true
-		s.log.Info("wallet credited", "account", email, "invoice", p.ID, "balance", b)
-		out = append(out, result{Invoice: p.ID, Paid: true, Amount: p.Amount})
+		s.log.Info("wallet credited", "account", email, "invoice", p.ID, "amount", p.Amount, "gateway", v.Gateway, "balance", b)
+		out = append(out, result{Invoice: p.ID, Paid: true, Amount: p.Amount, Status: "success", PlanID: p.PlanID})
+
+		// The top-up was raised to buy a plan: buy it now, in the same visit.
+		// The switch was the buyer's choice when they paid for it.
+		if settled.PlanID != "" && err == nil {
+			plan, ok := s.planByID(settled.PlanID)
+			if !ok {
+				s.log.Warn("paid-for plan no longer exists; credit kept", "account", email, "plan", settled.PlanID)
+				continue
+			}
+			sub, err := s.buyPlan(email, plan, true, "invoice:"+p.ID)
+			if err != nil {
+				s.log.Error("plan paid for but not activated; credit kept", "account", email, "plan", plan.ID, "error", err)
+				continue
+			}
+			s.log.Info("subscribed", "owner", email, "plan", plan.ID, "price", plan.PriceUSD, "until", sub.ExpiresAt, "via", p.ID)
+			subscribed = map[string]any{"plan_id": sub.PlanID, "name": sub.Name, "expires_at": sub.ExpiresAt}
+			if u := s.admin.GetUser(email); u != nil {
+				balance = u.Balance
+			}
+		}
 	}
 
-	res := map[string]any{"payments": out, "credited": credited}
+	res := map[string]any{"payments": out, "credited": credited, "failed": failed}
 	if credited {
 		res["balance"] = balance
+	}
+	if subscribed != nil {
+		res["subscribed"] = subscribed
 	}
 	writeJSON(w, http.StatusOK, res)
 }
@@ -982,11 +1082,12 @@ func (s *Server) listUsers(w http.ResponseWriter, _ *http.Request) {
 }
 
 func (s *Server) adminRechargeUser(w http.ResponseWriter, r *http.Request) {
+	by, _ := r.Context().Value(consoleEmailCtxKey{}).(string)
 	var body struct {
 		Email  string  `json:"email"`
 		Amount float64 `json:"amount"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<16)).Decode(&body); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid body")
 		return
 	}
@@ -994,6 +1095,19 @@ func (s *Server) adminRechargeUser(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "no admin store")
 		return
 	}
-	s.admin.AddPayment(body.Email, body.Amount, "admin-recharge", "manual-"+fmt.Sprint(time.Now().UnixNano()))
-	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+	email := strings.ToLower(strings.TrimSpace(body.Email))
+	amount := roundCents(body.Amount)
+	// A typo in the address used to create a fresh account holding the money,
+	// and a negative or zero amount was accepted and answered "ok".
+	if s.admin.GetUser(email) == nil {
+		writeError(w, http.StatusNotFound, "no account with that email")
+		return
+	}
+	if amount <= 0 || amount > 100000 {
+		writeError(w, http.StatusBadRequest, "amount must be a positive number of dollars")
+		return
+	}
+	balance := s.admin.AddPayment(email, amount, "success", "manual-"+fmt.Sprint(time.Now().UnixNano()))
+	s.log.Info("wallet credited by admin", "account", email, "amount", amount, "by", by, "balance", balance)
+	writeJSON(w, http.StatusOK, map[string]any{"status": "ok", "balance": balance})
 }

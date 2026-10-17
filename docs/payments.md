@@ -40,10 +40,43 @@ address they cannot reach.
    the rate NabuDesk is configured with; the wallet is credited the USD amount
    requested, whatever that day's rate was.
 3. The bank returns the payer to `{NABU_PUBLIC_URL}/panel/account`.
-4. The panel calls `POST /api/me/payments/settle`. The server lists this
-   account's own pending invoices (at most 10), asks the bridge
-   `GET /api/v1/pay/verify/{invoice}` for each, and credits once per invoice
-   whose status is `paid`.
+4. The panel calls `POST /api/me/payments/settle`. The server first marks
+   this account's invoices older than seven days `expired`, then lists its
+   own pending invoices (at most 20, oldest first), asks the bridge
+   `GET /api/v1/pay/verify/{invoice}` for each, and:
+   - credits once per invoice whose status is `paid` — unless the bridge's
+     `amount_usd` is more than a cent below what was invoiced, which marks the
+     row `underpaid` and credits nothing;
+   - marks `failed` an invoice the bridge calls `failed`, `expired`,
+     `cancelled`, `rejected` or `refunded`, so it stops being asked about.
+
+Top-ups are between $1 and $5,000, rounded to the cent, enforced by the
+server. The bridge's current methods come from `GET /api/v1/pay/gateways` and
+are shown to signed-in users through `/api/status` (`payment_gateways`,
+`payments_healthy`); with no gateway named, the payer picks one on NabuPay's
+own page, which only lists the ones that work.
+
+## Buying a plan
+
+`POST /api/plans/{id}/subscribe` charges one term to the balance and, in the
+same write, adds a `plan` history row (negative amount) and a `plan-credit`
+row for any credit the plan bundles. The body may carry:
+
+- `idempotency_key` — a second request with the same key is the same click
+  and charges nothing;
+- `confirm_switch: true` — required to replace a different active plan,
+  whose remaining days are lost; without it the answer is `409
+  plan_switch_needs_confirm` with `days_left`.
+
+Short of money, the answer is `402 insufficient_balance` with
+`shortfall_usd`. `POST /api/me/recharge {"plan": "<id>"}` then raises an
+invoice for exactly that shortfall (at least $1), and the settle that credits
+it buys the plan in the same request.
+
+Errors carry a stable `error.code` (`payments_disabled`,
+`amount_out_of_range`, `gateway_refused`, `bridge_unreachable`,
+`insufficient_balance`, `plan_switch_needs_confirm`, `no_such_plan`,
+`plan_unavailable`); the console translates by code.
 
 Nothing carried by the returning browser is read: not the query string the
 gateway appended, not an invoice number. A return URL is something anyone can
@@ -61,10 +94,13 @@ strand a payment: the next visit asks again.
 |---|---|
 | `pending` | Invoice raised, money not yet confirmed. Re-asked on every visit. |
 | `success` | Bridge said `paid`; wallet credited once. |
-| `failed` | Bridge said the gateway refused it. Nothing credited. |
+| `failed` | Bridge said the gateway refused or cancelled it. Nothing credited. |
+| `expired` | Unconfirmed for seven days; no longer asked about. Nothing credited. |
+| `underpaid` | Bridge said `paid` but collected less than invoiced. Nothing credited — a support case. |
 
-An admin top-up from the console is recorded as `success` with id
-`manual-<timestamp>` and never touches the bridge.
+An admin top-up from the console is recorded as `success`, kind `admin`, with
+id `manual-<timestamp>`, and never touches the bridge. It refuses an address
+with no account and any amount that is not positive.
 
 ## Reading the log
 
@@ -77,6 +113,9 @@ An admin top-up from the console is recorded as `success` with id
 | `could not confirm a payment` | bridge did not answer the verify call | invoice stays `pending`; nothing lost; next page load retries |
 | `confirmed payment could not be credited` | store write failed after the bridge said `paid` | disk / permissions on the admin store; the invoice stays pending and retries |
 | `wallet credited` | done | — |
+| `gateway collected less than the invoice; not credited` | the bridge reported a smaller `amount_usd` | check the payment in NabuDesk; credit by hand what arrived |
+| `plan paid for but not activated; credit kept` | the top-up landed but buying the plan failed | the money is in the wallet; the customer can press Activate |
+| `another instance holds the console state` | a second container on the same `/data` | stop the stale container |
 
 ## Verifying by hand
 
@@ -121,8 +160,12 @@ account email. Never ask for card numbers.
 
 ## Duplicate containers
 
-A Coolify deploy can leave the previous container running beside the new one;
-Traefik then round-robins between them. Both share the admin store on disk, so
-a payment started on one and settled on the other still works, but a
-half-deployed pair where one has the `NABUPAY_*` env and the other does not
-produces intermittent `501`s. Stop the stale container.
+The admin store is one JSON file held in memory and written back whole, with
+usage debits batched between writes. Two processes on it are two wallets that
+overwrite each other: a payment credited by one is lost on the other's next
+write, or credited twice. The gateway therefore takes an exclusive lock on
+`console.json.lock` at startup; a second instance waits up to 30 seconds for
+the first to stop (a normal redeploy) and then exits with
+`another instance holds the console state`. A Coolify deploy that left the
+previous container running shows up as that line in the new container's log:
+stop the stale one.

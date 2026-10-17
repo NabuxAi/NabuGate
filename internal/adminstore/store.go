@@ -66,6 +66,18 @@ type Payment struct {
 	Amount    float64   `json:"amount"`
 	Status    string    `json:"status"`
 	CreatedAt time.Time `json:"created_at"`
+	// Kind says what the row is: "topup" (money in through the bridge),
+	// "plan" (a plan bought from the balance, a negative amount), "plan-credit"
+	// (credit a plan bundles), "admin" (an operator's top-up). Rows written
+	// before it existed carry none and are top-ups or legacy statuses.
+	Kind string `json:"kind,omitempty"`
+	// PlanID on a pending top-up is the plan to buy the moment it is credited:
+	// "pay the difference and activate" is one action for the buyer.
+	PlanID string `json:"plan_id,omitempty"`
+	// PaidUSD is what the bridge said was collected, when it said.
+	PaidUSD float64 `json:"paid_usd,omitempty"`
+	// Gateway is the method the payer used, when the bridge said.
+	Gateway string `json:"gateway,omitempty"`
 }
 
 type User struct {
@@ -216,16 +228,21 @@ type FlowStepRecord struct {
 }
 
 type state struct {
-	Admins       []Admin                `json:"admins"`
-	Tokens       []Token                `json:"tokens"`
-	Agents       []AgentRecord          `json:"agents"`
-	Flows        []FlowRecord           `json:"flows"`
-	Usage        map[string]Counters    `json:"usage"`
-	UsageByModel map[string]Counters    `json:"usage_by_model,omitempty"`
-	UsageByProv  map[string]Counters    `json:"usage_by_prov,omitempty"`
-	Sessions     map[string]time.Time   `json:"sessions"`
-	UserSessions map[string]SessionInfo `json:"user_sessions"`
-	Users        map[string]*User       `json:"users,omitempty"` // token hash -> expiry
+	Admins       []Admin             `json:"admins"`
+	Tokens       []Token             `json:"tokens"`
+	Agents       []AgentRecord       `json:"agents"`
+	Flows        []FlowRecord        `json:"flows"`
+	Usage        map[string]Counters `json:"usage"`
+	UsageByModel map[string]Counters `json:"usage_by_model,omitempty"`
+	UsageByProv  map[string]Counters `json:"usage_by_prov,omitempty"`
+	// OwnerByModel and OwnerByDay are each customer's spend split by model
+	// and by UTC day, keyed by owner email. They are what lets a customer see
+	// where their credit went, which per-key totals alone cannot answer.
+	OwnerByModel map[string]map[string]Counters `json:"owner_by_model,omitempty"`
+	OwnerByDay   map[string]map[string]Counters `json:"owner_by_day,omitempty"`
+	Sessions     map[string]time.Time           `json:"sessions"`
+	UserSessions map[string]SessionInfo         `json:"user_sessions"`
+	Users        map[string]*User               `json:"users,omitempty"` // token hash -> expiry
 	// ProviderRequests are asks to spend the gateway's own upstream credential.
 	// See provideraccess.go — a grant is additive and never removes access.
 	ProviderRequests []ProviderRequest `json:"provider_requests,omitempty"`
@@ -258,6 +275,9 @@ func Open(path string) (*Store, error) {
 		UserSessions: map[string]SessionInfo{},
 		Users:        map[string]*User{},
 	}}
+	if err := lockStateFile(path); err != nil {
+		return nil, err
+	}
 
 	raw, err := os.ReadFile(path)
 	switch {
@@ -304,15 +324,37 @@ func (s *Store) flush() error {
 		return err
 	}
 	tmp := s.path + ".tmp"
-	if err := os.WriteFile(tmp, raw, 0o600); err != nil {
+	f, err := os.OpenFile(tmp, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o600)
+	if err != nil {
+		return err
+	}
+	// Synced before the rename: this file is the wallet, and a rename that
+	// reaches the disk ahead of the data it names is an empty wallet after a
+	// power cut.
+	if _, err := f.Write(raw); err != nil {
+		f.Close()
+		return err
+	}
+	if err := f.Sync(); err != nil {
+		f.Close()
+		return err
+	}
+	if err := f.Close(); err != nil {
 		return err
 	}
 	return os.Rename(tmp, s.path)
 }
 
+// save writes the state now. dirty is cleared only once the write landed: a
+// failed write must leave the change pending, so the periodic Persist retries
+// it instead of believing it is on disk.
 func (s *Store) save() error {
+	if err := s.flush(); err != nil {
+		s.dirty = true
+		return err
+	}
 	s.dirty = false
-	return s.flush()
+	return nil
 }
 
 // ─────────────────────────── admin accounts ────────────────────────────────
@@ -681,6 +723,72 @@ func (s *Store) TokensForOwner(owner string) []Token {
 // so the owner's projects are the join. A key that was deleted keeps its usage
 // row, which stays out of this total — the figure answers "what are my current
 // keys costing", which is the question the panel asks.
+// ownerDays is how many days of per-day spend are kept per customer.
+const ownerDays = 90
+
+func (s *Store) recordOwnerLocked(owner, model string, e UsageEntry) {
+	if s.st.OwnerByModel == nil {
+		s.st.OwnerByModel = map[string]map[string]Counters{}
+	}
+	if s.st.OwnerByDay == nil {
+		s.st.OwnerByDay = map[string]map[string]Counters{}
+	}
+	byModel := s.st.OwnerByModel[owner]
+	if byModel == nil {
+		byModel = map[string]Counters{}
+		s.st.OwnerByModel[owner] = byModel
+	}
+	c := byModel[model]
+	c.add(e)
+	byModel[model] = c
+
+	byDay := s.st.OwnerByDay[owner]
+	if byDay == nil {
+		byDay = map[string]Counters{}
+		s.st.OwnerByDay[owner] = byDay
+	}
+	now := time.Now().UTC()
+	day := now.Format("2006-01-02")
+	d := byDay[day]
+	d.add(e)
+	byDay[day] = d
+	if len(byDay) > ownerDays {
+		cutoff := now.AddDate(0, 0, -ownerDays).Format("2006-01-02")
+		for k := range byDay {
+			if k < cutoff {
+				delete(byDay, k)
+			}
+		}
+	}
+}
+
+// OwnerBreakdown returns a customer's spend per model and per UTC day (the
+// last `days` days, oldest first, days without traffic omitted).
+func (s *Store) OwnerBreakdown(owner string, days int) (map[string]Counters, []DayCounters) {
+	owner = strings.ToLower(strings.TrimSpace(owner))
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	byModel := make(map[string]Counters, len(s.st.OwnerByModel[owner]))
+	for k, v := range s.st.OwnerByModel[owner] {
+		byModel[k] = v
+	}
+	cutoff := time.Now().UTC().AddDate(0, 0, -days+1).Format("2006-01-02")
+	var out []DayCounters
+	for day, c := range s.st.OwnerByDay[owner] {
+		if day >= cutoff {
+			out = append(out, DayCounters{Date: day, Counters: c})
+		}
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].Date < out[j].Date })
+	return byModel, out
+}
+
+// DayCounters is one day of a customer's spend.
+type DayCounters struct {
+	Date string
+	Counters
+}
+
 func (s *Store) UsageForOwner(owner string) map[string]Counters {
 	out := map[string]Counters{}
 	for _, t := range s.TokensForOwner(owner) {
@@ -723,6 +831,15 @@ func (s *Store) DeleteTokenForOwner(owner, name string) error {
 		return s.save()
 	}
 	return ErrTokenNotFound
+}
+
+// HasTokens reports whether any console token exists. A deployment with
+// console tokens is one that charges for calls, and must not fall back to the
+// open, unauthenticated mode a keyless development checkout runs in.
+func (s *Store) HasTokens() bool {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return len(s.st.Tokens) > 0
 }
 
 func (s *Store) Tokens() []Token {
@@ -832,6 +949,7 @@ func (s *Store) RecordUsage(project, prov, model string, e UsageEntry) {
 		}
 		t.LastUsed = time.Now().UTC()
 		if t.Owner != "" {
+			s.recordOwnerLocked(strings.ToLower(t.Owner), model, e)
 			if u, ok := s.st.Users[strings.ToLower(t.Owner)]; ok {
 				before := u.Balance
 				u.Balance -= cost
@@ -967,13 +1085,20 @@ func (s *Store) AddPayment(email string, amount float64, status string, id strin
 	if status != "failed" && status != "pending" {
 		u.Balance += amount
 	}
+	kind := ""
+	if strings.HasPrefix(id, "manual-") {
+		kind = "admin"
+	}
 	u.Payments = append(u.Payments, Payment{
 		ID:        id,
 		Amount:    amount,
 		Status:    status,
 		CreatedAt: time.Now(),
+		Kind:      kind,
 	})
-	s.save()
+	if err := s.save(); err != nil {
+		log.Printf("adminstore: persist payment %s for %s: %v", id, email, err)
+	}
 	return u.Balance
 }
 func (s *Store) SignupUser(email, password string) error {

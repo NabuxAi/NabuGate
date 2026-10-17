@@ -189,6 +189,10 @@ providers:
     type: openai
     base_url: "https://openrouter.ai/api/v1"
     api_key_env: "OPENROUTER_API_KEY"
+    # The whole catalogue (~470 models) as "openrouter/<vendor>/<model>",
+    # discovered live from /v1/models — NabuGen's "openrouter/*" grant had
+    # nothing to reach while this was off.
+    passthrough: true
 
   # Cloudflare Workers AI (developers.cloudflare.com/workers-ai) — OpenAI-wire
   # serverless inference (Llama / gpt-oss / Qwen / Mistral / DeepSeek / bge). The
@@ -371,6 +375,20 @@ providers:
     type: openai
     base_url: "https://openrouter.ai/api/v1"
     api_key_env: "OPENROUTER_API_KEY_2"
+    passthrough: true
+
+  # Hugging Face Inference Providers (huggingface.co/docs/inference-providers)
+  # — one OpenAI-wire router in front of Novita, DeepInfra, Together, Groq,
+  # Cerebras, Fireworks and more. Models are "<org>/<model>" with an optional
+  # ":<provider>" (or ":cheapest" / ":fastest") suffix; the rungs below pin
+  # the provider so the price in pricing: is the price actually paid.
+  # passthrough exposes the live catalogue as "huggingface/<org>/<model>".
+  # Skipped while HF_TOKEN is unset.
+  huggingface:
+    enabled: true
+    type: openai
+    base_url: "https://router.huggingface.co/v1"
+    api_key_env: "HF_TOKEN"
     passthrough: true
 
   # Cerebras — ~1M tokens/day free, no card. Fastest inference of the group.
@@ -853,6 +871,12 @@ model_registry:
         model: "deepseek/deepseek-v4-pro"
       - provider: gapgpt
         model: "deepseek-v4-pro"
+      - provider: openrouter
+        model: "deepseek/deepseek-v4-pro"
+      - provider: openrouter2
+        model: "deepseek/deepseek-v4-pro"
+      - provider: huggingface
+        model: "deepseek-ai/DeepSeek-V4-Pro:deepinfra"
 
   # Leaks its chain of thought into `content` on Parspack; keep it out of
   # user-facing aliases.
@@ -862,6 +886,12 @@ model_registry:
         model: "moonshotai/Kimi-K2.6"
       - provider: parspack
         model: "moonshotai/kimi-k2.6"
+      - provider: openrouter
+        model: "moonshotai/kimi-k2.6"
+      - provider: openrouter2
+        model: "moonshotai/kimi-k2.6"
+      - provider: huggingface
+        model: "moonshotai/Kimi-K2.6:deepinfra"
 
   # Leaks its chain of thought into `content` on Parspack, intermittently.
   # Keep it out of the lead position on user-facing aliases.
@@ -871,6 +901,12 @@ model_registry:
         model: "MiniMaxAI/MiniMax-M2.7"
       - provider: parspack
         model: "minimax/minimax-m2.7"
+      - provider: openrouter
+        model: "minimax/minimax-m2.7"
+      - provider: openrouter2
+        model: "minimax/minimax-m2.7"
+      - provider: huggingface
+        model: "MiniMaxAI/MiniMax-M2.7:deepinfra"
 
   glm-5.2:
     serves:
@@ -878,6 +914,12 @@ model_registry:
         model: "z-ai/glm-5.2"
       - provider: tokenrouter
         model: "glm-5.2"
+      - provider: openrouter
+        model: "z-ai/glm-5.2"
+      - provider: openrouter2
+        model: "z-ai/glm-5.2"
+      - provider: huggingface
+        model: "zai-org/GLM-5.2:deepinfra"
 
   gpt-oss-20b:
     serves:
@@ -892,6 +934,12 @@ model_registry:
       # `fallback` list, where `model:` does resolve; see nabu-cheap.
       - provider: cloudflare
         model: "@cf/openai/gpt-oss-120b"
+      - provider: openrouter
+        model: "openai/gpt-oss-20b"
+      - provider: openrouter2
+        model: "openai/gpt-oss-20b"
+      - provider: huggingface
+        model: "openai/gpt-oss-20b:deepinfra"
 
 
   # The remaining reasoning-dialect models found by probing the catalogue. They
@@ -980,6 +1028,32 @@ model_registry:
       - provider: anthropic
         model: "claude-sonnet-5"
 
+  # Current Claude generation, straight from Anthropic's own API. All four
+  # reject temperature/top_p (or any non-default value), hence param_style.
+  claude-opus-5-5:
+    param_style: reasoning
+    serves:
+      - provider: anthropic
+        model: "claude-opus-5-5"
+
+  claude-sonnet-5-5:
+    param_style: reasoning
+    serves:
+      - provider: anthropic
+        model: "claude-sonnet-5-5"
+
+  claude-haiku-5-5:
+    param_style: reasoning
+    serves:
+      - provider: anthropic
+        model: "claude-haiku-5-5"
+
+  claude-fable-5-1:
+    param_style: reasoning
+    serves:
+      - provider: anthropic
+        model: "claude-fable-5-1"
+
   gpt-5.6-terra:
     serves:
       - provider: openrouter
@@ -995,6 +1069,114 @@ model_registry:
         model: "openai/gpt-5.6-luna"
       - provider: gapgpt
         model: "gpt-5.6-luna"
+
+  # Cheap open models sold by both OpenRouter and Hugging Face — two vendors
+  # per model, so either account running dry costs a round trip, not the
+  # answer. They sit in chains ahead of the Claude rungs, which spend the
+  # Anthropic key and should be reached only when everything cheaper failed.
+  # Prices: openrouter.ai/api/v1/models and router.huggingface.co/v1/models,
+  # 2026-10-17. Not yet probed with a key.
+  deepseek-v4.1-flash:
+    serves:
+      - provider: openrouter
+        model: "deepseek/deepseek-v4.1-flash"
+      - provider: openrouter2
+        model: "deepseek/deepseek-v4.1-flash"
+      - provider: huggingface
+        model: "deepseek-ai/DeepSeek-V4.1-Flash:deepinfra"
+
+  gpt-oss-120b:
+    param_style: reasoning
+    serves:
+      - provider: huggingface
+        model: "openai/gpt-oss-120b:novita"
+      - provider: openrouter
+        model: "openai/gpt-oss-120b"
+      - provider: openrouter2
+        model: "openai/gpt-oss-120b"
+
+  gemma-4-31b:
+    serves:
+      - provider: huggingface
+        model: "google/gemma-4-31B-it:novita"
+      - provider: openrouter
+        model: "google/gemma-4-31b-it"
+      - provider: openrouter2
+        model: "google/gemma-4-31b-it"
+
+  glm-5.3-flash:
+    serves:
+      - provider: openrouter
+        model: "z-ai/glm-5.3-flash"
+      - provider: openrouter2
+        model: "z-ai/glm-5.3-flash"
+      - provider: huggingface
+        model: "zai-org/GLM-5.3-Flash:baseten"
+
+  mimo-v2.5:
+    serves:
+      - provider: openrouter
+        model: "xiaomi/mimo-v2.5"
+      - provider: openrouter2
+        model: "xiaomi/mimo-v2.5"
+      - provider: huggingface
+        model: "XiaomiMiMo/MiMo-V2.5:deepinfra"
+
+  step-3.5-flash:
+    serves:
+      - provider: openrouter
+        model: "stepfun/step-3.5-flash"
+      - provider: openrouter2
+        model: "stepfun/step-3.5-flash"
+      - provider: huggingface
+        model: "stepfun-ai/Step-3.5-Flash:deepinfra"
+
+  qwen3.6-35b-a3b:
+    serves:
+      - provider: openrouter
+        model: "qwen/qwen3.6-35b-a3b"
+      - provider: openrouter2
+        model: "qwen/qwen3.6-35b-a3b"
+      - provider: huggingface
+        model: "Qwen/Qwen3.6-35B-A3B:deepinfra"
+
+  deepseek-v3.2:
+    serves:
+      - provider: openrouter
+        model: "deepseek/deepseek-v3.2"
+      - provider: openrouter2
+        model: "deepseek/deepseek-v3.2"
+      - provider: huggingface
+        model: "deepseek-ai/DeepSeek-V3.2:deepinfra"
+
+  llama-3.3-70b:
+    serves:
+      - provider: openrouter
+        model: "meta-llama/llama-3.3-70b-instruct"
+      - provider: openrouter2
+        model: "meta-llama/llama-3.3-70b-instruct"
+      - provider: huggingface
+        model: "meta-llama/Llama-3.3-70B-Instruct:novita"
+
+  # Free on OpenRouter; Hugging Face is the paid rung behind it.
+  gemma-4-26b:
+    serves:
+      - provider: openrouter
+        model: "google/gemma-4-26b-a4b-it:free"
+      - provider: openrouter2
+        model: "google/gemma-4-26b-a4b-it:free"
+      - provider: huggingface
+        model: "google/gemma-4-26B-A4B-it:deepinfra"
+
+  # Reads images: nabu-vision's cross-vendor rung.
+  qwen3-vl-30b:
+    serves:
+      - provider: openrouter
+        model: "qwen/qwen3-vl-30b-a3b-instruct"
+      - provider: openrouter2
+        model: "qwen/qwen3-vl-30b-a3b-instruct"
+      - provider: huggingface
+        model: "Qwen/Qwen3-VL-30B-A3B-Instruct:deepinfra"
 
   # OpenRouter free tier — these cost nothing, so they belong at the end of
   # chains as a floor rather than a failure.
@@ -1060,8 +1242,16 @@ models:
       # gemini-2.5-pro is already 429 on it.
       - provider: gemini
         model: "gemini-2.5-flash"
-      - model: gpt-5.6-luna
+      - model: deepseek-v4.1-flash
+      - model: gpt-oss-120b
+      - model: gemma-4-31b
+      - model: glm-5.3-flash
+      - model: mimo-v2.5
+      - model: step-3.5-flash
       - model: laguna-s
+      - model: gpt-5.6-luna
+      # Claude spends the Anthropic key: last paid rung, cheapest Claude.
+      - model: claude-haiku-5-5
       # Ultimate local self-hosted fallback
       - provider: llamacpp
         model: "qwen-local"
@@ -1083,6 +1273,8 @@ models:
       - model: gemini-2.5-flash
       - model: qwen-plus
       - model: qwen-turbo
+      - model: deepseek-v4.1-flash
+      - model: claude-haiku-5-5
 
 
   # The console's alias, so every rung has to carry tools and hold a 10k-token
@@ -1101,6 +1293,12 @@ models:
       - model: gpt-5.5
       - model: gpt-4o
       - model: deepseek-v4-pro
+      - model: deepseek-v4.1-flash
+      - model: gpt-oss-120b
+      - model: qwen3.6-35b-a3b
+      - model: glm-5.3-flash
+      - model: deepseek-v3.2
+      - model: nemotron-3-super
       - model: claude-sonnet-5
       # Ultimate local self-hosted fallback. 2k tokens of context: it holds a
       # sentence, not the console's prompt.
@@ -1119,9 +1317,14 @@ models:
       # router skipped them. These rungs resolve.
       - provider: gemini
         model: "gemini-2.5-flash-lite"
-      - model: gpt-5.6-luna
       - model: nemotron-3-super
       - model: laguna-s
+      - model: gemma-4-26b
+      - model: gpt-oss-120b
+      - model: step-3.5-flash
+      - model: deepseek-v4.1-flash
+      - model: gpt-5.6-luna
+      - model: claude-haiku-5-5
       # Ultimate local self-hosted fallback
       - provider: llamacpp
         model: "qwen-local"
@@ -1154,6 +1357,9 @@ models:
       # when given an image, and nemotron-nano-12b-v2-vl does not return JSON.
       # So the floor here is a paid one, and until an account is funded this
       # alias is only as reliable as Gemini's free quota.
+      # qwen3-vl-30b is the cheap cross-vendor answer to that (OpenRouter and
+      # Hugging Face, $0.15/$0.60), ahead of the Claude floor.
+      - model: qwen3-vl-30b
       - model: claude-sonnet-5
 
   # Reading the text in an image, cheapest engine first.
@@ -1191,6 +1397,10 @@ models:
       # model should try that model everywhere before giving up on it.
       - provider: openrouter2
         model: "minimax/minimax-m2.7"
+      - provider: openrouter
+        model: "minimax/minimax-m2.7"
+      - provider: huggingface
+        model: "MiniMaxAI/MiniMax-M2.7:deepinfra"
       # Last resort, and a different model entirely: something is better than an
       # error, but only after MiniMax has been tried on every vendor that has it.
       - provider: groq
@@ -1205,6 +1415,10 @@ models:
       # cannot serve it. Verified working through this gateway.
       - provider: openrouter2
         model: "moonshotai/kimi-k2.6"
+      - provider: openrouter
+        model: "moonshotai/kimi-k2.6"
+      - provider: huggingface
+        model: "moonshotai/Kimi-K2.6:deepinfra"
       # Last resort, and not Kimi at all.
       - provider: openai
         model: "gpt-4o"
@@ -1299,6 +1513,63 @@ models:
     fallback:
       - provider: gapgpt
         model: "claude-sonnet-5"
+
+  # Claude from Anthropic directly. claude-sonnet-5 is the cross-vendor rung:
+  # it is also sold by OpenRouter and GapGPT, so an Anthropic outage or an
+  # exhausted key still answers.
+  nabu-claude:
+    primary:
+      model: claude-opus-5-5
+    fallback:
+      - model: claude-sonnet-5-5
+      - model: claude-sonnet-5
+
+  nabu-claude-sonnet:
+    primary:
+      model: claude-sonnet-5-5
+    fallback:
+      - model: claude-sonnet-5
+
+  nabu-claude-haiku:
+    primary:
+      model: claude-haiku-5-5
+    fallback:
+      - model: claude-sonnet-5
+
+  nabu-claude-fable:
+    primary:
+      model: claude-fable-5-1
+    fallback:
+      - model: claude-opus-5-5
+      - model: claude-sonnet-5
+
+  # One vendor each, several models deep: per-model availability on these
+  # routers comes and goes, so the next model on the same key is the useful
+  # retry. Everything else in the catalogue is "openrouter/<id>" or
+  # "huggingface/<org>/<model>" directly.
+  nabu-openrouter:
+    primary:
+      provider: openrouter
+      model: "deepseek/deepseek-v4.1-flash"
+    fallback:
+      - provider: openrouter
+        model: "z-ai/glm-5.3-flash"
+      - provider: openrouter
+        model: "google/gemma-4-26b-a4b-it:free"
+      - provider: openrouter2
+        model: "deepseek/deepseek-v4.1-flash"
+
+  nabu-hf:
+    primary:
+      provider: huggingface
+      model: "openai/gpt-oss-120b:novita"
+    fallback:
+      - provider: huggingface
+        model: "deepseek-ai/DeepSeek-V4.1-Flash:deepinfra"
+      - provider: huggingface
+        model: "Qwen/Qwen3.6-35B-A3B:deepinfra"
+      - provider: huggingface
+        model: "meta-llama/Llama-3.3-70B-Instruct:novita"
 
   nabu-arvan:
     primary:
@@ -1951,6 +2222,12 @@ embeddings:
 
 # Structured decision aliases (TypeSafe and v1m / System One / Decisions).
 # Evaluated via POST /v1/systemone or POST /v1/decisions.
+#
+# A decision does not need an entry here: any chat alias also answers
+# /v1/decisions through the local engine — one forward pass per question over
+# the letter tokens' logprobs, with an optional "temperature" (calibration)
+# and "engine" ("auto" | "local" | "native") in the request body. POST
+# /v1/decisions/calibrate fits that temperature from labelled samples.
 decisions:
   nabu-decision:
     primary:
@@ -1959,6 +2236,17 @@ decisions:
     fallback:
       - provider: openrouter
         model: "typesafe/jev-latest"
+      # Local logprob engine on OpenAI-wire models that return top_logprobs
+      # (per OpenRouter's supported_parameters): free first, then cents.
+      # Claude cannot stand here — Anthropic returns no logprobs.
+      - provider: openrouter
+        model: "liquid/lfm-2.5-2.6b:free"
+      - provider: openrouter2
+        model: "liquid/lfm-2.5-2.6b:free"
+      - provider: openrouter
+        model: "deepseek/deepseek-v4.1-flash"
+      - provider: huggingface
+        model: "meta-llama/Llama-3.1-8B-Instruct:novita"
 
   # v1m-fronted decisions; the fallback rung comes from a different vendor
   # (the TypeSafe SaaS), the way nabu-decision's second rung comes from
@@ -2018,6 +2306,35 @@ pricing:
   gpt-5.6-luna: { input: 0.20, output: 1.20 }
   gpt-oss-120b: { input: 0.15, output: 0.60 }
   gpt-oss-20b: { input: 0.018, output: 0.09 }
+  # ── OpenRouter / Hugging Face (live catalogues, 2026-10-17) ──────────────
+  deepseek-v4.1-flash: { input: 0.15, output: 0.60 }
+  gemma-4-31b-it: { input: 0.14, output: 0.40 }
+  "huggingface/deepseek-ai/DeepSeek-V4.1-Flash:deepinfra": { input: 0.20, output: 0.60 }
+  "huggingface/openai/gpt-oss-120b:novita": { input: 0.05, output: 0.25 }
+  "huggingface/google/gemma-4-31B-it:novita": { input: 0.14, output: 0.40 }
+  "huggingface/meta-llama/Llama-3.1-8B-Instruct:novita": { input: 0.02, output: 0.05 }
+  glm-5.3-flash: { input: 0.15, output: 0.50 }
+  mimo-v2.5: { input: 0.14, output: 0.28 }
+  step-3.5-flash: { input: 0.10, output: 0.30 }
+  qwen3.6-35b-a3b: { input: 0.15, output: 1.00 }
+  deepseek-v3.2: { input: 0.28, output: 0.42 }
+  llama-3.3-70b-instruct: { input: 0.10, output: 0.32 }
+  qwen3-vl-30b-a3b-instruct: { input: 0.15, output: 0.60 }
+  "openrouter/deepseek/deepseek-v4-pro": { input: 0.209, output: 0.418 }
+  "openrouter2/deepseek/deepseek-v4-pro": { input: 0.209, output: 0.418 }
+  "huggingface/deepseek-ai/DeepSeek-V4-Pro:deepinfra": { input: 1.30, output: 2.60 }
+  "huggingface/moonshotai/Kimi-K2.6:deepinfra": { input: 0.75, output: 3.50 }
+  "huggingface/MiniMaxAI/MiniMax-M2.7:deepinfra": { input: 0.25, output: 1.00 }
+  "huggingface/zai-org/GLM-5.2:deepinfra": { input: 0.75, output: 2.40 }
+  "huggingface/openai/gpt-oss-20b:deepinfra": { input: 0.03, output: 0.14 }
+  "huggingface/zai-org/GLM-5.3-Flash:baseten": { input: 0.15, output: 0.50 }
+  "huggingface/XiaomiMiMo/MiMo-V2.5:deepinfra": { input: 0.14, output: 0.28 }
+  "huggingface/stepfun-ai/Step-3.5-Flash:deepinfra": { input: 0.10, output: 0.30 }
+  "huggingface/Qwen/Qwen3.6-35B-A3B:deepinfra": { input: 0.10, output: 0.95 }
+  "huggingface/deepseek-ai/DeepSeek-V3.2:deepinfra": { input: 0.26, output: 0.38 }
+  "huggingface/meta-llama/Llama-3.3-70B-Instruct:novita": { input: 0.135, output: 0.40 }
+  "huggingface/google/gemma-4-26B-A4B-it:deepinfra": { input: 0.07, output: 0.34 }
+  "huggingface/Qwen/Qwen3-VL-30B-A3B-Instruct:deepinfra": { input: 0.15, output: 0.60 }
   text-embedding-3-small: { input: 0.02, output: 0 }
   whisper-1: { per_minute: 0.006 }
   # Token-billed transcription: OpenAI's own estimate is $0.006 and $0.003 a minute.
@@ -2031,7 +2348,14 @@ pricing:
   gpt-image-1: { per_image: 0.167 }
 
   # ── Anthropic (OpenRouter, 2026-09-26) ───────────────────────────────────
-  claude-sonnet-5: { input: 2.00, output: 10.00 }
+  claude-sonnet-5: { input: 2.00, output: 10.00, input_cache_read: 0.20, input_cache_write: 2.50 }
+  # anthropic.com/pricing, 2026-10-06. Haiku 5.5 is $0.50/$2.50 past 100K
+  # prompt tokens; the flat rate below is the common case.
+  # Cache reads and 5-minute cache writes, billed apart from input tokens.
+  claude-fable-5-1: { input: 10.00, output: 50.00, input_cache_read: 0.25, input_cache_write: 12.50 }
+  claude-opus-5-5: { input: 4.00, output: 20.00, input_cache_read: 0.20, input_cache_write: 5.00 }
+  claude-sonnet-5-5: { input: 2.00, output: 10.00, input_cache_read: 0.20, input_cache_write: 2.50 }
+  claude-haiku-5-5: { input: 0.10, output: 0.50, input_cache_read: 0.01, input_cache_write: 0.125 }
   "anthropic/claude-3-5-sonnet-latest": { input: 3, output: 15 }
   "anthropic/claude-3-5-haiku-latest": { input: 0.8, output: 4 }
 

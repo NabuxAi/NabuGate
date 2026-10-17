@@ -219,6 +219,14 @@ type DecisionRequest struct {
 	Model     string          `json:"model"`
 	State     json.RawMessage `json:"state"`
 	Questions json.RawMessage `json:"questions"`
+	// Temperature is the calibration temperature for the local decision
+	// engine: option logits are divided by it before the constrained softmax
+	// (T > 1 flattens an overconfident distribution). Never sent upstream.
+	Temperature *float64 `json:"-"`
+	// Engine picks how the alias is served: "" or "auto" prefer a native
+	// decision provider, "local" forces the logprob engine, "native" only
+	// accepts providers that speak a decisions API. Gateway-internal.
+	Engine string `json:"-"`
 }
 
 // DecisionResponse is the normalized structured decision response.

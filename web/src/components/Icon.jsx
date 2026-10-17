@@ -24,6 +24,7 @@ const P = {
   bot: <><rect x="3" y="8" width="18" height="12" rx="3" /><path d="M12 8V4M8 4h8" /><circle cx="9" cy="14" r="1.2" fill="currentColor" /><circle cx="15" cy="14" r="1.2" fill="currentColor" /></>,
   lock: <><rect x="4" y="11" width="16" height="10" rx="2" /><path d="M8 11V7a4 4 0 0 1 8 0v4" /></>,
   zap: <path d="M13 2 3 14h9l-1 8 10-12h-9l1-8Z" />,
+  scale: <><path d="M12 3v18M8 21h8" /><path d="m6 6-3 6a3 3 0 0 0 6 0Z M18 6l3 6a3 3 0 0 1-6 0Z" /><path d="M6 6h12" /></>,
   sun: <><circle cx="12" cy="12" r="4" /><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41" /></>,
   moon: <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79Z" />,
   globe: <><circle cx="12" cy="12" r="10" /><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10Z" /></>,
@@ -58,6 +59,10 @@ const P = {
   flow: <><rect x="3" y="3" width="6" height="6" rx="1.5" /><rect x="15" y="15" width="6" height="6" rx="1.5" /><path d="M6 9v3a3 3 0 0 0 3 3h6" /></>,
   wand: <><path d="m15 4-11 11 5 5L20 9Z" /><path d="M14 5l5 5M5 3v2M3 4h4M19 17v2M18 18h2" /></>,
   box: <><path d="M21 8 12 3 3 8v8l9 5 9-5V8Z" /><path d="m3 8 9 5 9-5M12 13v8" /></>,
+  pause: <><circle cx="12" cy="12" r="10" /><path d="M10 15V9M14 15V9" /></>,
+  clock: <><circle cx="12" cy="12" r="10" /><path d="M12 6v6l4 2" /></>,
+  ban: <><circle cx="12" cy="12" r="10" /><path d="m4.9 4.9 14.2 14.2" /></>,
+  type: <path d="M4 7V5h16v2M9 19h6M12 5v14" />,
 };
 
 export default function Icon({ name, size = '1em', stroke = 1.8, className, style, title }) {

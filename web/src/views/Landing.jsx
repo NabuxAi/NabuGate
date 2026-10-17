@@ -211,7 +211,7 @@ const PROVIDERS = [
   ['OpenAI', '#10a37f'], ['Anthropic', '#d97757'], ['Google Gemini', '#4f8cff'], ['DeepSeek', '#4d6bfe'],
   ['Groq', '#f55036'], ['OpenRouter', '#6467f2'], ['Mistral', '#fa520f'], ['xAI', '#94a3b8'],
   ['Cloudflare', '#f38020'], ['TokenRouter', '#22c55e'], ['AvalAI', '#0ea5e9'], ['GapGPT', '#a855f7'],
-  ['ArvanCloud', '#00b4b0'], ['ElevenLabs', '#cbd5e1'], ['Pexels', '#05a081'],
+  ['ArvanCloud', '#00b4b0'], ['Hugging Face', '#ffd21e'], ['ElevenLabs', '#cbd5e1'], ['Pexels', '#05a081'],
 ];
 
 const TOOLS = ['Claude Code', 'Cursor', 'Codex', 'Cline', 'Roo Code', 'Continue', 'VS Code', 'OpenAI SDK'];
