@@ -13,16 +13,10 @@ const T = {
     p2: 'مسیریابی هوشمند و fallback بین ارائه‌دهنده‌ها',
     p3: 'پرداخت به‌ازای مصرف؛ موجودی منقضی نمی‌شود',
     home: 'صفحهٔ اصلی',
-    loginTitle: 'خوش برگشتید',
-    loginLead: 'برای ادامه وارد حساب NabuGate شوید.',
     adminTitle: 'ورود به مدیریت',
     adminLead: 'این بخش فقط برای مدیران دروازه است.',
-    signupTitle: 'ساخت حساب',
-    signupLead: 'چند ثانیه طول می‌کشد؛ بعد از آن کلید API بسازید.',
     setupTitle: 'راه‌اندازی اولیه',
     setupNote: 'هنوز حسابی ساخته نشده. اولین حساب را همین‌جا بساز — بعد از آن این فرم بسته می‌شود و کسی نمی‌تواند از بیرون حساب اضافه کند.',
-    tabLogin: 'ورود',
-    tabSignup: 'ثبت‌نام',
     username: 'نام کاربری',
     email: 'ایمیل',
     emailOrUser: 'ایمیل یا نام کاربری',
@@ -35,11 +29,20 @@ const T = {
     ssoFailed: 'ورود با SSO ناموفق بود.',
     ssoError: 'خطای SSO: {code}',
     submitSetup: 'ساخت حساب مدیر',
-    submitSignup: 'ساخت حساب',
-    submitLogin: 'ورود',
     or: 'یا',
-    nabu: 'ورود با حساب نابو',
-    google: 'ورود با حساب گوگل',
+    continueTitle: 'ورود یا ثبت‌نام',
+    continueLead: 'ایمیل و رمزتان را بزنید؛ اگر حساب دارید وارد می‌شوید و اگر نه، همین‌جا ساخته می‌شود.',
+    submitContinue: 'ادامه',
+    newAccount: 'با این ایمیل هنوز حسابی نیست. رمز را یک بار دیگر بزنید تا حساب ساخته شود.',
+    submitCreate: 'ساخت حساب و ورود',
+    otherEmail: 'ایمیل دیگری می‌زنم',
+    wrongPassword: 'ایمیل یا رمز عبور درست نیست.',
+    useSso: 'این حساب با حساب نابو یا گوگل ساخته شده؛ با همان دکمهٔ پایین وارد شوید.',
+    shortPassword: 'رمز عبور باید دست‌کم ۱۰ نویسه باشد.',
+    invalidEmail: 'یک ایمیل درست وارد کنید.',
+    throttled: 'تلاش‌های ناموفق زیاد بود؛ چند دقیقه بعد دوباره امتحان کنید.',
+    nabu: 'ادامه با حساب نابو',
+    google: 'ادامه با حساب گوگل',
   },
   en: {
     tagline: 'The central AI gateway',
@@ -49,16 +52,10 @@ const T = {
     p2: 'Smart routing and fallback across providers',
     p3: 'Pay as you go; credit never expires',
     home: 'Home',
-    loginTitle: 'Welcome back',
-    loginLead: 'Sign in to your NabuGate account to continue.',
     adminTitle: 'Administrator sign-in',
     adminLead: 'This area is for gateway administrators only.',
-    signupTitle: 'Create your account',
-    signupLead: 'It takes a few seconds; then create an API key.',
     setupTitle: 'First-time setup',
     setupNote: 'No account exists yet. Create the first one here — after that this form closes and nobody can add accounts from outside.',
-    tabLogin: 'Sign in',
-    tabSignup: 'Sign up',
     username: 'Username',
     email: 'Email',
     emailOrUser: 'Email or username',
@@ -71,9 +68,18 @@ const T = {
     ssoFailed: 'Single sign-on failed.',
     ssoError: 'SSO error: {code}',
     submitSetup: 'Create admin account',
-    submitSignup: 'Create account',
-    submitLogin: 'Sign in',
     or: 'or',
+    continueTitle: 'Sign in or sign up',
+    continueLead: 'Enter your email and password: you are signed in if you have an account, and one is created here if you do not.',
+    submitContinue: 'Continue',
+    newAccount: 'There is no account with this email yet. Type the password once more to create it.',
+    submitCreate: 'Create account and sign in',
+    otherEmail: 'Use a different email',
+    wrongPassword: 'The email or password is not right.',
+    useSso: 'This account was made with Nabu or Google; sign in with that button below.',
+    shortPassword: 'The password must be at least 10 characters.',
+    invalidEmail: 'Enter a valid email address.',
+    throttled: 'Too many failed attempts; try again in a few minutes.',
     nabu: 'Continue with Nabu',
     google: 'Continue with Google',
   },
@@ -93,7 +99,9 @@ export default function SignIn({ needsSetup, onAuthenticated }) {
   const [confirm, setConfirm] = useState('');
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
-  const [mode, setMode] = useState(needsSetup ? 'setup' : 'login'); // 'setup', 'login', 'signup'
+  // 'setup' creates the first administrator; 'continue' is sign-in and
+  // sign-up in one, and 'create' is its second step for a new address.
+  const [mode, setMode] = useState(needsSetup ? 'setup' : 'continue');
   const [nabu, setNabu] = useState(null);
 
   useEffect(() => {
@@ -112,9 +120,22 @@ export default function SignIn({ needsSetup, onAuthenticated }) {
     }
   }, [needsSetup]);
 
-  const creating = mode === 'setup' || mode === 'signup';
+  const creating = mode === 'setup' || mode === 'create';
   const isPanel = window.location.pathname.startsWith('/panel');
-  const isAdmin = mode === 'login' && !isPanel;
+  const isAdmin = !isPanel && mode !== 'setup';
+
+  // The server's answers, by status and code, as sentences in the page's
+  // language; a raw English message never reaches the form.
+  function errorFor(err) {
+    if (err.unauthenticated || err.status === 401) return { key: 'wrongPassword' };
+    if (err.status === 429) return { key: 'throttled' };
+    switch (err.code) {
+      case 'use_sso': return { key: 'useSso' };
+      case 'short_password': return { key: 'shortPassword' };
+      case 'invalid_email': return { key: 'invalidEmail' };
+      default: return { key: 'failed' };
+    }
+  }
 
   async function submit(e) {
     e.preventDefault();
@@ -124,23 +145,34 @@ export default function SignIn({ needsSetup, onAuthenticated }) {
       setError({ key: 'mismatch' });
       return;
     }
+    if (creating && password.length < 10) {
+      setError({ key: 'shortPassword' });
+      return;
+    }
     setBusy(true);
     try {
-      if (mode === 'setup') await api.setup(username, password);
-      else if (mode === 'signup') await api.signup(username, password);
-      else await api.login(username, password);
+      if (mode === 'setup') {
+        await api.setup(username, password);
+      } else {
+        const res = await api.continueAuth(username, password, mode === 'create');
+        if (res && res.new_account) {
+          setConfirm('');
+          setMode('create');
+          return;
+        }
+      }
       onAuthenticated();
     } catch (err) {
-      setError(err.message ? { text: err.message } : { key: 'failed' });
+      setError(errorFor(err));
     } finally {
       setBusy(false);
     }
   }
 
-  const switchMode = (m) => { setMode(m); setError(null); };
+  const backToEmail = () => { setMode('continue'); setConfirm(''); setError(null); };
 
-  const title = mode === 'setup' ? t('setupTitle') : mode === 'signup' ? t('signupTitle') : isAdmin ? t('adminTitle') : t('loginTitle');
-  const lead = mode === 'signup' ? t('signupLead') : isAdmin ? t('adminLead') : t('loginLead');
+  const title = mode === 'setup' ? t('setupTitle') : isAdmin ? t('adminTitle') : t('continueTitle');
+  const lead = isAdmin ? t('adminLead') : t('continueLead');
   const errorText = error && (error.text || t(error.key, error.vars));
 
   return (
@@ -179,19 +211,18 @@ export default function SignIn({ needsSetup, onAuthenticated }) {
 
           {mode === 'setup' && <p className="auth-note">{t('setupNote')}</p>}
 
-          {!needsSetup && (
-            <div className="seg auth-tabs" role="tablist">
-              <button type="button" role="tab" aria-selected={mode === 'login'} className={'seg-btn' + (mode === 'login' ? ' active' : '')} onClick={() => switchMode('login')}>{t('tabLogin')}</button>
-              <button type="button" role="tab" aria-selected={mode === 'signup'} className={'seg-btn' + (mode === 'signup' ? ' active' : '')} onClick={() => switchMode('signup')}>{t('tabSignup')}</button>
-            </div>
-          )}
+          {mode === 'create' && <p className="auth-note">{t('newAccount')}</p>}
 
           <label className="field">
-            <span>{mode === 'setup' ? t('username') : mode === 'signup' ? t('email') : t('emailOrUser')}</span>
+            <span>{mode === 'setup' ? t('username') : isPanel ? t('email') : t('emailOrUser')}</span>
             <input
               className="input"
               value={username}
-              onChange={(e) => setUsername(e.target.value)}
+              onChange={(e) => { setUsername(e.target.value); if (mode === 'create') backToEmail(); }}
+              // An administrator signs in with a username; only the user
+              // panel is email-only.
+              type={isPanel && mode !== 'setup' ? 'email' : 'text'}
+              inputMode="email"
               autoComplete="username"
               dir="ltr"
               required
@@ -230,11 +261,15 @@ export default function SignIn({ needsSetup, onAuthenticated }) {
           {errorText && <p className="auth-error" role="alert"><Icon name="alert" size={16} />{errorText}</p>}
 
           <button className="btn btn-primary auth-submit" disabled={busy}>
-            {busy ? '…' : mode === 'setup' ? t('submitSetup') : mode === 'signup' ? t('submitSignup') : t('submitLogin')}
+            {busy ? '…' : mode === 'setup' ? t('submitSetup') : mode === 'create' ? t('submitCreate') : t('submitContinue')}
             {!busy && <Icon name="arrow" size={16} className="flip-rtl" />}
           </button>
 
-          {nabu && nabu.enabled && mode === 'login' && (
+          {mode === 'create' && (
+            <button type="button" className="btn btn-outline auth-submit" onClick={backToEmail}>{t('otherEmail')}</button>
+          )}
+
+          {nabu && nabu.enabled && mode !== 'setup' && (
             <>
               <div className="auth-or">{t('or')}</div>
               <div className="auth-sso">

@@ -1114,10 +1114,29 @@ func (s *Store) AddPayment(email string, amount float64, status string, id strin
 	}
 	return u.Balance
 }
+// Account rules the sign-in form states, enforced here because the form is
+// not the only client: a password the hint calls too short was accepted.
+var (
+	ErrInvalidEmail  = errors.New("enter a valid email address")
+	ErrShortPassword = errors.New("the password must be at least 10 characters")
+)
+
+// ValidEmail is a sanity check, not RFC 5322: one @, something before it, a
+// dot after it, no spaces.
+func ValidEmail(email string) bool {
+	at := strings.IndexByte(email, '@')
+	return at > 0 && at == strings.LastIndexByte(email, '@') &&
+		strings.Contains(email[at+1:], ".") && !strings.ContainsAny(email, " \t\r\n") &&
+		!strings.HasSuffix(email, ".")
+}
+
 func (s *Store) SignupUser(email, password string) error {
 	email = strings.TrimSpace(strings.ToLower(email))
-	if email == "" || password == "" {
-		return errors.New("email or password is invalid")
+	if !ValidEmail(email) {
+		return ErrInvalidEmail
+	}
+	if len([]rune(password)) < 10 {
+		return ErrShortPassword
 	}
 
 	s.mu.Lock()
@@ -1197,6 +1216,56 @@ func (s *Store) ChangeUserPassword(email, current, next string) error {
 	found.Salt = base64.RawStdEncoding.EncodeToString(newSalt)
 	found.Hash = base64.RawStdEncoding.EncodeToString(newHash)
 	return s.save()
+}
+
+// EnsureUser returns whether email holds an account, creating one with no
+// password when it does not. A sign-in through NabuAuth proves the address,
+// and the account is what carries a balance, a plan and keys: a session
+// without one left the person signed in to a panel that could do nothing.
+func (s *Store) EnsureUser(email, name string) (created bool, err error) {
+	email = strings.TrimSpace(strings.ToLower(email))
+	if !ValidEmail(email) {
+		return false, ErrInvalidEmail
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.st.Users == nil {
+		s.st.Users = make(map[string]*User)
+	}
+	if u := s.st.Users[email]; u != nil {
+		if u.Name == "" && name != "" {
+			u.Name = name
+			return false, s.save()
+		}
+		return false, nil
+	}
+	s.st.Users[email] = &User{Email: email, Name: name}
+	return true, s.save()
+}
+
+// AccountState says what a sign-in with this address can do: "none" (no
+// account yet), "password" (sign in with it), or "sso" (an account with no
+// password, made through NabuAuth or by a payment, reached only that way —
+// letting a password be set on it by whoever typed the address would hand the
+// account to them).
+func (s *Store) AccountState(email string) string {
+	email = strings.TrimSpace(strings.ToLower(email))
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	u := s.st.Users[email]
+	for _, a := range s.st.Admins {
+		if strings.EqualFold(a.Username, email) {
+			return "password"
+		}
+	}
+	switch {
+	case u == nil:
+		return "none"
+	case u.Hash == "" || u.Salt == "":
+		return "sso"
+	default:
+		return "password"
+	}
 }
 
 func (s *Store) AuthenticateUser(email, password string) (string, time.Time, error) {

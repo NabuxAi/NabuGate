@@ -39,6 +39,7 @@ func (s *Server) mountConsoleAPI(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/setup", s.consoleSetup)
 	mux.HandleFunc("POST /api/login", s.consoleLogin)
 	mux.HandleFunc("POST /api/signup", s.consoleSignup)
+	mux.HandleFunc("POST /api/auth/continue", s.consoleContinue)
 
 	mux.HandleFunc("POST /api/logout", s.consoleLogout)
 
@@ -1053,6 +1054,60 @@ func requireAdmin(next http.HandlerFunc) http.HandlerFunc {
 		next(w, r)
 	}
 }
+// consoleContinue is sign-in and sign-up as one step: the form asks for an
+// email and a password and this decides which it was.
+//
+//   - An administrator's username, or an account with a password: sign in.
+//   - No account with that address: answer new_account, and the form asks for
+//     the password once more; sent again with create, the account is made and
+//     signed in. Creating on the first press would turn a typo in a returning
+//     user's address into a second, empty account.
+//   - An account with no password (made through NabuAuth or Google): answer
+//     use_sso, since letting whoever typed the address set its password would
+//     hand them the account.
+func (s *Server) consoleContinue(w http.ResponseWriter, r *http.Request) {
+	var c struct {
+		Username string `json:"username"`
+		Password string `json:"password"`
+		Create   bool   `json:"create"`
+	}
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<16)).Decode(&c); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid JSON body")
+		return
+	}
+	c.Username = strings.TrimSpace(c.Username)
+	if !strings.Contains(c.Username, "@") {
+		// Not an email: only an administrator's username can be meant.
+		s.startConsoleSession(w, r, c.Username, c.Password)
+		return
+	}
+	switch s.admin.AccountState(c.Username) {
+	case "sso":
+		writeErrorCode(w, http.StatusConflict, "use_sso",
+			"this account signs in with Nabu or Google; use that button", nil)
+	case "none":
+		if !c.Create {
+			writeJSON(w, http.StatusOK, map[string]any{"authenticated": false, "new_account": true})
+			return
+		}
+		if err := s.admin.SignupUser(c.Username, c.Password); err != nil {
+			code := "signup_failed"
+			switch {
+			case errors.Is(err, adminstore.ErrInvalidEmail):
+				code = "invalid_email"
+			case errors.Is(err, adminstore.ErrShortPassword):
+				code = "short_password"
+			}
+			writeErrorCode(w, http.StatusBadRequest, code, err.Error(), nil)
+			return
+		}
+		s.log.Info("account created", "account", strings.ToLower(c.Username))
+		s.startConsoleSession(w, r, c.Username, c.Password)
+	default:
+		s.startConsoleSession(w, r, c.Username, c.Password)
+	}
+}
+
 func (s *Server) consoleSignup(w http.ResponseWriter, r *http.Request) {
 	var c credentials
 	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<16)).Decode(&c); err != nil {

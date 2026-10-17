@@ -278,6 +278,21 @@ func (s *Server) consoleNabuCallback(w http.ResponseWriter, r *http.Request) {
 	email := strings.ToLower(profile.Email)
 	isAdmin := cfg.Admins[email]
 
+	// Signing in with Nabu or Google is also signing up: the account is what
+	// holds a balance, a plan and keys, and a session without one could do
+	// nothing but show an empty panel.
+	if !isAdmin {
+		created, err := s.admin.EnsureUser(email, profile.Name)
+		if err != nil {
+			s.log.Warn("nabuauth sign-in without a usable email", "error", err)
+			fail("failed", dest)
+			return
+		}
+		if created {
+			s.log.Info("account created", "account", email, "via", "nabuauth")
+		}
+	}
+
 	token, expiry, err := s.admin.NewSession(email, isAdmin)
 	if err != nil {
 		s.log.Error("could not issue console session", "error", err)

@@ -74,6 +74,10 @@ export const signup = (username, password) =>
 export const login = (username, password) =>
   req('/login', { method: 'POST', body: JSON.stringify({ username, password }) });
 
+// Sign-in and sign-up in one step; see consoleContinue on the server.
+export const continueAuth = (username, password, create = false) =>
+  req('/auth/continue', { method: 'POST', body: JSON.stringify({ username, password, create }) });
+
 export const logout = () => req('/logout', { method: 'POST' });
 
 // ---- tokens -----------------------------------------------------------------
