@@ -261,7 +261,7 @@ for chunk in stream:
       {active === 'frameworks' && (
         <section>
           <H1>LangChain و فریم‌ورک‌های هوش مصنوعی</H1>
-          <Lead>NabuGate با فرمتِ OpenAI حرف می‌زند، پس هر فریم‌ورکی که با OpenAI کار می‌کند با آن هم کار می‌کند: آدرسِ پایه را <code dir="ltr">{BASE}</code> بگذارید، کلیدتان را بدهید و نامِ یک alias را در نامِ مدل بنویسید. چت، استریم، فراخوانیِ ابزار (حتی استریم‌شده)، خروجیِ ساختاریافته، ایجنت‌ها و embedding با تک‌تکِ کتابخانه‌های زیر آزموده شده‌اند.</Lead>
+          <Lead>NabuGate با فرمتِ OpenAI حرف می‌زند، پس هر فریم‌ورکی که با OpenAI کار می‌کند با آن هم کار می‌کند: آدرسِ پایه را <code dir="ltr">{BASE}</code> بگذارید، کلیدتان را بدهید و نامِ یک alias را در نامِ مدل بنویسید. چت، استریم، فراخوانی ابزار (حتی استریم‌شده)، خروجی ساختاریافته، ایجنت‌ها و embedding با تک‌تکِ کتابخانه‌های زیر آزموده شده‌اند.</Lead>
           <H2>LangChain (پایتون) و LangGraph</H2>
           <CodeBlock code={`from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 
@@ -330,11 +330,11 @@ llm = OpenAILike(model="nabu-smart", api_base="${BASE}", api_key="${KEY}",
           <p>اعتبارنامهٔ OpenAI (یا «OpenAI-compatible») را انتخاب کنید، آدرسِ پایه را <code dir="ltr">{BASE}</code> بگذارید، کلید را بچسبانید و alias را به‌عنوانِ نامِ مدل بنویسید.</p>
           <H2>نکته‌ها</H2>
           <ul style={{ paddingInlineStart: 20, display: 'flex', flexDirection: 'column', gap: 8 }}>
-            <li><strong>ابزار، ایجنت و تصویر</strong> روی همهٔ aliasهای چت کار می‌کنند، از جمله <code>nabu-claude*</code>: دروازه ابزارها، نتیجهٔ ابزار و تصویرِ فرمتِ OpenAI را به فرمتِ Claude و برعکس ترجمه می‌کند. مدل‌های فعلیِ Claude خودشان تصمیم می‌گیرند ابزار را صدا بزنند یا نه، پس آن‌جا <code>tool_choice: "required"</code> مثلِ <code>"auto"</code> رفتار می‌کند؛ ابزار را در پرامپت بخواهید.</li>
+            <li><strong>ابزار، ایجنت و تصویر</strong> روی همهٔ aliasهای چت کار می‌کنند، از جمله <code>nabu-claude*</code>: دروازه ابزارها، نتیجهٔ ابزار و تصویرِ فرمتِ OpenAI را به فرمتِ Claude و برعکس ترجمه می‌کند. مدل‌های فعلی Claude خودشان تصمیم می‌گیرند ابزار را صدا بزنند یا نه، پس آن‌جا <code>tool_choice: "required"</code> مثلِ <code>"auto"</code> رفتار می‌کند؛ ابزار را در پرامپت بخواهید.</li>
             <li><strong>Embedding در LangChain:</strong> <code>check_embedding_ctx_length=False</code> را بگذارید. وگرنه LangChain شناسهٔ توکن می‌فرستد که فقط برای توکنایزرِ یک فروشنده معنا دارد، و دروازه آن را با خطای <code>tokenized_input</code> رد می‌کند.</li>
             <li><strong>OpenAI Agents SDK:</strong> مثلِ بالا از <code>OpenAIChatCompletionsModel</code> استفاده کنید. حالتِ پیش‌فرضش یعنی Responses API دست‌نخورده عبور می‌کند و مدلی می‌خواهد که فروشنده‌اش <code dir="ltr">/v1/responses</code> داشته باشد.</li>
             <li><strong>فلوها</strong> (چند ایجنت پشتِ هم) یک‌جا جواب می‌دهند، نه به‌صورتِ استریم.</li>
-            <li>هر فراخوانی دقیقاً مثلِ فراخوانیِ مستقیم از موجودی‌تان کم می‌شود؛ فراخوانی با کلیدِ خودتان (<code dir="ltr">X-Nabu-Key-&lt;provider&gt;</code>) هزینه‌ای ندارد.</li>
+            <li>هر فراخوانی دقیقاً مثلِ فراخوانی مستقیم از موجودی‌تان کم می‌شود؛ فراخوانی با کلیدِ خودتان (<code dir="ltr">X-Nabu-Key-&lt;provider&gt;</code>) هزینه‌ای ندارد.</li>
           </ul>
         </section>
       )}
@@ -452,7 +452,7 @@ NABU_PUBLIC_URL=https://gate.example.com # آدرس بازگشت پرداخت‌
           <ul style={{ paddingInlineStart: 20, display: 'flex', flexDirection: 'column', gap: 8 }}>
             <li><code>payment bridge refused the request (401)</code>: سکرت یا app id با پل نمی‌خواند، یا ساعت سرور بیش از حد جلو/عقب است (امضا timestamp دارد).</li>
             <li><code>payment bridge refused the request (422)</code>: خودِ درگاه بانکی فاکتور را رد کرده؛ پیام پل در ادامهٔ خط است.</li>
-            <li><code>could not confirm a payment</code>: پل موقتاً پاسخ نداد. فاکتور pending می‌ماند و با باز شدن بعدیِ صفحه دوباره پرسیده می‌شود؛ پرداخت گم نمی‌شود.</li>
+            <li><code>could not confirm a payment</code>: پل موقتاً پاسخ نداد. فاکتور pending می‌ماند و با باز شدن بعدی صفحه دوباره پرسیده می‌شود؛ پرداخت گم نمی‌شود.</li>
             <li><code>wallet credited</code>: اعتبار اضافه شد، با شماره فاکتور و موجودی جدید.</li>
           </ul>
           <Callout kind="warn" icon="⚠️">

@@ -36,7 +36,7 @@ const T = {
     disabled: () => <><strong>درگاه پرداخت در این استقرار فعال نیست.</strong> دکمه‌های پرداخت کار نمی‌کنند تا مدیر متغیرهای <code dir="ltr">NABUPAY_URL</code> و <code dir="ltr">NABUPAY_SECRET</code> را تنظیم کند. برای شارژ دستی با پشتیبانی تماس بگیرید.</>,
     gateway: 'درگاه پرداخت',
     chooseLater: 'در صفحهٔ پرداخت انتخاب می‌کنم',
-    bankRate: 'بانک معادلِ تومانیِ این مبلغ را با نرخ روز کم می‌کند؛ همین مبلغِ دلاری به کیف‌پولتان اضافه می‌شود.',
+    bankRate: 'بانک معادلِ تومانی این مبلغ را با نرخ روز کم می‌کند؛ همین مبلغِ دلاری به کیف‌پولتان اضافه می‌شود.',
   },
   en: {
     payments_disabled: 'Online payment is not enabled on this deployment. Contact support for a manual top-up.',

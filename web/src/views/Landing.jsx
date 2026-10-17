@@ -23,7 +23,7 @@ const T = {
     getStarted: 'شروع کنید',
     openConsole: 'رفتن به پنل',
     menu: 'منو',
-    eyebrow: 'درگاه هوش مصنوعیِ سازگار با OpenAI',
+    eyebrow: 'درگاه هوش مصنوعی سازگار با OpenAI',
     heroA: 'یک API،',
     heroB: 'همهٔ مدل‌های هوش مصنوعی',
     heroSub: 'نبوگیت GPT، Claude، Gemini، DeepSeek و ده‌ها مدل دیگر را پشت یک آدرس و یک کلید می‌آورد؛ با مسیریابی هوشمند، fallback خودکار بین ارائه‌دهنده‌ها و پرداخت به‌ازای مصرف.',

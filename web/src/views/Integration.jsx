@@ -29,7 +29,7 @@ const T = {
     ),
     tools: 'راهنمای ابزارها',
     toolSdk: () => <><code dir="ltr">OPENAI_BASE_URL</code> و <code dir="ltr">OPENAI_API_KEY</code>.</>,
-    toolCursor: 'بازنویسیِ آدرسِ پایهٔ OpenAI در تنظیمات.',
+    toolCursor: 'بازنویسی آدرسِ پایهٔ OpenAI در تنظیمات.',
     toolVscode: () => <>همان دو متغیر در <code dir="ltr">settings.json</code>.</>,
   },
   en: {
