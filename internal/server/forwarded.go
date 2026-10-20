@@ -13,9 +13,11 @@ import (
 // A reverse proxy in front of one of them (the Iran mirror at gate.nabuxai.ir
 // is the case this exists for) sends that name in X-Forwarded-Host while the
 // upstream Host stays gate.nabuxai.com, because that is what the TLS
-// certificate and the vhost expect. Those names are allowed to win over
-// NABU_PUBLIC_URL so a payer, and an OAuth callback, return to the host the
-// browser actually opened.
+// certificate and the vhost expect. On the Coolify mirror, Traefik terminates
+// TLS and the internal nginx is what sets those two headers: Host is .com,
+// X-Forwarded-Host is .ir, X-Forwarded-Proto is https. Those names are allowed
+// to win over NABU_PUBLIC_URL so a payer, and an OAuth callback, return to the
+// host the browser actually opened.
 var canonicalPublicHosts = map[string]bool{
 	"gate.nabuxai.com": true,
 	"gate.nabuxai.ir":  true,

@@ -90,10 +90,12 @@ func loginKey(username string, r *http.Request) string {
 }
 
 // clientIP is the caller's address, preferring the first hop in X-Forwarded-For
-// because the gateway runs behind a reverse proxy. That proxy has to set the
-// header to the real client — the Iran mirror overwrites it with $remote_addr
-// rather than appending a value the caller supplied, which would let the
-// caller choose the address the rate limit sees.
+// because the gateway runs behind a reverse proxy. The proxy that accepted the
+// browser connection has to put that address first. The standalone Iran nginx
+// is that proxy, so it overwrites the header with $remote_addr. Behind Coolify,
+// Traefik is that proxy and the internal nginx keeps Traefik's value as the
+// first hop, appending only its own address. A caller-supplied address must
+// not be allowed to sit in front of the real one.
 func clientIP(r *http.Request) string {
 	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
 		if i := strings.IndexByte(xff, ','); i > 0 {

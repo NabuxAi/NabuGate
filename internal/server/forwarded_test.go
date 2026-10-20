@@ -75,6 +75,33 @@ func TestRedirectURIFollowsTheMirror(t *testing.T) {
 	}
 }
 
+func TestCoolifyHopKeepsTheMirrorOrigin(t *testing.T) {
+	// What the foreign gateway sees after Coolify's nginx: the TCP peer is
+	// the Iran server, Host is the upstream vhost, and the browser identity
+	// lives only in the forwarded headers.
+	t.Setenv("NABU_PUBLIC_URL", "https://gate.nabuxai.com")
+	r := httptest.NewRequest(http.MethodGet, "https://gate.nabuxai.com/api/nabu/start", nil)
+	r.Host = "gate.nabuxai.com"
+	r.RemoteAddr = "203.0.113.50:443"
+	r.Header.Set("X-Forwarded-Host", "gate.nabuxai.ir")
+	r.Header.Set("X-Forwarded-Proto", "https")
+	r.Header.Set("X-Forwarded-For", "198.51.100.20, 172.16.0.2")
+
+	if got := publicBase(r); got != "https://gate.nabuxai.ir" {
+		t.Fatalf("public base = %q, want the mirror, not the upstream Host", got)
+	}
+	if got := testNabuConfig().redirectURI(r); got != "https://gate.nabuxai.ir/api/nabu/callback" {
+		t.Fatalf("redirect uri = %q", got)
+	}
+	c := browserCookie(r, http.Cookie{Name: "nabugate_session", Value: "tok", HttpOnly: true})
+	if c.Domain != "" || !c.Secure {
+		t.Fatalf("cookie Domain=%q Secure=%v; the browser on .ir must store a Secure host-only cookie", c.Domain, c.Secure)
+	}
+	if got := clientIP(r); got != "198.51.100.20" {
+		t.Fatalf("client ip = %q, want the browser, not the Iran proxy", got)
+	}
+}
+
 func TestBrowserCookieIsHostOnlyAndSecureBehindTheProxy(t *testing.T) {
 	r := httptest.NewRequest(http.MethodPost, "http://gate.nabuxai.com/api/login", nil)
 	r.Header.Set("X-Forwarded-Proto", "https")

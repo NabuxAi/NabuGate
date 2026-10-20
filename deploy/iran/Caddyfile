@@ -1,4 +1,6 @@
-# Iran mirror for NabuGate, Caddy equivalent of nginx.conf.
+# Optional. Use this only on a machine where nothing else owns ports 80/443.
+# The Iran server runs Coolify; deploy docker-compose.yml there instead.
+# Caddy equivalent of nginx.conf.
 #
 # Caddy obtains and renews the certificate for gate.nabuxai.ir by itself.
 # Run: caddy run --config /etc/caddy/Caddyfile

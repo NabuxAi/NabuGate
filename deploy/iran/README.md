@@ -2,32 +2,77 @@
 
 This directory is a reverse proxy for an Iran-hosted machine. It does not run NabuGate. Every request — pages, static files, `/v1/*`, the console API, server-sent events, and websocket upgrades — is forwarded to `https://gate.nabuxai.com`. Browsers in Iran talk only to `gate.nabuxai.ir`. The connection to the upstream leaves from this server.
 
-Nothing in this directory is applied automatically. Installing it is a manual step on that machine.
+The machine runs **Coolify**, and Coolify’s proxy (`coolify-proxy`, Traefik v3) already owns ports 80 and 443 and issues the Let’s Encrypt certificate per host. The file to deploy is [`docker-compose.yml`](docker-compose.yml). It starts one nginx container that listens on container port 80 only: no TLS, no host port binding. Traefik routes `gate.nabuxai.ir` to that port. The domain is set in Coolify (`docker_compose_domains`), not in the compose file.
+
+[`nginx.conf`](nginx.conf) and [`Caddyfile`](Caddyfile) are optional, for a host where nothing else is using 80/443. Do not install them on the Coolify server.
+
+Nothing in this directory is applied automatically.
 
 ## What the upstream already does
 
-The gateway reads `X-Forwarded-Host` and `X-Forwarded-Proto`:
+The gateway trusts `X-Forwarded-Host` and `X-Forwarded-Proto` over the `Host` header the proxy uses for the upstream certificate. After this nginx, a request arrives at `gate.nabuxai.com` with:
 
-- Payment return URLs and the NabuAuth `redirect_uri` use the mirror’s host, so the browser comes back to `.ir`.
-- Session cookies are host-only (no `Domain`) and `Secure` when the forwarded scheme is https, so they stick to `gate.nabuxai.ir`.
-- Streamed responses set `X-Accel-Buffering: no` and are flushed as they arrive. The proxy configs below also turn buffering off.
-- The console and the docs copy the base URL from the page’s own origin, so a sample taken on the mirror says `https://gate.nabuxai.ir/v1`.
+| Header | Value |
+| --- | --- |
+| `Host` | `gate.nabuxai.com` |
+| `X-Forwarded-Host` | `gate.nabuxai.ir` |
+| `X-Forwarded-Proto` | `https` |
+| `X-Forwarded-For` | the browser, then Traefik |
 
-`server.cors_origins` stays empty. The mirror is same-origin; granting `gate.nabuxai.ir` would only let that page call `.com` directly.
+`X-Forwarded-Proto` is the literal `https`. Inside the container `$scheme` is `http`, because Traefik already terminated TLS. Using `$scheme` would build `http://` return URLs and omit `Secure` on cookies.
+
+From those headers the gateway:
+
+- Builds payment return URLs and the NabuAuth `redirect_uri` as `https://gate.nabuxai.ir/...`, so the browser comes back to the mirror even when `NABU_PUBLIC_URL` is `https://gate.nabuxai.com`.
+- Sets session cookies with an empty `Domain` and `Secure`, so the browser stores them for `gate.nabuxai.ir`.
+- Rate-limits the first `X-Forwarded-For` hop, which is the browser. Traefik wrote that hop; this nginx appends its own address after it.
+- Flushes streamed responses and sets `X-Accel-Buffering: no`. This nginx also turns `proxy_buffering` and `proxy_request_buffering` off.
+
+The console and the docs copy the base URL from the page’s own origin, so a sample taken on the mirror says `https://gate.nabuxai.ir/v1`. API calls from the page are relative. `server.cors_origins` stays empty: the mirror is same-origin, and listing `gate.nabuxai.ir` would only let that page call `.com` directly.
 
 ## Before you start
 
-1. DNS: an A/AAAA record for `gate.nabuxai.ir` pointing at this server, not at the foreign host.
-2. This server can open outbound TCP 443 to `gate.nabuxai.com`.
+1. DNS: an A/AAAA record for `gate.nabuxai.ir` pointing at the Coolify server, not at the foreign host.
+2. That server can open outbound TCP 443 to `gate.nabuxai.com`.
 3. On the **upstream** deployment, leave `NABUAUTH_REDIRECT_URI` unset so each host derives its own callback. Register both of these redirect URIs on NabuAuth:
 
    - `https://gate.nabuxai.com/api/nabu/callback`
    - `https://gate.nabuxai.ir/api/nabu/callback`
 
    If `NABUAUTH_REDIRECT_URI` is pinned to the `.com` URL, sign-in from the mirror returns to `.com`.
-4. Do not set `NABU_PUBLIC_URL` in a way that surprises you: a forwarded host of `gate.nabuxai.ir` or `gate.nabuxai.com` wins over that variable. Any other forwarded host does not.
+4. A forwarded host of `gate.nabuxai.ir` or `gate.nabuxai.com` wins over `NABU_PUBLIC_URL`. Any other forwarded host does not.
 
-## nginx
+## Coolify
+
+1. In Coolify, create a **Docker Compose** resource from this repository. Set the **Base Directory** to `deploy/iran` so the build context is this directory. Leave the compose file as `docker-compose.yml`.
+2. Coolify parses a service named `mirror`. Open **Domains** and add one domain for that service:
+   - Protocol: `https`
+   - Domain: `gate.nabuxai.ir`
+   - Port: `80` (the port inside the container, not a host port)
+   Coolify stores this on `docker_compose_domains` and generates the Traefik router, the Let’s Encrypt certificate, and the HTTP→HTTPS redirect. Do not add a `Host()` label or a `ports:` entry to the compose file; a published port would skip Traefik.
+3. Turn **Gzip compression off** for this resource. Coolify’s compress middleware buffers `text/event-stream`, so a streamed chat would arrive in one piece. nginx in this container already has `gzip off` and `proxy_buffering off`.
+4. Deploy. The container healthcheck is `GET /healthz` on port 80 inside the container (a local `200`, not a call to the upstream). Traefik is what answers `https://gate.nabuxai.ir/healthz`.
+
+The service has to stay named `mirror`. `SERVICE_FQDN_MIRROR_80` is how Coolify knows to route the domain to port 80; renaming the service without renaming that variable leaves the container off the proxy.
+
+## Check
+
+```bash
+curl -fsSI https://gate.nabuxai.ir/ | head
+curl -fsS https://gate.nabuxai.ir/v1/models -H "Authorization: Bearer $KEY" | head
+# A streamed completion should print chunks as they arrive, not after the call ends.
+curl -N https://gate.nabuxai.ir/v1/chat/completions \
+  -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" \
+  -d '{"model":"nabu-fast","stream":true,"messages":[{"role":"user","content":"ping"}]}'
+```
+
+Open `https://gate.nabuxai.ir/` and confirm the copied base URL in the hero is `https://gate.nabuxai.ir/v1`. Sign-in should set a cookie for `gate.nabuxai.ir` with `Secure` and no `Domain`. A top-up and a NabuAuth sign-in should return to `https://gate.nabuxai.ir`, not to `.com`.
+
+## Optional: a host that is not running Coolify
+
+Use one of these, not both, and not on the Coolify server (they both want ports 80 and 443, which Traefik already has).
+
+### nginx
 
 ```bash
 sudo apt-get update
@@ -55,9 +100,9 @@ sudo cp nginx.conf /etc/nginx/sites-available/gate.nabuxai.ir
 sudo nginx -t && sudo systemctl reload nginx
 ```
 
-`certbot renew` keeps the certificate current. The port-80 server in `nginx.conf` already serves `/.well-known/acme-challenge/` from `/var/www/certbot` and redirects every other path to HTTPS, so webroot renewal works with the file as committed.
+`certbot renew` keeps the certificate current. The port-80 server in `nginx.conf` already serves `/.well-known/acme-challenge/` from `/var/www/certbot` and redirects every other path to HTTPS, so webroot renewal works with the file as committed. This nginx is the edge, so it sets `X-Forwarded-For` to `$remote_addr` and `X-Forwarded-Proto` to `$scheme`.
 
-## Caddy
+### Caddy
 
 Caddy issues the certificate itself. Install Caddy, then:
 
@@ -66,18 +111,3 @@ sudo cp Caddyfile /etc/caddy/Caddyfile
 sudo caddy validate --config /etc/caddy/Caddyfile
 sudo systemctl reload caddy
 ```
-
-Use nginx **or** Caddy, not both, on ports 80 and 443.
-
-## Check
-
-```bash
-curl -fsSI https://gate.nabuxai.ir/ | head
-curl -fsS https://gate.nabuxai.ir/v1/models -H "Authorization: Bearer $KEY" | head
-# A streamed completion should print chunks as they arrive, not after the call ends.
-curl -N https://gate.nabuxai.ir/v1/chat/completions \
-  -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" \
-  -d '{"model":"nabu-fast","stream":true,"messages":[{"role":"user","content":"ping"}]}'
-```
-
-Open `https://gate.nabuxai.ir/` and confirm the copied base URL in the hero is `https://gate.nabuxai.ir/v1`. Sign-in should set a cookie for `gate.nabuxai.ir` with `Secure` and no `Domain`.
