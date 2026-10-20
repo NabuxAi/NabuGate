@@ -142,7 +142,7 @@ server:
     # address them by name instead of rebuilding the prompt per request.
     - key: "${DADEBARAN_KEY}"
       project: "dadebaran"
-      allow: ["nabu-*", "dadebaran-*", "parspack/*", "avalai/*", "gapgpt/*", "gpt-*", "o1", "o3", "o3-mini", "o4-mini", "deepseek-*", "kimi-*", "minimax-*", "glm-*"]
+      allow: ["nabu-*", "dadebaran-*", "parspack/*", "avalai/*", "gapgpt/*", "gpt-*", "o1", "o3", "o3-mini", "o4-mini", "deepseek-*", "kimi-*", "minimax-*", "mimo-*", "glm-*"]
       rate_limit: 240
 
 # The MCP endpoint. Read-only, and it holds no secrets: the token arrives in
@@ -390,6 +390,24 @@ providers:
     base_url: "https://router.huggingface.co/v1"
     api_key_env: "HF_TOKEN"
     passthrough: true
+
+  # MiniMax (platform.minimax.io) — OpenAI-compatible chat at /v1/chat/completions.
+  # Auth is Bearer. Speech is a different API (/v1/t2a_v2) and video another, so
+  # neither is routed here. Skipped while MINIMAX_API_KEY is unset.
+  minimax:
+    enabled: true
+    type: openai
+    base_url: "https://api.minimax.io/v1"
+    api_key_env: "MINIMAX_API_KEY"
+
+  # Xiaomi MiMo (platform.xiaomimimo.com) — OpenAI-compatible chat. Their SDK
+  # quickstart sends Authorization: Bearer; curl samples also accept an api-key
+  # header. Skipped while MIMO_API_KEY is unset.
+  mimo:
+    enabled: true
+    type: openai
+    base_url: "https://api.xiaomimimo.com/v1"
+    api_key_env: "MIMO_API_KEY"
 
   # Cerebras — ~1M tokens/day free, no card. Fastest inference of the group.
   cerebras:
@@ -895,6 +913,9 @@ model_registry:
 
   # Leaks its chain of thought into `content` on Parspack, intermittently.
   # Keep it out of the lead position on user-facing aliases.
+  # MiniMax retired M2.7 for new pay-as-you-go users on 2026-10-19 and removes
+  # it on 2026-11-18 (platform.minimax.io/docs/faq/models). The first-party
+  # rung stays last: a new key that can no longer call it costs one attempt.
   minimax-m2.7:
     serves:
       - provider: dahl
@@ -907,6 +928,33 @@ model_registry:
         model: "minimax/minimax-m2.7"
       - provider: huggingface
         model: "MiniMaxAI/MiniMax-M2.7:deepinfra"
+      - provider: minimax
+        model: "MiniMax-M2.7"
+
+  # Current MiniMax text models (platform.minimax.io/docs/faq/models, 2026-10-20).
+  # M3's price in pricing: is the standard ≤512k tier; above 512k MiniMax bills
+  # $0.60/$2.40. One Hugging Face rung: together and fireworks-ai publish the
+  # same novita rate, and they share the HF token.
+  minimax-m3:
+    serves:
+      - provider: minimax
+        model: "MiniMax-M3"
+      - provider: openrouter
+        model: "minimax/minimax-m3"
+      - provider: openrouter2
+        model: "minimax/minimax-m3"
+      - provider: huggingface
+        model: "MiniMaxAI/MiniMax-M3:novita"
+
+  # OpenRouter lists only the rate-limited :free id, not a paid one.
+  minimax-m3.1-flash:
+    serves:
+      - provider: minimax
+        model: "MiniMax-M3.1-Flash"
+      - provider: openrouter
+        model: "minimax/minimax-m3.1-flash:free"
+      - provider: openrouter2
+        model: "minimax/minimax-m3.1-flash:free"
 
   glm-5.2:
     serves:
@@ -1113,14 +1161,65 @@ model_registry:
       - provider: huggingface
         model: "zai-org/GLM-5.3-Flash:baseten"
 
+  # Text ids from the MiMo OpenAI-compat page, 2026-10-20:
+  # mimo-v2.5, mimo-v2.5-pro, mimo-v2.6-flash, mimo-v2.6-pro,
+  # mimo-v2.6-pro-ultraspeed. ASR and TTS ids on the same platform are not
+  # chat routes. The HF rungs for V2.6 are the open-weight RL checkpoints
+  # (XiaomiMiMo/MiMo-V2.6-*-RL), which is the id the HF router actually lists.
   mimo-v2.5:
     serves:
+      - provider: mimo
+        model: "mimo-v2.5"
       - provider: openrouter
         model: "xiaomi/mimo-v2.5"
       - provider: openrouter2
         model: "xiaomi/mimo-v2.5"
       - provider: huggingface
         model: "XiaomiMiMo/MiMo-V2.5:deepinfra"
+
+  mimo-v2.5-pro:
+    serves:
+      - provider: mimo
+        model: "mimo-v2.5-pro"
+      - provider: openrouter
+        model: "xiaomi/mimo-v2.5-pro"
+      - provider: openrouter2
+        model: "xiaomi/mimo-v2.5-pro"
+      - provider: huggingface
+        model: "XiaomiMiMo/MiMo-V2.5-Pro:novita"
+
+  mimo-v2.6-flash:
+    serves:
+      - provider: mimo
+        model: "mimo-v2.6-flash"
+      - provider: openrouter
+        model: "xiaomi/mimo-v2.6-flash"
+      - provider: openrouter2
+        model: "xiaomi/mimo-v2.6-flash"
+      - provider: huggingface
+        model: "XiaomiMiMo/MiMo-V2.6-Flash-RL:novita"
+
+  mimo-v2.6-pro:
+    serves:
+      - provider: mimo
+        model: "mimo-v2.6-pro"
+      - provider: openrouter
+        model: "xiaomi/mimo-v2.6-pro"
+      - provider: openrouter2
+        model: "xiaomi/mimo-v2.6-pro"
+      - provider: huggingface
+        model: "XiaomiMiMo/MiMo-V2.6-Pro-RL:novita"
+
+  # Same checkpoint as mimo-v2.6-pro, served fast. Ten times the list price.
+  # No HF host published this id on 2026-10-20.
+  mimo-v2.6-pro-ultraspeed:
+    serves:
+      - provider: mimo
+        model: "mimo-v2.6-pro-ultraspeed"
+      - provider: openrouter
+        model: "xiaomi/mimo-v2.6-pro-ultraspeed"
+      - provider: openrouter2
+        model: "xiaomi/mimo-v2.6-pro-ultraspeed"
 
   step-3.5-flash:
     serves:
@@ -1401,10 +1500,48 @@ models:
         model: "minimax/minimax-m2.7"
       - provider: huggingface
         model: "MiniMaxAI/MiniMax-M2.7:deepinfra"
+      # M2.7 leaves the MiniMax API on 2026-11-18. The current MiniMax models,
+      # on every host, before a last resort that is not MiniMax at all.
+      - model: minimax-m3
+      - model: minimax-m3.1-flash
       # Last resort, and a different model entirely: something is better than an
       # error, but only after MiniMax has been tried on every vendor that has it.
       - provider: groq
         model: "llama-3.1-70b-versatile"
+
+  # The registry entries, as public aliases, so they show on /v1/models.
+  # A caller names the model; the router walks every host and skips an unset key.
+  minimax-m2.7:
+    primary:
+      model: minimax-m2.7
+
+  minimax-m3:
+    primary:
+      model: minimax-m3
+
+  minimax-m3.1-flash:
+    primary:
+      model: minimax-m3.1-flash
+
+  mimo-v2.5:
+    primary:
+      model: mimo-v2.5
+
+  mimo-v2.5-pro:
+    primary:
+      model: mimo-v2.5-pro
+
+  mimo-v2.6-flash:
+    primary:
+      model: mimo-v2.6-flash
+
+  mimo-v2.6-pro:
+    primary:
+      model: mimo-v2.6-pro
+
+  mimo-v2.6-pro-ultraspeed:
+    primary:
+      model: mimo-v2.6-pro-ultraspeed
 
   nabu-kimi:
     primary:
@@ -2318,7 +2455,15 @@ pricing:
   "huggingface/google/gemma-4-31B-it:novita": { input: 0.14, output: 0.40 }
   "huggingface/meta-llama/Llama-3.1-8B-Instruct:novita": { input: 0.02, output: 0.05 }
   glm-5.3-flash: { input: 0.15, output: 0.50 }
+  # Xiaomi overseas list for V2.5 (pay-as-you-go, 2026-10-20): $0.14/$0.28 and
+  # $0.435/$0.87. V2.6 is the Xiaomi row on OpenRouter's endpoints API the same
+  # day — flash $0.14/$0.28, pro $0.435/$0.87, ultraspeed $4.35/$8.70 — which is
+  # also what api.xiaomimimo.com serves. HF pins are router.huggingface.co.
   mimo-v2.5: { input: 0.14, output: 0.28 }
+  mimo-v2.5-pro: { input: 0.435, output: 0.87 }
+  mimo-v2.6-flash: { input: 0.14, output: 0.28 }
+  mimo-v2.6-pro: { input: 0.435, output: 0.87 }
+  mimo-v2.6-pro-ultraspeed: { input: 4.35, output: 8.70 }
   step-3.5-flash: { input: 0.10, output: 0.30 }
   qwen3.6-35b-a3b: { input: 0.15, output: 1.00 }
   deepseek-v3.2: { input: 0.28, output: 0.42 }
@@ -2333,6 +2478,9 @@ pricing:
   "huggingface/openai/gpt-oss-20b:deepinfra": { input: 0.03, output: 0.14 }
   "huggingface/zai-org/GLM-5.3-Flash:baseten": { input: 0.15, output: 0.50 }
   "huggingface/XiaomiMiMo/MiMo-V2.5:deepinfra": { input: 0.14, output: 0.28 }
+  "huggingface/XiaomiMiMo/MiMo-V2.5-Pro:novita": { input: 0.522, output: 1.044 }
+  "huggingface/XiaomiMiMo/MiMo-V2.6-Flash-RL:novita": { input: 0.14, output: 0.28 }
+  "huggingface/XiaomiMiMo/MiMo-V2.6-Pro-RL:novita": { input: 0.435, output: 0.87 }
   "huggingface/stepfun-ai/Step-3.5-Flash:deepinfra": { input: 0.10, output: 0.30 }
   "huggingface/Qwen/Qwen3.6-35B-A3B:deepinfra": { input: 0.10, output: 0.95 }
   "huggingface/deepseek-ai/DeepSeek-V3.2:deepinfra": { input: 0.26, output: 0.38 }
@@ -2395,7 +2543,13 @@ pricing:
 
   # ── Open models, at their list price across hosts (OpenRouter, 2026-09-26) ─
   deepseek-v4-pro: { input: 0.348, output: 0.696 }
+  # MiniMax pay-as-you-go (platform.minimax.io/docs/guides/pricing-paygo,
+  # 2026-10-20). M3 is the standard ≤512k tier. M3.1 Flash is flat.
+  # OpenRouter's minimax-m3.1-flash:free id is free by the :free rule.
   minimax-m2.7: { input: 0.30, output: 1.20 }
+  minimax-m3: { input: 0.30, output: 1.20 }
+  minimax-m3.1-flash: { input: 0.15, output: 0.60 }
+  "huggingface/MiniMaxAI/MiniMax-M3:novita": { input: 0.30, output: 1.20 }
   kimi-k2.6: { input: 0.95, output: 4.00 }
   glm-5.2: { input: 0.6496, output: 2.0416 }
   # RunPod bills GPU seconds, not tokens, so its Llama is billed at the list price.

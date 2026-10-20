@@ -291,6 +291,20 @@ var catalogue = map[string]Vendor{
 		Color: "#673AB7",
 		Icon:  "M12 1.6 3.4 6.5v11L12 22.4l8.6-4.9v-11L12 1.6Zm0 2.6 6.3 3.6-6.3 3.6-6.3-3.6L12 4.2ZM5.1 9.3l6 3.5v7l-6-3.5v-7Zm13.8 0v7l-6 3.5v-7l6-3.5Z",
 	},
+	"minimax": {
+		Label: "MiniMax", Blurb: "مدل‌های زبانی M3 و M3.1 Flash، با API سازگار با OpenAI.",
+		BlurbEn:      "M3 and M3.1 Flash language models, over an OpenAI-compatible API.",
+		Capabilities: []string{CapChat},
+		Site:         "https://platform.minimax.io", KeysURL: "https://platform.minimax.io/user-center/basic-information/interface-key",
+		Color: "#111111",
+	},
+	"mimo": {
+		Label: "Xiaomi MiMo", Blurb: "مدل‌های زبانی میمو از شیائومی، با API سازگار با OpenAI.",
+		BlurbEn:      "Xiaomi's MiMo language models, over an OpenAI-compatible API.",
+		Capabilities: []string{CapChat},
+		Site:         "https://platform.xiaomimimo.com", KeysURL: "https://platform.xiaomimimo.com/console/api-keys",
+		Color: "#FF6900",
+	},
 	"siliconflow": {
 		Label: "SiliconFlow", Blurb: "مدل‌های بازِ چینی، ارزان و سریع.",
 		BlurbEn:      "Chinese open models, cheap and fast.",

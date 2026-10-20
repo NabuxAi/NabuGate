@@ -10,7 +10,7 @@ server:
       # Aliases and whole passthrough provider namespaces ("parspack/*" covers
       # every parspack/<model>, including nested IDs like parspack/openai/gpt-5.5;
       # "avalai/*" and "gapgpt/*" do the same for those aggregators).
-      allow: ["nabu-fast", "nabu-embed", "nabu-decision", "typesafe/*", "nabu-v1m", "v1m/*", "parspack/*", "avalai/*", "gapgpt/*", "9router/*", "cloudflare/*", "tokenrouter/*", "replicate/*", "runpod/*", "nabu-avalai", "nabu-gap", "nabu-arvan", "nabu-9router", "nabu-cloudflare", "nabu-tokenrouter", "nabu-replicate", "nabu-runpod", "nabu-flux"]
+      allow: ["nabu-fast", "nabu-embed", "nabu-decision", "typesafe/*", "nabu-v1m", "v1m/*", "parspack/*", "avalai/*", "gapgpt/*", "9router/*", "cloudflare/*", "tokenrouter/*", "replicate/*", "runpod/*", "nabu-avalai", "nabu-gap", "nabu-arvan", "nabu-9router", "nabu-cloudflare", "nabu-tokenrouter", "nabu-replicate", "nabu-runpod", "nabu-flux", "minimax-*", "mimo-*"]
       rate_limit: 120
 
 providers:
@@ -31,6 +31,23 @@ providers:
     type: openai
     base_url: "https://openrouter.ai/api/v1"
     api_key_env: "OPENROUTER_API_KEY"
+
+  # MiniMax chat (api.minimax.io). OpenAI-compatible, Bearer auth.
+  # Skipped while MINIMAX_API_KEY is unset. config.default.yaml adds OpenRouter
+  # and Hugging Face fallbacks for the same aliases.
+  minimax:
+    enabled: true
+    type: openai
+    base_url: "https://api.minimax.io/v1"
+    api_key_env: "MINIMAX_API_KEY"
+
+  # Xiaomi MiMo chat (api.xiaomimimo.com). OpenAI-compatible, Bearer auth.
+  # Skipped while MIMO_API_KEY is unset.
+  mimo:
+    enabled: true
+    type: openai
+    base_url: "https://api.xiaomimimo.com/v1"
+    api_key_env: "MIMO_API_KEY"
 
   # Cloudflare Workers AI (developers.cloudflare.com/workers-ai) — serverless
   # inference on Cloudflare's edge network, hosting Meta Llama, OpenAI gpt-oss,
@@ -394,8 +411,49 @@ models:
       provider: dahl
       model: "MiniMaxAI/MiniMax-M2.7"
     fallback:
+      - provider: minimax
+        model: "MiniMax-M3"
+      - provider: minimax
+        model: "MiniMax-M3.1-Flash"
       - provider: groq
         model: "llama-3.1-70b-versatile"
+
+  # First-party only in this sample. config.default.yaml fans each of these
+  # out across OpenRouter and Hugging Face as well.
+  minimax-m3:
+    primary:
+      provider: minimax
+      model: "MiniMax-M3"
+
+  minimax-m3.1-flash:
+    primary:
+      provider: minimax
+      model: "MiniMax-M3.1-Flash"
+
+  mimo-v2.5:
+    primary:
+      provider: mimo
+      model: "mimo-v2.5"
+
+  mimo-v2.5-pro:
+    primary:
+      provider: mimo
+      model: "mimo-v2.5-pro"
+
+  mimo-v2.6-flash:
+    primary:
+      provider: mimo
+      model: "mimo-v2.6-flash"
+
+  mimo-v2.6-pro:
+    primary:
+      provider: mimo
+      model: "mimo-v2.6-pro"
+
+  mimo-v2.6-pro-ultraspeed:
+    primary:
+      provider: mimo
+      model: "mimo-v2.6-pro-ultraspeed"
 
   nabu-kimi:
     primary:
@@ -690,6 +748,16 @@ pricing:
   "anthropic/claude-3-5-haiku-latest": { input: 0.8, output: 4 }
   "gemini/gemini-1.5-pro": { input: 1.25, output: 5 }
   "groq/llama-3.1-70b-versatile": { input: 0.59, output: 0.79 }
+  # MiniMax pay-as-you-go, 2026-10-20. M3 is the ≤512k standard tier.
+  minimax-m3: { input: 0.30, output: 1.20 }
+  minimax-m3.1-flash: { input: 0.15, output: 0.60 }
+  # Xiaomi MiMo. V2.5 from the overseas pay-as-you-go page; V2.6 from the
+  # Xiaomi row on OpenRouter's endpoints API, 2026-10-20.
+  mimo-v2.5: { input: 0.14, output: 0.28 }
+  mimo-v2.5-pro: { input: 0.435, output: 0.87 }
+  mimo-v2.6-flash: { input: 0.14, output: 0.28 }
+  mimo-v2.6-pro: { input: 0.435, output: 0.87 }
+  mimo-v2.6-pro-ultraspeed: { input: 4.35, output: 8.70 }
   # DashScope (Qwen3-Coder): approximate USD per 1M tokens, base tier ≤32k context.
   "dashscope/qwen3-coder-plus": { input: 0.55, output: 2.20 }
   "dashscope/qwen3-coder-next": { input: 0.15, output: 0.55 }
