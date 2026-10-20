@@ -57,8 +57,8 @@ export function ThemeToggle({ className = '' }) {
   const { theme, toggleTheme } = useTheme();
   const { lang } = useI18n();
   const label = theme === 'dark'
-    ? (lang === 'fa' ? 'حالت روز' : 'Light mode')
-    : (lang === 'fa' ? 'حالت شب' : 'Dark mode');
+    ? ({ fa: 'حالت روز', en: 'Light mode', ar: 'الوضع الفاتح' }[lang] || 'حالت روز')
+    : ({ fa: 'حالت شب', en: 'Dark mode', ar: 'الوضع الداكن' }[lang] || 'حالت شب');
   return (
     <button type="button" className={'icon-btn ' + className} onClick={toggleTheme} aria-label={label} title={label}>
       <Icon name={theme === 'dark' ? 'sun' : 'moon'} size={17} />

@@ -9,7 +9,6 @@ import (
 	"math"
 	"net/http"
 	"net/url"
-	"os"
 	"sort"
 	"strconv"
 	"strings"
@@ -207,18 +206,17 @@ func (s *Server) startConsoleSession(w http.ResponseWriter, r *http.Request, use
 	}
 	s.logins.reset(key)
 
-	http.SetCookie(w, &http.Cookie{
+	http.SetCookie(w, browserCookie(r, http.Cookie{
 		Name:  consoleCookie,
 		Value: token,
-		Path:  "/",
-		// HttpOnly so no script on the page can read it, and SameSite=Strict
-		// because the console has no cross-site use at all.
+		// HttpOnly so no script on the page can read it. SameSite=Lax, matching
+		// the session issued on the NabuAuth callback: the cookie is host-only
+		// (no Domain), so the Iran mirror stores it for gate.nabuxai.ir.
 		HttpOnly: true,
-		Secure:   r.TLS != nil || strings.EqualFold(r.Header.Get("X-Forwarded-Proto"), "https"),
 		SameSite: http.SameSiteLaxMode,
 		Expires:  expiry,
 		MaxAge:   int(time.Until(expiry).Seconds()),
-	})
+	}))
 	writeJSON(w, http.StatusOK, map[string]any{"authenticated": true})
 }
 
@@ -226,10 +224,10 @@ func (s *Server) consoleLogout(w http.ResponseWriter, r *http.Request) {
 	if c, err := r.Cookie(consoleCookie); err == nil {
 		_ = s.admin.EndSession(c.Value)
 	}
-	http.SetCookie(w, &http.Cookie{
-		Name: consoleCookie, Value: "", Path: "/",
+	http.SetCookie(w, browserCookie(r, http.Cookie{
+		Name: consoleCookie, Value: "",
 		HttpOnly: true, SameSite: http.SameSiteLaxMode, MaxAge: -1,
-	})
+	}))
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -436,7 +434,7 @@ func (s *Server) createToken(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-		t, secret, err := s.admin.NewToken(req.Name, cleanList(req.Allow), req.RateLimit, cleanList(req.AllowedOrigins), owner, cleanList(req.Providers))
+	t, secret, err := s.admin.NewToken(req.Name, cleanList(req.Allow), req.RateLimit, cleanList(req.AllowedOrigins), owner, cleanList(req.Providers))
 	if err != nil {
 		status := http.StatusBadRequest
 		if errors.Is(err, adminstore.ErrNameTaken) {
@@ -944,20 +942,11 @@ func (s *Server) settleMyPayments(w http.ResponseWriter, r *http.Request) {
 }
 
 // publicURL is the base the payer's browser reached us on, so the gateway sends
-// them back to the same host they started from.
+// them back to the same host they started from — including the Iran mirror,
+// whose proxy keeps the upstream Host as gate.nabuxai.com and puts the
+// browser's host in X-Forwarded-Host.
 func (s *Server) publicURL(r *http.Request) string {
-	if v := strings.TrimRight(os.Getenv("NABU_PUBLIC_URL"), "/"); v != "" {
-		return v
-	}
-	scheme := "https"
-	if r.TLS == nil && !strings.EqualFold(r.Header.Get("X-Forwarded-Proto"), "https") {
-		scheme = "http"
-	}
-	host := r.Header.Get("X-Forwarded-Host")
-	if host == "" {
-		host = r.Host
-	}
-	return scheme + "://" + host
+	return publicBase(r)
 }
 
 func (s *Server) consoleOverview(w http.ResponseWriter, r *http.Request) {
@@ -1054,6 +1043,7 @@ func requireAdmin(next http.HandlerFunc) http.HandlerFunc {
 		next(w, r)
 	}
 }
+
 // consoleContinue is sign-in and sign-up as one step: the form asks for an
 // email and a password and this decides which it was.
 //

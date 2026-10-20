@@ -90,11 +90,11 @@ func (c nabuAuthConfig) redirectURI(r *http.Request) string {
 	if c.RedirectURI != "" {
 		return c.RedirectURI
 	}
-	scheme := "http"
-	if r.TLS != nil || strings.EqualFold(r.Header.Get("X-Forwarded-Proto"), "https") {
-		scheme = "https"
-	}
-	return fmt.Sprintf("%s://%s/api/nabu/callback", scheme, r.Host)
+	// Derived from the host the browser used. Behind the Iran mirror that is
+	// X-Forwarded-Host (gate.nabuxai.ir), not the upstream Host the proxy
+	// sends so the certificate matches. An explicit NABUAUTH_REDIRECT_URI
+	// still wins — and then only that one URI is registered.
+	return publicBase(r) + "/api/nabu/callback"
 }
 
 func b64u(raw []byte) string { return base64.RawURLEncoding.EncodeToString(raw) }
@@ -187,18 +187,18 @@ func (s *Server) consoleNabuStart(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "could not start sign-in")
 		return
 	}
-	http.SetCookie(w, &http.Cookie{
+	http.SetCookie(w, browserCookie(r, http.Cookie{
 		Name:  consoleNabuFlowCookie,
 		Value: cookieValue,
-		Path:  "/",
 		// HttpOnly so no script on the page can read the verifier. SameSite=Lax
 		// rather than Strict, because the cookie must survive the redirect back
 		// from NabuAuth — Strict would drop it and every sign-in would fail.
+		// Domain stays empty: a host-only cookie is stored for whichever host
+		// the browser talked to, including the Iran mirror.
 		HttpOnly: true,
-		Secure:   requestIsHTTPS(r),
 		SameSite: http.SameSiteLaxMode,
 		MaxAge:   int(consoleNabuFlowTTL.Seconds()),
-	})
+	}))
 
 	q := url.Values{
 		"client_id":             {cfg.ClientID},
@@ -225,10 +225,10 @@ func (s *Server) consoleNabuCallback(w http.ResponseWriter, r *http.Request) {
 	}
 
 	clearFlow := func() {
-		http.SetCookie(w, &http.Cookie{
-			Name: consoleNabuFlowCookie, Value: "", Path: "/",
-			HttpOnly: true, Secure: requestIsHTTPS(r), SameSite: http.SameSiteLaxMode, MaxAge: -1,
-		})
+		http.SetCookie(w, browserCookie(r, http.Cookie{
+			Name: consoleNabuFlowCookie, Value: "",
+			HttpOnly: true, SameSite: http.SameSiteLaxMode, MaxAge: -1,
+		}))
 	}
 	// The console is a single-page app, so a failure comes back as a flag it can
 	// render rather than a JSON body the browser would show raw.
@@ -300,25 +300,19 @@ func (s *Server) consoleNabuCallback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	clearFlow()
-	http.SetCookie(w, &http.Cookie{
+	http.SetCookie(w, browserCookie(r, http.Cookie{
 		Name:     consoleCookie,
 		Value:    token,
-		Path:     "/",
 		HttpOnly: true,
-		Secure:   requestIsHTTPS(r),
 		SameSite: http.SameSiteLaxMode,
 		Expires:  expiry,
 		MaxAge:   int(time.Until(expiry).Seconds()),
-	})
+	}))
 
 	if dest == "" {
 		dest = "/panel/"
 	}
 	http.Redirect(w, r, dest, http.StatusFound)
-}
-
-func requestIsHTTPS(r *http.Request) bool {
-	return r.TLS != nil || strings.EqualFold(r.Header.Get("X-Forwarded-Proto"), "https")
 }
 
 type nabuAuthProfile struct {

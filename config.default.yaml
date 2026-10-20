@@ -13,6 +13,11 @@ server:
   # exactly; "*.example.com" matches the subdomain tree. This decides whether a
   # browser may make the call; a key's own allowed_origins still decides whether
   # that key may be used from there, and both must pass.
+  #
+  # gate.nabuxai.ir is intentionally not listed. That host is a reverse proxy
+  # of this whole site (see deploy/iran/), so the browser's calls are
+  # same-origin and never need a CORS grant. Listing it would only allow a
+  # page on the mirror to call gate.nabuxai.com directly.
   cors_origins: []
     # - "app.nabuxai.com"
     # - "*.mrchatgpt.org"

@@ -90,7 +90,10 @@ func loginKey(username string, r *http.Request) string {
 }
 
 // clientIP is the caller's address, preferring the first hop in X-Forwarded-For
-// because the gateway runs behind a reverse proxy.
+// because the gateway runs behind a reverse proxy. That proxy has to set the
+// header to the real client — the Iran mirror overwrites it with $remote_addr
+// rather than appending a value the caller supplied, which would let the
+// caller choose the address the rate limit sees.
 func clientIP(r *http.Request) string {
 	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
 		if i := strings.IndexByte(xff, ','); i > 0 {

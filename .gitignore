@@ -12,6 +12,11 @@ config.yaml
 # macOS
 .DS_Store
 
+# Intro-video render toolchain. Sources and the compressed files under
+# web/public/intro are committed; the install and the raw render are not.
+video/node_modules/
+video/out/
+
 # SDK build output and local tool state. Each package is built from source at
 # publish time, so committing artefacts only creates diff noise.
 packages/node/dist/

@@ -4,6 +4,7 @@ import * as api from '../api.js';
 import CodeBlock from '../components/CodeBlock.jsx';
 import { Skeleton } from '../components/Skeleton.jsx';
 import { useT } from '../i18n/index.jsx';
+import { gatewayBase } from '../origin.js';
 
 const T = {
   fa: {
@@ -60,7 +61,7 @@ const T = {
 
 export default function Integration() {
   const t = useT(T);
-  const origin = typeof window !== 'undefined' ? window.location.origin : 'https://gate.nabuxai.com';
+  const base = gatewayBase();
   const [tokens, setTokens] = useState([]);
   const [aliases, setAliases] = useState([]);
 
@@ -99,7 +100,7 @@ export default function Integration() {
       <div className="card" style={{ marginBottom: 24, padding: 24 }}>
         <h3 style={{ marginTop: 0, marginBottom: 16 }}>{t('endpoint')}</h3>
         <div style={{ ...codeBlock, marginBottom: 12 }}>
-          <div style={{ marginBottom: 8 }}><strong>Base URL:</strong> <code>{origin}/v1</code></div>
+          <div style={{ marginBottom: 8 }}><strong>Base URL:</strong> <code>{base}</code></div>
           <div><strong>API key:</strong> <code>{keyPlaceholder}</code></div>
         </div>
         {tokens.length === 0 ? (
@@ -117,14 +118,14 @@ export default function Integration() {
         <h4 style={{ marginBottom: 8 }}>OpenAI Python SDK</h4>
         <CodeBlock code={`from openai import OpenAI
 
-client = OpenAI(base_url="${origin}/v1", api_key="${keyPlaceholder}")
+client = OpenAI(base_url="${base}", api_key="${keyPlaceholder}")
 client.chat.completions.create(
     model="${model}",
     messages=[{"role": "user", "content": "${t('hello')}"}],
 )`} />
 
         <h4 style={{ marginTop: 24, marginBottom: 8 }}>cURL</h4>
-        <CodeBlock code={`curl ${origin}/v1/chat/completions \\
+        <CodeBlock code={`curl ${base}/chat/completions \\
   -H "Authorization: Bearer ${keyPlaceholder}" \\
   -H "Content-Type: application/json" \\
   -d '{"model":"${model}","messages":[{"role":"user","content":"${t('hello')}"}]}'`} />

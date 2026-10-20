@@ -1,0 +1,17 @@
+{
+  "name": "nabugate-intro",
+  "private": true,
+  "type": "module",
+  "description": "NabuGate landing intro. One Remotion composition, rendered once per locale.",
+  "scripts": {
+    "render": "node render.mjs"
+  },
+  "dependencies": {
+    "@remotion/bundler": "4.0.372",
+    "@remotion/cli": "4.0.372",
+    "@remotion/renderer": "4.0.372",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "remotion": "4.0.372"
+  }
+}

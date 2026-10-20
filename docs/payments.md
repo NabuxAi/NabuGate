@@ -18,17 +18,22 @@ confirmed the payment.
 | `NABUPAY_SECRET` | Shared secret; requests are signed `sha256("<app>:<ts>:<body>")` | unset = payments off |
 | `NABUPAY_APP_ID` | Identifies this caller to the bridge | `gate` |
 | `NABUPAY_GATEWAY` | Default gateway slug the bridge should use | `zarinpal` |
-| `NABU_PUBLIC_URL` | Where the gateway returns the payer | derived from the request |
+| `NABU_PUBLIC_URL` | Fallback return host when the proxy sends no `X-Forwarded-Host` | derived from the request |
 
 With `NABUPAY_URL` or `NABUPAY_SECRET` unset the gateway still starts. The
 startup log says `payments disabled`, `/api/status` answers
 `"payments_enabled": false`, the panel greys out every pay button and says so,
 and `POST /api/me/recharge` answers `501`.
 
-Set `NABU_PUBLIC_URL` explicitly when the service sits behind a proxy or
-Traefik. Without it the return URL is built from the request's `Host` header,
-which behind some proxies is the internal hostname, and the payer lands on an
-address they cannot reach.
+The return URL is the host the browser used. A reverse proxy must send
+`X-Forwarded-Host` and `X-Forwarded-Proto` (the Iran mirror does; see
+`deploy/iran/`). Those win even when `NABU_PUBLIC_URL` names the canonical
+host, so a payer who opened `https://gate.nabuxai.ir` comes back there. A
+forwarded host that is neither that pin nor `gate.nabuxai.com` /
+`gate.nabuxai.ir` is ignored, so a client cannot aim the callback elsewhere.
+
+Set `NABU_PUBLIC_URL` when the proxy sends neither header. Otherwise the URL
+is built from `Host`, which behind some proxies is an internal name.
 
 ## The flow
 
@@ -39,7 +44,7 @@ address they cannot reach.
 2. The panel sends the browser to `checkout_url`. The bank charges in toman at
    the rate NabuDesk is configured with; the wallet is credited the USD amount
    requested, whatever that day's rate was.
-3. The bank returns the payer to `{NABU_PUBLIC_URL}/panel/account`.
+3. The bank returns the payer to `{public base}/panel/account`.
 4. The panel calls `POST /api/me/payments/settle`. The server first marks
    this account's invoices older than seven days `expired`, then lists its
    own pending invoices (at most 20, oldest first), asks the bridge

@@ -440,12 +440,12 @@ llm = OpenAILike(model="nabu-smart", api_base="${BASE}", api_key="${KEY}",
 NABUPAY_SECRET=...                      # سکرت مشترک؛ درخواست‌ها با HMAC-SHA256 امضا می‌شوند
 NABUPAY_APP_ID=gate                     # شناسهٔ این سرویس نزد پل (پیش‌فرض gate)
 NABUPAY_GATEWAY=zarinpal                # درگاه پیش‌فرض (اسلاگ پل)
-NABU_PUBLIC_URL=https://gate.example.com # آدرس بازگشت پرداخت‌کننده؛ اگر خالی باشد از خود درخواست ساخته می‌شود`} label=".env" />
+NABU_PUBLIC_URL=https://gate.example.com # پشتیبان، وقتی پروکسی X-Forwarded-Host نفرستد`} label=".env" />
           <p style={{ marginTop: 12 }}>اگر <code>NABUPAY_URL</code> یا <code>NABUPAY_SECRET</code> خالی باشد، دروازه بالا می‌آید ولی پنل می‌گوید شارژ در دسترس نیست و <code>/api/status</code> مقدار <code dir="ltr">payments_enabled: false</code> برمی‌گرداند. لاگ شروع سرویس این را صریح می‌نویسد.</p>
           <H2>جریان پرداخت</H2>
           <Steps items={[
             <><code dir="ltr">POST /api/me/recharge</code> روی پل <code dir="ltr">/api/v1/pay/checkout</code> فاکتور می‌سازد، فاکتور را <em>قبل از</em> رفتن کاربر با وضعیت pending به نام حساب ثبت می‌کند و <code>checkout_url</code> را برمی‌گرداند.</>,
-            <>کاربر به بانک می‌رود و به <code dir="ltr">{'{NABU_PUBLIC_URL}'}/panel/account</code> برمی‌گردد.</>,
+            <>کاربر به بانک می‌رود و به <code dir="ltr">{'{public base}'}/panel/account</code> برمی‌گردد — همان میزبانی که از آن شروع کرده.</>,
             <>پنل <code dir="ltr">POST /api/me/payments/settle</code> را می‌زند. سرور فقط فاکتورهای pending <em>همین حساب</em> را از پل (<code dir="ltr">/api/v1/pay/verify/{'{invoice}'}</code>) می‌پرسد و اگر <code>paid</code> بود یک‌بار اعتبار می‌دهد. هیچ چیزی از query string بازگشت خوانده نمی‌شود.</>,
           ]} />
           <H2>عیب‌یابی از لاگ</H2>
@@ -456,7 +456,7 @@ NABU_PUBLIC_URL=https://gate.example.com # آدرس بازگشت پرداخت‌
             <li><code>wallet credited</code>: اعتبار اضافه شد، با شماره فاکتور و موجودی جدید.</li>
           </ul>
           <Callout kind="warn" icon="⚠️">
-            <strong>آدرس بازگشت غلط:</strong> اگر پشت پروکسی هستید و <code>NABU_PUBLIC_URL</code> ست نیست، آدرس بازگشت از هدر Host ساخته می‌شود و ممکن است به آدرس داخلی برگردد. آن را صریح ست کنید.
+            <strong>آدرس بازگشت غلط:</strong> پروکسی باید <code>X-Forwarded-Host</code> و <code>X-Forwarded-Proto</code> بفرستد. آدرس بازگشت از آن‌ها ساخته می‌شود، پس آینهٔ ایران (<code dir="ltr">gate.nabuxai.ir</code>) پرداخت‌کننده را به خود آینه برمی‌گرداند حتی اگر <code>NABU_PUBLIC_URL</code> میزبان اصلی را گفته باشد. میزبانِ فورواردشده‌ای که نه با این مقدار و نه با نام‌های عمومی بخواند نادیده گرفته می‌شود. اگر پروکسی میزبان نفرستد، <code>NABU_PUBLIC_URL</code> را ست کنید وگرنه آدرس از <code>Host</code> ساخته می‌شود و ممکن است داخلی باشد.
           </Callout>
           <Callout icon="💡">شارژ دستی از پنل مدیریت («کاربران» → شارژ) بدون درگاه انجام می‌شود و به‌صورت <code>admin-recharge</code> ثبت می‌شود.</Callout>
           <p>راهنمای کامل‌تر در repo: <code dir="ltr">docs/payments.md</code>.</p>

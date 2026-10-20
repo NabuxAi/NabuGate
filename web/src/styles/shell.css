@@ -166,8 +166,8 @@ html[lang="en"] .nav-group-title { text-transform: uppercase; letter-spacing: 0.
    other script's label falls back to the system's: naming Inter for "EN" on a
    Persian page (or Vazirmatn for «فا» on an English one) downloaded a whole
    ~47 KB font file for two letters. */
-.seg-btn[lang="fa"] { font-family: system-ui, -apple-system, 'Segoe UI', Tahoma, sans-serif; }
-html[lang="fa"] .seg-btn[lang="fa"] { font-family: var(--ng-font); }
+.seg-btn[lang="fa"], .seg-btn[lang="ar"] { font-family: system-ui, -apple-system, 'Segoe UI', Tahoma, sans-serif; }
+html[lang="fa"] .seg-btn[lang="fa"], html[lang="ar"] .seg-btn[lang="ar"] { font-family: var(--ng-font); }
 .seg-btn[lang="en"] { font-family: var(--ng-font); letter-spacing: 0.02em; }
 .seg-btn:hover { color: var(--ng-heading); }
 .seg-btn.active { color: var(--ng-heading); background: var(--ng-surface); box-shadow: var(--ng-shadow-xs), 0 0 0 1px var(--ng-border-card); }
