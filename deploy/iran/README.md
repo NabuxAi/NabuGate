@@ -55,7 +55,7 @@ sudo cp nginx.conf /etc/nginx/sites-available/gate.nabuxai.ir
 sudo nginx -t && sudo systemctl reload nginx
 ```
 
-`certbot renew` keeps the certificate current. The HTTP server in `nginx.conf` only redirects; renewal via webroot still needs the challenge location. If renewal starts failing, add the `/.well-known/acme-challenge/` location from the temporary server back into the port-80 block.
+`certbot renew` keeps the certificate current. The port-80 server in `nginx.conf` already serves `/.well-known/acme-challenge/` from `/var/www/certbot` and redirects every other path to HTTPS, so webroot renewal works with the file as committed.
 
 ## Caddy
 
