@@ -1,0 +1,31 @@
+# Iran mirror for Coolify.
+#
+# coolify-proxy (Traefik v3) already listens on 80/443 and issues the
+# certificate. This compose file starts one nginx container on container
+# port 80 and publishes no host ports and no TLS.
+#
+# In Coolify, set the Base Directory to deploy/iran and attach
+# https://gate.nabuxai.ir to the "mirror" service on port 80. Coolify stores
+# that on docker_compose_domains and generates the Traefik router. Do not
+# add a Host() label here, and do not add a ports: mapping.
+
+services:
+  mirror:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: nabugate-iran-mirror
+    restart: unless-stopped
+    expose:
+      - "80"
+    environment:
+      # Declares the internal port. Leave the value empty: Coolify fills the
+      # hostname from the domain attached to this service. The service name
+      # must stay "mirror" or this variable name stops matching.
+      - SERVICE_FQDN_MIRROR_80
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://127.0.0.1/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 5s

@@ -440,12 +440,12 @@ llm = OpenAILike(model="nabu-smart", api_base="${BASE}", api_key="${KEY}",
 NABUPAY_SECRET=...                      # shared secret; requests are signed with HMAC-SHA256
 NABUPAY_APP_ID=gate                     # this service's ID at the bridge (default: gate)
 NABUPAY_GATEWAY=zarinpal                # default gateway (the bridge's slug)
-NABU_PUBLIC_URL=https://gate.example.com # where the payer returns; if empty, derived from the request itself`} label=".env" />
+NABU_PUBLIC_URL=https://gate.example.com # fallback when the proxy sends no X-Forwarded-Host`} label=".env" />
           <p style={{ marginTop: 12 }}>If <code>NABUPAY_URL</code> or <code>NABUPAY_SECRET</code> is empty, the gateway still starts, but the console reports that top-ups are unavailable and <code>/api/status</code> returns <code dir="ltr">payments_enabled: false</code>. The startup log states this explicitly.</p>
           <H2>Payment flow</H2>
           <Steps items={[
             <><code dir="ltr">POST /api/me/recharge</code> creates an invoice through the bridge’s <code dir="ltr">/api/v1/pay/checkout</code>, records it as pending against the account <em>before</em> the user leaves, and returns <code>checkout_url</code>.</>,
-            <>The user goes to the bank and returns to <code dir="ltr">{'{NABU_PUBLIC_URL}'}/panel/account</code>.</>,
+            <>The user goes to the bank and returns to <code dir="ltr">{'{public base}'}/panel/account</code> — the host they started on.</>,
             <>The console calls <code dir="ltr">POST /api/me/payments/settle</code>. The server checks only <em>this account’s</em> pending invoices with the bridge (<code dir="ltr">/api/v1/pay/verify/{'{invoice}'}</code>) and credits each one that is <code>paid</code> exactly once. Nothing is read from the return query string.</>,
           ]} />
           <H2>Troubleshooting from the logs</H2>
@@ -456,7 +456,7 @@ NABU_PUBLIC_URL=https://gate.example.com # where the payer returns; if empty, de
             <li><code>wallet credited</code>: the credit was added, with the invoice number and the new balance.</li>
           </ul>
           <Callout kind="warn" icon="⚠️">
-            <strong>Wrong return URL:</strong> if you’re behind a proxy and <code>NABU_PUBLIC_URL</code> isn’t set, the return URL is built from the Host header and may point back to an internal address. Set it explicitly.
+            <strong>Wrong return URL:</strong> a proxy must send <code>X-Forwarded-Host</code> and <code>X-Forwarded-Proto</code>. The return URL follows those, so the Iran mirror (<code dir="ltr">gate.nabuxai.ir</code>) sends the payer back to the mirror even when <code>NABU_PUBLIC_URL</code> names the canonical host. A forwarded host that matches neither the pin nor those public names is ignored. If the proxy sends no forwarded host, set <code>NABU_PUBLIC_URL</code> or the URL is built from <code>Host</code>, which may be internal.
           </Callout>
           <Callout icon="💡">Manual top-ups from the admin console (“Users” → top-up) need no gateway and are recorded as <code>admin-recharge</code>.</Callout>
           <p>A fuller guide lives in the repo: <code dir="ltr">docs/payments.md</code>.</p>

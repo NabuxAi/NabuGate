@@ -60,6 +60,7 @@ const P = {
   wand: <><path d="m15 4-11 11 5 5L20 9Z" /><path d="M14 5l5 5M5 3v2M3 4h4M19 17v2M18 18h2" /></>,
   box: <><path d="M21 8 12 3 3 8v8l9 5 9-5V8Z" /><path d="m3 8 9 5 9-5M12 13v8" /></>,
   pause: <><circle cx="12" cy="12" r="10" /><path d="M10 15V9M14 15V9" /></>,
+  play: <><circle cx="12" cy="12" r="10" /><path d="m10 8 6 4-6 4V8Z" /></>,
   clock: <><circle cx="12" cy="12" r="10" /><path d="M12 6v6l4 2" /></>,
   ban: <><circle cx="12" cy="12" r="10" /><path d="m4.9 4.9 14.2 14.2" /></>,
   type: <path d="M4 7V5h16v2M9 19h6M12 5v14" />,

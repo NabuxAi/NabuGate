@@ -1,0 +1,37 @@
+# Optional. Use this only on a machine where nothing else owns ports 80/443.
+# The Iran server runs Coolify; deploy docker-compose.yml there instead.
+# Caddy equivalent of nginx.conf.
+#
+# Caddy obtains and renews the certificate for gate.nabuxai.ir by itself.
+# Run: caddy run --config /etc/caddy/Caddyfile
+# or:  caddy reload --config /etc/caddy/Caddyfile
+#
+# The upstream Host and TLS SNI stay gate.nabuxai.com. X-Forwarded-Host tells
+# the gateway the browser is on the mirror.
+
+gate.nabuxai.ir {
+	encode off
+	request_body {
+		max_size 100MB
+	}
+
+	reverse_proxy https://gate.nabuxai.com {
+		header_up Host gate.nabuxai.com
+		header_up X-Forwarded-Host {host}
+		header_up X-Forwarded-Proto {scheme}
+		header_up X-Forwarded-For {remote_host}
+		header_up X-Real-IP {remote_host}
+		header_up Accept-Encoding {header.Accept-Encoding}
+
+		transport http {
+			tls_server_name gate.nabuxai.com
+			dial_timeout 10s
+			response_header_timeout 30s
+			read_timeout 3600s
+			write_timeout 3600s
+		}
+
+		# Flush each chunk. A positive interval holds SSE until the buffer fills.
+		flush_interval -1
+	}
+}

@@ -105,8 +105,10 @@ export default function App() {
 
   useEffect(() => {
     const brand = 'NabuGate';
-    if (view === 'landing') document.title = lang === 'fa' ? 'نبوگیت — دروازهٔ یکپارچهٔ هوش مصنوعی' : 'NabuGate — one API for every AI model';
-    else if (view === 'docs') document.title = `${lang === 'fa' ? 'مستندات' : 'Docs'} · ${brand}`;
+    const landingTitle = { fa: 'نبوگیت — دروازهٔ یکپارچهٔ هوش مصنوعی', en: 'NabuGate — one API for every AI model', ar: 'نابوغيت — واجهة واحدة لكل نماذج الذكاء الاصطناعي' };
+    const docsTitle = { fa: 'مستندات', en: 'Docs', ar: 'التوثيق' };
+    if (view === 'landing') document.title = landingTitle[lang] || landingTitle.fa;
+    else if (view === 'docs') document.title = `${docsTitle[lang] || docsTitle.fa} · ${brand}`;
     else document.title = `${tNav(view)} · ${brand}`;
   }, [view, lang, tNav]);
 

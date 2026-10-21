@@ -4,6 +4,8 @@ import Icon from '../components/Icon.jsx';
 import CodeBlock from '../components/CodeBlock.jsx';
 import { LangSwitch, Logo, ThemeToggle } from '../components/Brand.jsx';
 import { fmtDigits, fmtInt, useI18n, useT } from '../i18n/index.jsx';
+import { gatewayBase, siteOrigin } from '../origin.js';
+import { IntroButton, IntroDialog, useIntro } from './IntroVideo.jsx';
 import '../styles/landing.css';
 
 /*
@@ -187,6 +189,93 @@ const T = {
     footSignup: 'Sign up',
     rights: 'All rights reserved.',
   },
+  ar: {
+    brand: 'نابوغيت',
+    navFeatures: 'المزايا',
+    navHow: 'كيف يعمل',
+    navPricing: 'الأسعار',
+    navDocs: 'التوثيق',
+    signIn: 'دخول',
+    getStarted: 'ابدأ',
+    openConsole: 'افتح اللوحة',
+    menu: 'القائمة',
+    eyebrow: 'بوابة ذكاء اصطناعي متوافقة مع OpenAI',
+    heroA: 'واجهة واحدة،',
+    heroB: 'كل نماذج الذكاء الاصطناعي',
+    heroSub: 'نابوغيت يضع GPT وClaude وGemini وDeepSeek وغيرها خلف عنوان واحد ومفتاح واحد، مع توجيه ذكي واحتياط تلقائي بين المزوّدين والدفع حسب الاستخدام.',
+    readDocs: 'اقرأ التوثيق',
+    worksWith: 'يعمل مع الأدوات التي تستخدمها كل يوم',
+    online: 'متصل',
+    route: 'مسار الطلب',
+    rateLimited: 'حدّ المعدّل ← التالي',
+    served: 'تمت الإجابة',
+    balance: 'الرصيد',
+    modelsFrom: 'نماذج من',
+    statModels: 'نموذج واسم مستعار متاحان الآن',
+    statEndpoint: 'عنوان للدردشة والتضمين والصور والكلام',
+    statCode: 'تغيير في الكود؛ عنوان الأساس فقط هو الذي يتبدل',
+    statMin: 'الحد الأدنى للشحن؛ الرصيد لا ينتهي',
+    featEyebrow: 'المزايا',
+    featTitle: 'كل ما تحتاجه للبناء بالذكاء الاصطناعي',
+    featSub: 'طبقة رقيقة يمكن الاعتماد عليها بين تطبيقك والمزوّدين — من دون حبس على بائع واحد.',
+    f1t: 'توافق كامل مع OpenAI',
+    f1b: 'أي SDK أو أداة تتحدث OpenAI تتصل بتغيير عنوان الأساس. جسم الطلب يمر كما هو: tools وresponse_format والبث والرؤية.',
+    f2t: 'احتياط تلقائي',
+    f2b: 'اسم مثل nabu-fast سلسلة من عدة مزوّدين. إذا انقطع أحدهم أو أعاد ردًا فارغًا، يجيب التالي من دون أن يلاحظ مستخدمك.',
+    f3t: 'مفتاح لكل تطبيق',
+    f3b: 'قيّد كل مفتاح بالنماذج والمصادر وسقف الطلبات. استهلاك كل مفتاح ظاهر وحده، وإلغاء واحد لا يمس البقية.',
+    f4t: 'ادفع مقابل ما تستخدم',
+    f4b: 'محفظة بالدولار تُخصم بسعر النموذج الحقيقي. كل رد يعيد الرصيد المتبقي في ترويسة.',
+    f5t: 'مفتاحك أنت (BYOK)',
+    f5b: 'أرسل مفتاح المزوّد بترويسة X-Nabu-Key-<provider>. يُسجَّل الاستخدام ولا يُخصم من الرصيد، والمفتاح لا يُخزَّن مع الطلب.',
+    f6t: 'الوكلاء والتدفقات',
+    f6b: 'استدعِ مساعدًا بنظام جاهز أو سلسلة من عدة خطوات تمامًا كأنها نموذج — بطلب واحد من أي عميل OpenAI.',
+    f7t: 'كل الوسائط',
+    f7b: 'دردشة، تضمين، توليد صور، تحويل النص إلى كلام، تفريغ الكلام، وصوت مباشر — كلها من المفتاح نفسه.',
+    mChat: 'دردشة', mEmbed: 'تضمين', mImage: 'صور', mSpeech: 'كلام', mStt: 'تفريغ', mLive: 'صوت مباشر',
+    howEyebrow: 'كيف يعمل',
+    howTitle: 'أول رد في ثلاث خطوات',
+    howSub: 'من إنشاء الحساب إلى أول طلب API، مسار واضح.',
+    s1t: 'إنشاء حساب',
+    s1b: 'أنشئ حسابًا في لوحة نابوغيت بالبريد أو غوغل أو حساب نابو.',
+    s2t: 'اشحن المحفظة',
+    s2b: 'اشحن أي مبلغ من دولار واحد؛ الدفع عبر بوابة البنك.',
+    s3t: 'أنشئ مفتاحًا واتصل',
+    s3b: 'أنشئ مفتاح API، اضبط عنوان الأساس، وأداتك جاهزة.',
+    devEyebrow: 'للمطوّرين',
+    devTitle: 'يعمل مع الأدوات التي لديك الآن',
+    devSub: 'إعدادات جاهزة لكل أداة. ضع المفتاح وانتهى الأمر.',
+    devMore: 'دليل كامل لكل أداة',
+    priceEyebrow: 'التسعير',
+    priceTitle: 'ادفع حسب الاستخدام، من دون اشتراك إجباري',
+    priceSub: 'تشحن محفظة بالدولار؛ كل طلب يُخصم بسعر النموذج الحقيقي. الرصيد لا ينتهي.',
+    pStarter: 'بداية', pStarterB: 'تجربة النماذج والمشاريع الصغيرة.',
+    pPro: 'احترافي', pProB: 'تطوير يومي مع Cursor وCline وClaude Code.',
+    pTeam: 'فريق', pTeamB: 'مفتاح لكل تطبيق، وتقرير استهلاك منفصل.',
+    pCredit: 'رصيد',
+    pF1: 'الوصول إلى كل النماذج والأسماء المستعارة',
+    pF2: 'احتياط تلقائي بين المزوّدين',
+    pF3: 'مفاتيح غير محدودة بتقارير منفصلة',
+    pF4: 'رصيد بلا تاريخ انتهاء',
+    recommended: 'اقتراحنا',
+    choose: 'اختر في اللوحة',
+    priceNote: 'أي مبلغ من ١ إلى ٥٬٠٠٠ دولار. الدفع في صفحة البنك بالتومان بسعر اليوم؛ بيانات البطاقة لا تصل إلينا.',
+    faqEyebrow: 'أسئلة شائعة',
+    faqTitle: 'إجابات الأسئلة المتكررة',
+    faqSub: 'ليست هنا؟ التوثيق يشرح كل شيء بالتفصيل.',
+    fullDocs: 'التوثيق الكامل',
+    ctaTitle: 'ابدأ البناء بكل النماذج اليوم',
+    ctaSub: 'أنشئ حسابًا، خذ مفتاحًا، وأرسل أول طلب.',
+    footTag: 'بوابة الذكاء الاصطناعي الموحّدة: واجهة متوافقة مع OpenAI لكل النماذج.',
+    footProduct: 'المنتج',
+    footDev: 'المطوّر',
+    footAccount: 'الحساب',
+    footModels: 'النماذج',
+    footApi: 'مرجع API',
+    footStatus: 'حالة الخدمة',
+    footSignup: 'تسجيل',
+    rights: 'جميع الحقوق محفوظة.',
+  },
 };
 
 const FAQ = {
@@ -203,6 +292,13 @@ const FAQ = {
     ['How is it billed?', 'A USD wallet. Each request deducts the model’s real per-million-token price, and every response reports the remaining balance in a header.'],
     ['What if my payment fails?', 'The invoice is bound to your account before you leave for the bank, and the console re-asks the gateway on every visit. An unconfirmed charge is reversed within 72 hours. “Payment issues” in the docs covers every case.'],
     ['How do API keys work?', 'One key per app, limited by model, origin and rate. The full key is shown only once.'],
+  ],
+  ar: [
+    ['ما هو نابوغيت؟', 'بوابة متوافقة مع OpenAI: عنوان واحد ومفتاح واحد لنماذج OpenAI وAnthropic وGoogle وغيرها، مع احتياط تلقائي.'],
+    ['هل يعمل مع Cursor وClaude Code؟', 'نعم. Cursor وCline وRoo Code وCodex وحزم OpenAI تتصل بتغيير عنوان الأساس؛ وClaude Code عبر متغيرات ANTHROPIC_*. لكل أداة دليل في التوثيق.'],
+    ['كيف تُحسب التكلفة؟', 'محفظة بالدولار. كل طلب يُخصم بسعر النموذج الحقيقي لكل مليون رمز، وكل رد يعيد الرصيد المتبقي في ترويسة.'],
+    ['ماذا لو فشلت عملية الدفع؟', 'تُسجَّل الفاتورة على حسابك قبل الذهاب إلى البنك، واللوحة تسأل البوابة في كل زيارة. المبلغ غير المؤكَّد يُعاد خلال ٧٢ ساعة. قسم «مشكلات الدفع» في التوثيق يغطي الحالات.'],
+    ['كيف يعمل مفتاح API؟', 'مفتاح لكل تطبيق، بحدود النموذج والمصدر والمعدّل. النص الكامل للمفتاح يُعرض مرة واحدة.'],
   ],
 };
 
@@ -266,6 +362,7 @@ function Section({ id, eyebrow, title, sub, children, className = '' }) {
 export default function Landing({ signedIn = false }) {
   const t = useT(T);
   const { lang } = useI18n();
+  const intro = useIntro();
   const [models, setModels] = useState([]);
   const [menu, setMenu] = useState(false);
   const [tab, setTab] = useState('curl');
@@ -299,10 +396,10 @@ export default function Landing({ signedIn = false }) {
     return () => { el.removeEventListener('pointermove', onMove); el.removeEventListener('pointerleave', onLeave); };
   }, []);
 
-  const ORIGIN = window.location.origin.startsWith('http') ? window.location.origin : 'https://gate.nabuxai.com';
-  const BASE = `${ORIGIN}/v1`;
+  const ORIGIN = siteOrigin();
+  const BASE = gatewayBase();
   const KEY = 'ng_xxxxxxxxxxxxxxxx';
-  const hello = lang === 'fa' ? 'سلام!' : 'Hello!';
+  const hello = lang === 'ar' ? 'مرحبا!' : lang === 'fa' ? 'سلام!' : 'Hello!';
   const snips = snippets(ORIGIN, BASE, KEY, hello);
   const snip = snips.find((s) => s.id === tab) || snips[0];
 
@@ -327,6 +424,7 @@ export default function Landing({ signedIn = false }) {
 
   return (
     <div className="lp">
+      <IntroDialog open={intro.open} onClose={intro.close} />
       <div className="lp-bg" aria-hidden="true">
         <span className="lp-orb a" /><span className="lp-orb b" /><span className="lp-orb c" />
         <span className="lp-grid" />
@@ -381,6 +479,7 @@ export default function Landing({ signedIn = false }) {
                   {ctaLabel}<Icon name="arrow" size={18} className="flip-rtl" />
                 </a>
                 <a href="/docs" className="lp-btn lp-btn-outline lp-btn-lg"><Icon name="book" size={18} />{t('readDocs')}</a>
+                <IntroButton onClick={intro.replay} />
               </div>
               <div className="lp-tools lp-reveal">
                 <span>{t('worksWith')}</span>

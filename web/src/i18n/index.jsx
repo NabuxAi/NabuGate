@@ -17,10 +17,11 @@ import { createContext, useCallback, useContext, useMemo, useState } from 'react
 export const LANGS = {
   fa: { code: 'fa', dir: 'rtl', name: 'فارسی', short: 'فا', locale: 'fa-IR' },
   en: { code: 'en', dir: 'ltr', name: 'English', short: 'EN', locale: 'en-US' },
+  ar: { code: 'ar', dir: 'rtl', name: 'العربية', short: 'عر', locale: 'ar' },
 };
 export const DEFAULT_LANG = 'fa';
 const STORAGE_KEY = 'nabugate_lang';
-const PREFIX_RE = /^\/(fa|en)(?=\/|$)/;
+const PREFIX_RE = new RegExp(`^\\/(${Object.keys(LANGS).join('|')})(?=\\/|$)`);
 
 const supported = (l) => (l && Object.prototype.hasOwnProperty.call(LANGS, l) ? l : null);
 

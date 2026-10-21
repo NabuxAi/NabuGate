@@ -11,19 +11,22 @@ Three surfaces share one bundle and one design system:
 
 | Surface | Path | What it is |
 | --- | --- | --- |
-| **Landing** | `/`, `/fa`, `/en` | Public home page: hero with a live routing demo, provider/model marquee (from `/api/public/models`), features, setup snippets per tool, pricing, FAQ. |
-| **Docs** | `/docs`, `/en/docs`, and inside the console | Searchable section nav, "on this page" rail, prev/next; one content file per language in `src/views/docs/`. |
+| **Landing** | `/`, `/fa`, `/en`, `/ar` | Public home page: hero with a live routing demo, a first-visit intro video, provider/model marquee (from `/api/public/models`), features, setup snippets per tool, pricing, FAQ. |
+| **Docs** | `/docs`, `/en/docs`, `/ar/docs`, and inside the console | Searchable section nav, "on this page" rail, prev/next; one content file per language in `src/views/docs/`. |
 | **Console** | `/panel/…` (users), `/admin/…` (admins) | Dashboard, balance & usage, plans, payments, API keys, providers, models, requests, integration, profile, security; admins also get global usage, users, access requests, agents & flows, system keys. |
 
 ## Languages
 
-Persian (`fa`, right-to-left, the default) and English (`en`, left-to-right).
-`src/i18n/index.jsx` holds the language provider, `useT()` and the locale-aware
-formatters (`fmtInt`, `usd`, `fmtDate` …). Each component keeps its own
-`{ fa, en }` dictionary next to the markup that uses it. The language comes from
-`?lang=`, a `/fa` or `/en` path prefix, the saved choice, or the browser, in
-that order; `index.html` applies it before first paint so the page never flips
-direction after loading.
+Persian (`fa`, right-to-left, the default), English (`en`, left-to-right) and
+Arabic (`ar`, right-to-left). `src/i18n/index.jsx` holds the language provider,
+`useT()` and the locale-aware formatters (`fmtInt`, `usd`, `fmtDate` …). Each
+component keeps its own dictionary next to the markup that uses it. A missing
+key falls back to Persian. The language comes from `?lang=`, a `/fa`, `/en` or
+`/ar` path prefix, the saved choice, or the browser, in that order;
+`index.html` applies it before first paint so the page never flips direction
+after loading. Docs prose is still Persian and English; Arabic readers see the
+Persian article when an Arabic file is not there. The landing page, including
+the intro video, is translated.
 
 ## Develop
 
