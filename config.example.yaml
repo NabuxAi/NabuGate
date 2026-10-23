@@ -637,6 +637,20 @@ audio:
       - provider: gemini
         model: "gemini-2.5-flash-preview-tts"
 
+  # The Gemini voice first, for a caller that chose how it sounds: NabuCRM's
+  # spoken console replies, where the owner picked Gemini's reading of Persian
+  # (named voice "marin" → Gemini "Sulafat", see `voices`). nabu-voice puts
+  # OpenAI first and would change voice the day OpenAI's budget returns.
+  # ElevenLabs v3 behind it reads Persian too, so a Gemini quota wall still
+  # speaks, in another voice.
+  nabu-voice-gemini:
+    primary:
+      provider: gemini
+      model: "gemini-2.5-flash-preview-tts"
+    fallback:
+      - provider: elevenlabs
+        model: "eleven_v3"
+
   # Persian, spoken on our own machine. Nothing about the text leaves the
   # network it is hosted on and no minute of it is billed abroad. No fallback:
   # a rung at a vendor would quietly send the text off-network, and a caller
