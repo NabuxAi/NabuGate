@@ -19,7 +19,16 @@ func TestShippedConfigsPinTheGeminiVoice(t *testing.T) {
 		if route.Primary.Provider != "gemini" {
 			t.Errorf("%s: nabu-voice-gemini starts at %q, want gemini", path, route.Primary.Provider)
 		}
-		if len(route.Fallback) == 0 || route.Fallback[0].Provider != "elevenlabs" || route.Fallback[0].Model != "eleven_v3" {
+		// The same Gemini voice on a second Google project may come first; the
+		// first rung that is not Gemini must be ElevenLabs v3, which reads Persian.
+		var other *Target
+		for k := range route.Fallback {
+			if p := route.Fallback[k].Provider; p != "gemini" && p != "gemini2" {
+				other = &route.Fallback[k]
+				break
+			}
+		}
+		if other == nil || other.Provider != "elevenlabs" || other.Model != "eleven_v3" {
 			t.Errorf("%s: nabu-voice-gemini should fall back to ElevenLabs eleven_v3, which reads Persian; got %+v", path, route.Fallback)
 		}
 	}
