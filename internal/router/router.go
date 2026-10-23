@@ -95,6 +95,11 @@ type Router struct {
 	voices     map[string]map[string]string
 	settingsMu sync.RWMutex
 	settings   map[string]AliasSetting
+
+	// drained is when each provider's gateway key was last refused for money
+	// (credit.go).
+	creditMu sync.Mutex
+	drained  map[string]time.Time
 }
 
 // catalogEntry is one provider's cached live-discovered model IDs, and when
@@ -119,6 +124,7 @@ func New(adapters map[string]provider.Adapter, models, images, audio, embeddings
 		log:           log,
 		passthrough:   passthrough,
 		catalog:       make(map[string]catalogEntry),
+		drained:       make(map[string]time.Time),
 		ttl:           discoveryTTL,
 		now:           time.Now,
 	}
@@ -351,12 +357,12 @@ func (r *Router) Chat(ctx context.Context, alias string, req provider.ChatReques
 			"latency_ms", latency.Milliseconds(),
 		}
 		if err != nil {
-			failures.add(t.label, t.Model, err)
+			r.failed(&failures, t, err)
 			r.log.Warn("upstream failed", append(attrs, "error", err.Error())...)
 			continue
 		}
 
-		recordKeySource(ctx, t.caller)
+		r.served(ctx, t)
 		r.log.Info("upstream ok",
 			append(attrs,
 				"prompt_tokens", resp.Usage.PromptTokens,
@@ -422,7 +428,7 @@ func (r *Router) ChatStream(ctx context.Context, alias string, req provider.Chat
 		})
 		attrs := []any{"capability", "chat-stream", "alias", alias, "provider", t.Provider, "model", t.Model, "attempt", i + 1, "latency_ms", time.Since(start).Milliseconds()}
 		if err != nil {
-			failures.add(t.label, t.Model, err)
+			r.failed(&failures, t, err)
 			r.log.Warn("upstream failed", append(attrs, "error", err.Error(), "started", started)...)
 			if started {
 				// Cannot fall back once the client has received bytes.
@@ -442,7 +448,7 @@ func (r *Router) ChatStream(ctx context.Context, alias string, req provider.Chat
 			continue
 		}
 
-		recordKeySource(ctx, t.caller)
+		r.served(ctx, t)
 		r.log.Info("upstream ok", append(attrs, "total_tokens", usage.TotalTokens)...)
 		return StreamResult{Provider: t.Provider, Model: t.Model, Usage: usage}, nil
 	}
@@ -488,11 +494,11 @@ func (r *Router) Image(ctx context.Context, alias string, req provider.ImageRequ
 		resp, err := imgAdapter.Image(ctx, req)
 		attrs := []any{"capability", "image", "alias", alias, "provider", t.Provider, "model", t.Model, "attempt", i + 1, "latency_ms", time.Since(start).Milliseconds()}
 		if err != nil {
-			failures.add(t.label, t.Model, err)
+			r.failed(&failures, t, err)
 			r.log.Warn("upstream failed", append(attrs, "error", err.Error())...)
 			continue
 		}
-		recordKeySource(ctx, t.caller)
+		r.served(ctx, t)
 		r.log.Info("upstream ok", append(attrs, "images", len(resp.Images))...)
 		return ImageResult{Alias: alias, Provider: t.Provider, Model: t.Model, Images: resp.Images}, nil
 	}
@@ -541,11 +547,11 @@ func (r *Router) Speech(ctx context.Context, alias string, req provider.SpeechRe
 		resp, err := spAdapter.Speech(ctx, req)
 		attrs := []any{"capability", "speech", "alias", alias, "provider", t.Provider, "model", t.Model, "attempt", i + 1, "latency_ms", time.Since(start).Milliseconds()}
 		if err != nil {
-			failures.add(t.label, t.Model, err)
+			r.failed(&failures, t, err)
 			r.log.Warn("upstream failed", append(attrs, "error", err.Error())...)
 			continue
 		}
-		recordKeySource(ctx, t.caller)
+		r.served(ctx, t)
 		r.log.Info("upstream ok", append(attrs, "bytes", len(resp.Audio))...)
 		return SpeechResult{Alias: alias, Provider: t.Provider, Model: t.Model, Audio: resp.Audio, ContentType: resp.ContentType}, nil
 	}
@@ -616,11 +622,11 @@ func (r *Router) Embed(ctx context.Context, alias string, req provider.Embedding
 		resp, err := embAdapter.Embed(ctx, req)
 		attrs := []any{"capability", "embedding", "alias", alias, "provider", t.Provider, "model", t.Model, "attempt", i + 1, "latency_ms", time.Since(start).Milliseconds()}
 		if err != nil {
-			failures.add(t.label, t.Model, err)
+			r.failed(&failures, t, err)
 			r.log.Warn("upstream failed", append(attrs, "error", err.Error())...)
 			continue
 		}
-		recordKeySource(ctx, t.caller)
+		r.served(ctx, t)
 		r.log.Info("upstream ok", append(attrs, "vectors", len(resp.Embeddings), "total_tokens", resp.Usage.TotalTokens)...)
 		return EmbedResult{Alias: alias, Provider: t.Provider, Model: t.Model, Embeddings: resp.Embeddings, Usage: resp.Usage}, nil
 	}
@@ -808,7 +814,7 @@ func (r *Router) Responses(ctx context.Context, model string, body map[string]js
 		resp, err := responder.Responses(ctx, raw)
 		attrs := []any{"capability", "responses", "model", model, "provider", t.Provider, "upstream_model", t.Model, "latency_ms", time.Since(start).Milliseconds()}
 		if err != nil {
-			failures.add(t.label, t.Model, err)
+			r.failed(&failures, t, err)
 			r.log.Warn("upstream failed", append(attrs, "error", err.Error())...)
 			failedProvider = t.Provider
 			failedModel = t.Model
@@ -827,7 +833,7 @@ func (r *Router) Responses(ctx context.Context, model string, body map[string]js
 			}(project, failedProvider, failedModel, t.Provider, t.Model, errReason)
 		}
 
-		recordKeySource(ctx, t.caller)
+		r.served(ctx, t)
 		r.log.Info("upstream ok", append(attrs, "status", resp.StatusCode)...)
 		return resp, t.Provider, t.Model, nil
 	}
@@ -900,11 +906,11 @@ func (r *Router) Transcribe(ctx context.Context, alias string, req provider.Tran
 		resp, err := trAdapter.Transcribe(ctx, req)
 		attrs := []any{"capability", "transcription", "alias", alias, "provider", t.Provider, "model", t.Model, "attempt", i + 1, "latency_ms", time.Since(start).Milliseconds()}
 		if err != nil {
-			failures.add(t.label, t.Model, err)
+			r.failed(&failures, t, err)
 			r.log.Warn("upstream failed", append(attrs, "error", err.Error())...)
 			continue
 		}
-		recordKeySource(ctx, t.caller)
+		r.served(ctx, t)
 		r.log.Info("upstream ok", append(attrs, "chars", len(resp.Text), "segments", len(resp.Segments), "words", len(resp.Words), "audio_seconds", resp.Duration)...)
 		return TranscribeResult{
 			Alias: alias, Provider: t.Provider, Model: t.Model,

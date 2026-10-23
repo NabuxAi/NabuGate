@@ -197,7 +197,7 @@ func (r *Router) attempts(ctx context.Context, targets []config.Target) []attemp
 			out = append(out, globalRung)
 		}
 	}
-	return out
+	return r.creditLast(out)
 }
 
 // ownRungs turns a caller's keys for one provider into the rungs to try, in the
