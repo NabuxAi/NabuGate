@@ -1,4 +1,19 @@
-# Iran mirror (`gate.nabuxai.ir`)
+# Iran mirrors (`gate`, `pilot`, `chat` `.nabuxai.ir`)
+
+One mirror, one Coolify resource per product. The resource's environment picks the product:
+
+| Resource | `UPSTREAM_HOST` | `MIRROR_HOST` | `NGINX_ENVSUBST_TEMPLATE_DIR` |
+| --- | --- | --- | --- |
+| NabuGate | `gate.nabuxai.com` (default) | `gate.nabuxai.ir` (default) | `/etc/nginx/templates` (default) |
+| NabuPilot | `pilot.nabuxai.com` | `pilot.nabuxai.ir` | `/etc/nginx/templates` |
+| NabuChat | `chat.nabuxai.com` | `chat.nabuxai.ir` | `/etc/nginx/templates-rewrite` |
+
+`templates/` passes requests through. It is for a product that builds its links from the request: NabuGate reads `X-Forwarded-Host`, and NabuPilot builds sign-in and payment return URLs from the page's own origin. `templates-rewrite/` also replaces `https://UPSTREAM_HOST` with `https://MIRROR_HOST` in pages, scripts, JSON, redirects and cookies. It is for a product that pins its public URL at build time: NabuChat bakes `NEXT_PUBLIC_DASHBOARD_URL` into its JavaScript. URL-encoded copies are not rewritten, because they are OAuth `redirect_uri` values and the product exchanges the code with the URL it was built with. So NabuChat's dashboard sign-in still round-trips through `chat.nabuxai.com`. Everything else (pages, the chat widget, the API) is served through the mirror.
+
+Each mirror host needs its callbacks registered on NabuAuth (`apps.yaml`), and an A record on ArvanCloud pointing at the Iran server, like every other `nabuxai.ir` name.
+
+The rest of this file describes the NabuGate mirror. The others differ only in the table above.
+
 
 This directory is a reverse proxy for an Iran-hosted machine. It does not run NabuGate. Every request — pages, static files, `/v1/*`, the console API, server-sent events, and websocket upgrades — is forwarded to `https://gate.nabuxai.com`. Browsers in Iran talk only to `gate.nabuxai.ir`. The connection to the upstream leaves from this server.
 
