@@ -1,4 +1,4 @@
-# Iran mirror for Coolify.
+# Iran mirror for Coolify — for any product, not only NabuGate.
 #
 # coolify-proxy (Traefik v3) already listens on 80/443 and issues the
 # certificate. This compose file starts one nginx container on container
@@ -14,7 +14,6 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    image: nabugate-iran-mirror
     restart: unless-stopped
     expose:
       - "80"
@@ -23,6 +22,13 @@ services:
       # hostname from the domain attached to this service. The service name
       # must stay "mirror" or this variable name stops matching.
       - SERVICE_FQDN_MIRROR_80
+      # Which product this mirrors. One compose, one resource per product:
+      # set these on the Coolify resource, not here.
+      - UPSTREAM_HOST=${UPSTREAM_HOST:-gate.nabuxai.com}
+      - MIRROR_HOST=${MIRROR_HOST:-gate.nabuxai.ir}
+      # /etc/nginx/templates (pass through) or /etc/nginx/templates-rewrite
+      # (also rewrite the upstream's absolute URLs; see that template).
+      - NGINX_ENVSUBST_TEMPLATE_DIR=${NGINX_ENVSUBST_TEMPLATE_DIR:-/etc/nginx/templates}
     healthcheck:
       test: ["CMD", "wget", "-q", "-O", "-", "http://127.0.0.1/healthz"]
       interval: 30s
