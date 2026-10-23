@@ -534,6 +534,22 @@ providers:
     base_url: "https://generativelanguage.googleapis.com/v1beta/openai"
     api_key_env: "GEMINI_API_KEY"
 
+  # A second Google AI Studio project. Two projects are two independent quota
+  # pools (the free tier allows about ten speech requests a day per model per
+  # project), so every Gemini rung below is followed by the same model on this
+  # key. Skipped while GEMINI_API_KEY_2 is unset.
+  gemini2:
+    enabled: true
+    type: gemini
+    base_url: "https://generativelanguage.googleapis.com/v1beta"
+    api_key_env: "GEMINI_API_KEY_2"
+
+  gemini-openai2:
+    enabled: true
+    type: openai
+    base_url: "https://generativelanguage.googleapis.com/v1beta/openai"
+    api_key_env: "GEMINI_API_KEY_2"
+
   # Alibaba Model Studio (Qwen), international endpoint — OpenAI-wire with
   # tools. The cross-vendor rung under Google: a Google outage or quota does
   # not take it down with it. Probed 2026-09-06: qwen-plus answers with
@@ -802,13 +818,19 @@ model_registry:
     serves:
       - provider: gemini-openai
         model: "gemini-3.6-flash"
+      - provider: gemini-openai2
+        model: "gemini-3.6-flash"
   gemini-3.5-flash:
     serves:
       - provider: gemini-openai
         model: "gemini-3.5-flash"
+      - provider: gemini-openai2
+        model: "gemini-3.5-flash"
   gemini-2.5-flash:
     serves:
       - provider: gemini-openai
+        model: "gemini-2.5-flash"
+      - provider: gemini-openai2
         model: "gemini-2.5-flash"
   # Alibaba's flagship. Probed 2026-09-08 on the international endpoint with
   # this key: all three of max, plus and turbo answer.
@@ -1346,6 +1368,8 @@ models:
       # gemini-2.5-pro is already 429 on it.
       - provider: gemini-openai
         model: "gemini-2.5-flash"
+      - provider: gemini-openai2
+        model: "gemini-2.5-flash"
       - model: deepseek-v4.1-flash
       - model: gpt-oss-120b
       - model: gemma-4-31b
@@ -1421,6 +1445,8 @@ models:
       # router skipped them. These rungs resolve.
       - provider: gemini-openai
         model: "gemini-2.5-flash-lite"
+      - provider: gemini-openai2
+        model: "gemini-2.5-flash-lite"
       - model: nemotron-3-super
       - model: laguna-s
       - model: gemma-4-26b
@@ -1452,6 +1478,8 @@ models:
       model: gpt-4o
     fallback:
       - provider: gemini-openai
+        model: "gemini-2.5-flash"
+      - provider: gemini-openai2
         model: "gemini-2.5-flash"
       # Gemini was the last rung, and on the free tier it answers 429 every
       # other call — so this alias died whenever the quota bit, with nothing
@@ -1487,6 +1515,8 @@ models:
     fallback:
       - model: gpt-4o
       - provider: gemini-openai
+        model: "gemini-2.5-flash"
+      - provider: gemini-openai2
         model: "gemini-2.5-flash"
 
   nabu-minimax:
@@ -1626,7 +1656,11 @@ models:
       provider: gemini-openai
       model: "gemini-3.1-flash-lite-preview"
     fallback:
+      - provider: gemini-openai2
+        model: "gemini-3.1-flash-lite-preview"
       - provider: gemini-openai
+        model: "gemini-2.5-flash-lite"
+      - provider: gemini-openai2
         model: "gemini-2.5-flash-lite"
       - model: gpt-4.1-nano
 
@@ -1815,6 +1849,8 @@ images:
     fallback:
       - provider: gemini
         model: "gemini-2.5-flash-image"
+      - provider: gemini2
+        model: "gemini-2.5-flash-image"
       - provider: pexels
         model: "search"
 
@@ -1911,18 +1947,23 @@ audio:
     fallback:
       - provider: gemini
         model: "gemini-2.5-flash-preview-tts"
+      - provider: gemini2
+        model: "gemini-2.5-flash-preview-tts"
 
   # The Gemini voice first, for a caller that chose how it sounds: NabuCRM's
   # spoken console replies, where the owner picked Gemini's reading of Persian
   # (named voice "marin" → Gemini "Sulafat", see `voices`). nabu-voice puts
   # OpenAI first and would change voice the day OpenAI's budget returns.
-  # ElevenLabs v3 behind it reads Persian too, so a Gemini quota wall still
-  # speaks, in another voice.
+  # The same voice on the second Google project comes next, so one project's
+  # quota wall keeps the voice; ElevenLabs v3 behind both reads Persian too, so
+  # a wall on both still speaks, in another voice.
   nabu-voice-gemini:
     primary:
       provider: gemini
       model: "gemini-2.5-flash-preview-tts"
     fallback:
+      - provider: gemini2
+        model: "gemini-2.5-flash-preview-tts"
       - provider: elevenlabs
         model: "eleven_v3"
 
@@ -1952,6 +1993,8 @@ audio:
         model: "gpt-4o-mini-tts"
       - provider: gemini
         model: "gemini-2.5-flash-preview-tts"
+      - provider: gemini2
+        model: "gemini-2.5-flash-preview-tts"
 
   # Persian, Arabic and everything else outside the older models' language list.
   #
@@ -1969,6 +2012,8 @@ audio:
       - provider: elevenlabs
         model: "eleven_v3_conversational"
       - provider: gemini
+        model: "gemini-2.5-flash-preview-tts"
+      - provider: gemini2
         model: "gemini-2.5-flash-preview-tts"
 
   # Two speakers talking rather than one reading — the conversational model is
@@ -2056,7 +2101,11 @@ transcription:
         model: "whisper-v3-turbo"
       - provider: gemini
         model: "gemini-3.5-transcribe"
+      - provider: gemini2
+        model: "gemini-3.5-transcribe"
       - provider: gemini
+        model: "gemini-3-flash"
+      - provider: gemini2
         model: "gemini-3-flash"
 
   # A person waiting on their own words: dictation into a text field, a voice
@@ -2541,6 +2590,7 @@ pricing:
   "gemini/gemini-1.5-pro": { input: 1.25, output: 5 }
   # Routed only to transcribe, so its input is audio: $1.00, not text's $0.50.
   "gemini/gemini-3-flash": { input: 1.00, output: 3.00 }
+  "gemini2/gemini-3-flash": { input: 1.00, output: 3.00 }
   gemini-3.5-transcribe: { input: 2.00, output: 12.00 }
   gemini-embedding-001: { input: 0.15, output: 0 }
   gemini-embedding-2-preview: { input: 0.20, output: 0 }
