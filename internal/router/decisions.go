@@ -132,12 +132,12 @@ func (r *Router) Decide(ctx context.Context, alias string, req provider.Decision
 				r.log.Warn("upstream failed", append(attrs, "error", err.Error())...)
 				// The last candidate's error is the one the rung is judged by.
 				if cand.label == candidates[len(candidates)-1].label {
-					failures.add(t.label, t.Model, err)
+					r.failed(&failures, t, err)
 				}
 				continue
 			}
 
-			recordKeySource(ctx, t.caller)
+			r.served(ctx, t)
 			r.log.Info("upstream ok", append(attrs, "total_tokens", resp.Usage.TotalTokens)...)
 			return DecisionResult{
 				Alias:    alias,

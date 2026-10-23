@@ -164,7 +164,7 @@ func (r *Router) LiveSession(ctx context.Context, alias string, body []byte) (Li
 		resp, err := liveAdapter.CreateLiveSession(ctx, provider.LiveSessionRequest{Model: t.Model, Body: rungBody})
 		attrs := []any{"capability", "live", "alias", alias, "provider", t.Provider, "model", t.Model, "attempt", i + 1, "latency_ms", time.Since(start).Milliseconds()}
 		if err != nil {
-			failures.add(t.label, t.Model, err)
+			r.failed(&failures, t, err)
 			var refusal *provider.LiveUpstreamError
 			if errors.As(err, &refusal) {
 				lastRefusal = refusal
@@ -172,7 +172,7 @@ func (r *Router) LiveSession(ctx context.Context, alias string, body []byte) (Li
 			r.log.Warn("upstream failed", append(attrs, "error", err.Error())...)
 			continue
 		}
-		recordKeySource(ctx, t.caller)
+		r.served(ctx, t)
 		r.noteLive(alias, nil)
 		r.log.Info("upstream ok", append(attrs, "session", resp.ID)...)
 		return LiveResult{Alias: alias, Provider: t.Provider, Model: t.Model, ID: resp.ID, Body: resp.Body}, nil

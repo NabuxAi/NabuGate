@@ -1145,6 +1145,40 @@ model_registry:
       - provider: gapgpt
         model: "gpt-5.6-luna"
 
+  # GPT-6 (openai.com/index/gpt-6-for-everyone, 2026-10-07): Astra is the top
+  # model, Sol is what ChatGPT's paid plans run, Luna what Free and Go run.
+  # OpenAI's own key first, Parspack second — both answered gpt-6-luna and
+  # gpt-6-sol on 2026-10-23. OpenRouter lists them too, but both of our
+  # accounts there are free tier and refuse them with "insufficient credits".
+  gpt-6-luna:
+    param_style: reasoning
+    serves:
+      - provider: openai
+        model: "gpt-6-luna"
+      - provider: parspack
+        model: "openai/gpt-6-luna"
+  gpt-6-sol:
+    param_style: reasoning
+    serves:
+      - provider: openai
+        model: "gpt-6-sol"
+      - provider: parspack
+        model: "openai/gpt-6-sol"
+  gpt-6.1-sol:
+    param_style: reasoning
+    serves:
+      - provider: openai
+        model: "gpt-6.1-sol"
+      - provider: parspack
+        model: "openai/gpt-6.1-sol"
+  gpt-6-astra:
+    param_style: reasoning
+    serves:
+      - provider: openai
+        model: "gpt-6-astra"
+      - provider: parspack
+        model: "openai/gpt-6-astra"
+
   # Cheap open models sold by both OpenRouter and Hugging Face — two vendors
   # per model, so either account running dry costs a round trip, not the
   # answer. They sit in chains ahead of the Claude rungs, which spend the
@@ -1377,6 +1411,7 @@ models:
       - model: mimo-v2.5
       - model: step-3.5-flash
       - model: laguna-s
+      - model: gpt-6-luna
       - model: gpt-5.6-luna
       # Claude spends the Anthropic key: last paid rung, cheapest Claude.
       - model: claude-haiku-5-5
@@ -1434,6 +1469,18 @@ models:
         model: "qwen-local"
 
 
+  # GPT-6 Sol, the model ChatGPT's paid plans answer with, then the cheaper
+  # Luna, then other vendors so an OpenAI and Parspack outage at once still
+  # answers.
+  nabu-gpt6:
+    primary:
+      model: gpt-6-sol
+    fallback:
+      - model: gpt-6-luna
+      - model: gemini-3.6-flash
+      - model: qwen-plus
+      - model: claude-sonnet-5
+
   nabu-cheap:
     primary:
       model: gpt-4.1-nano
@@ -1453,6 +1500,7 @@ models:
       - model: gpt-oss-120b
       - model: step-3.5-flash
       - model: deepseek-v4.1-flash
+      - model: gpt-6-luna
       - model: gpt-5.6-luna
       - model: claude-haiku-5-5
       # Ultimate local self-hosted fallback
@@ -2513,6 +2561,11 @@ pricing:
   gpt-4.1-nano: { input: 0.10, output: 0.40 }
   gpt-5.5: { input: 5.00, output: 30.00 }
   gpt-5.6-luna: { input: 0.20, output: 1.20 }
+  # GPT-6, OpenRouter's pass-through of OpenAI's list price (2026-10-23).
+  gpt-6-astra: { input: 10.00, output: 50.00 }
+  gpt-6-sol: { input: 2.00, output: 10.00 }
+  gpt-6.1-sol: { input: 2.00, output: 10.00 }
+  gpt-6-luna: { input: 0.10, output: 0.50 }
   gpt-oss-120b: { input: 0.15, output: 0.60 }
   gpt-oss-20b: { input: 0.018, output: 0.09 }
   # ── OpenRouter / Hugging Face (live catalogues, 2026-10-17) ──────────────

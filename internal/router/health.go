@@ -2,6 +2,7 @@ package router
 
 import (
 	"sort"
+	"strings"
 	"time"
 
 	"nabugate/internal/config"
@@ -34,6 +35,10 @@ type AliasHealth struct {
 	// Warnings are the ways this alias is weaker than it looks. Empty is the
 	// healthy case.
 	Warnings []string `json:"warnings,omitempty"`
+
+	// OutOfCredit is the providers behind this alias whose gateway key was
+	// just refused for money; they are tried last until the cooldown passes.
+	OutOfCredit []string `json:"out_of_credit,omitempty"`
 
 	// Disabled is an alias the gateway refuses on purpose — a live alias with
 	// no per-minute price — however many providers stand behind it.
@@ -138,6 +143,15 @@ func (r *Router) aliasHealth(alias, kind string, route config.ModelRoute) AliasH
 
 	if health.Live < health.Configured && health.Live > 0 {
 		health.Warnings = append(health.Warnings, "shorter than configured — some rungs name providers with no key here")
+	}
+
+	for _, p := range health.Providers {
+		if r.outOfCreditNow(p) {
+			health.OutOfCredit = append(health.OutOfCredit, p)
+		}
+	}
+	if len(health.OutOfCredit) > 0 {
+		health.Warnings = append(health.Warnings, "out of credit, tried last: "+strings.Join(health.OutOfCredit, ", "))
 	}
 
 	if kind == "live" {
