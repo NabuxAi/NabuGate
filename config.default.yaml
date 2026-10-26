@@ -2095,15 +2095,29 @@ transcription:
   # so one rung is not a fallback chain. The rungs below it are other vendors
   # entirely; each stays inert until its key env is set, which costs nothing.
   nabu-transcribe:
-    # The self-hosted engine leads because it is the only one that actually
-    # serves transcription here: Parspack lists whisper-1 and gpt-4o-transcribe
-    # in /models but its /audio/transcriptions answers 500 (and 502 HTML for the
-    # gpt-4o one) — verified by calling Parspack directly, not through here.
-    # The rungs below stay in place so the day a vendor works, it just works.
+    # Persian first: the dedicated Gemini transcription model leads because a
+    # language model repairs the disfluencies and misspellings the whisper
+    # family transcribes literally — on business Persian that is the difference
+    # between a usable note and «پرداختن شده» read as its own opposite. It
+    # answers through the Files + Interactions APIs, so the same key on the
+    # general multimodal model (one round trip, audio inlined, no upload)
+    # follows before a second Google project carries both again — one quota
+    # wall or one API surface breaking does not take the chain with it. The
+    # self-hosted whisper that used to lead stays the first free rung: CPU-bound
+    # (48-93 s for 4 s of audio on a busy host) but ours, and everything below
+    # is the vendor ladder as it was.
     primary:
-      provider: whisper
-      model: "mobiuslabsgmbh/faster-whisper-large-v3-turbo"
+      provider: gemini
+      model: "gemini-3.5-transcribe"
     fallback:
+      - provider: gemini
+        model: "gemini-3-flash"
+      - provider: gemini2
+        model: "gemini-3.5-transcribe"
+      - provider: gemini2
+        model: "gemini-3-flash"
+      - provider: whisper
+        model: "mobiuslabsgmbh/faster-whisper-large-v3-turbo"
       - provider: parspack
         model: "openai/whisper-1"
       - provider: parspack
@@ -2120,9 +2134,7 @@ transcription:
         model: "whisper-1"
       # Below the whisper family entirely, because a chain of one architecture
       # fails as one. Speechmatics is a different engine with its own accent and
-      # code-switching behaviour; Gemini is a different one again, and being a
-      # language model it repairs the disfluencies whisper transcribes
-      # literally. Both stay inert until their key env is set.
+      # code-switching behaviour. Stays inert until its key env is set.
       - provider: speechmatics
         model: "enhanced"
       # ElevenLabs Scribe: a different engine again, and the one that holds up
@@ -2147,14 +2159,6 @@ transcription:
       # Whisper once more, on hardware that is none of the above.
       - provider: fireworks
         model: "whisper-v3-turbo"
-      - provider: gemini
-        model: "gemini-3.5-transcribe"
-      - provider: gemini2
-        model: "gemini-3.5-transcribe"
-      - provider: gemini
-        model: "gemini-3-flash"
-      - provider: gemini2
-        model: "gemini-3-flash"
 
   # A person waiting on their own words: dictation into a text field, a voice
   # note read back while the sender is still looking. Seconds matter more
