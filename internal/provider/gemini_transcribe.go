@@ -102,6 +102,11 @@ type geminiInteractionResponse struct {
 	OutputText string `json:"output_text"`
 	Steps      []struct {
 		Content []struct {
+			// The live Interactions API carries the transcript itself here
+			// (verified against production, 2026-10-26: steps[].content[].text
+			// with type "model_output"); output_text has never been seen on
+			// the wire and is kept only in case a surface starts sending it.
+			Text        string `json:"text"`
 			Annotations []struct {
 				Type        string `json:"type"`
 				Text        string `json:"text"`
@@ -177,9 +182,21 @@ func (a *GeminiAdapter) transcribeInteraction(ctx context.Context, req Transcrip
 		return TranscriptionResponse{}, fmt.Errorf("%s: %s", a.name, parsed.Error.Message)
 	}
 
-	out := TranscriptionResponse{Text: strings.TrimSpace(parsed.OutputText), Language: req.Language}
+	var transcript strings.Builder
+	if parsed.OutputText != "" {
+		transcript.WriteString(parsed.OutputText)
+	}
+	out := TranscriptionResponse{Language: req.Language}
 	for _, step := range parsed.Steps {
 		for _, c := range step.Content {
+			// Each model_output content block is its own paragraph; the API
+			// separates them with newlines of its own only within a block.
+			if c.Text != "" {
+				if transcript.Len() > 0 {
+					transcript.WriteString("\n")
+				}
+				transcript.WriteString(c.Text)
+			}
 			for _, ann := range c.Annotations {
 				if ann.Type != "word_info" {
 					continue
@@ -193,6 +210,7 @@ func (a *GeminiAdapter) transcribeInteraction(ctx context.Context, req Transcrip
 			}
 		}
 	}
+	out.Text = strings.TrimSpace(transcript.String())
 	if len(out.Segments) > 0 {
 		out.Duration = out.Segments[len(out.Segments)-1].End
 	}

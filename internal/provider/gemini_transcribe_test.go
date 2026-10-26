@@ -110,10 +110,17 @@ func TestGeminiTranscribeInteraction(t *testing.T) {
 		if cfg["enable_word_timestamps"] != true {
 			t.Errorf("word timestamps not requested despite a granularity: %#v", cfg)
 		}
-		io.WriteString(w, `{"output_text":"hello there","steps":[{"content":[{"annotations":[
-			{"type":"word_info","text":"hello","start_offset":"0.5s","end_offset":"1s"},
-			{"type":"word_info","text":"there","start_offset":"1s","end_offset":"2.25s"},
-			{"type":"other","text":"ignored"}]}]}]}`)
+		// The shape the live Interactions API answers with (captured against
+		// production 2026-10-26): the transcript is steps[].content[].text,
+		// never output_text. A fixture shaped like the old struct passed while
+		// every real call came back "empty transcription".
+		io.WriteString(w, `{"id":"v1_x","status":"completed","object":"interaction","model":"gemini-3.5-transcribe",`+
+			`"steps":[{"type":"model_output","content":[`+
+			`{"type":"text","text":"hello there"},`+
+			`{"type":"annotation","annotations":[`+
+			`{"type":"word_info","text":"hello","start_offset":"0.5s","end_offset":"1s"},`+
+			`{"type":"word_info","text":"there","start_offset":"1s","end_offset":"2.25s"},`+
+			`{"type":"other","text":"ignored"}]}]}]}`)
 	})
 	mux.HandleFunc("/v1beta/files/abc", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodDelete {

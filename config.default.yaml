@@ -2111,11 +2111,11 @@ transcription:
       model: "gemini-3.5-transcribe"
     fallback:
       - provider: gemini
-        model: "gemini-3-flash"
+        model: "gemini-3.5-flash"
       - provider: gemini2
         model: "gemini-3.5-transcribe"
       - provider: gemini2
-        model: "gemini-3-flash"
+        model: "gemini-3.5-flash"
       - provider: whisper
         model: "mobiuslabsgmbh/faster-whisper-large-v3-turbo"
       - provider: parspack
