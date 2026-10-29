@@ -127,6 +127,10 @@ type ImageRequest struct {
 	N           int    // number of images (default 1)
 	AspectRatio string // e.g. "16:9" (best-effort; not all providers honor it)
 	Size        string // e.g. "1024x1024" (OpenAI-style)
+	Quality     string // OpenAI's low/medium/high/auto; other vendors ignore it
+	// What the picture must not contain. Wan takes it as a parameter; a model
+	// without one ignores it, so say it in the prompt too where it matters.
+	NegativePrompt string
 }
 
 // ImageResponse carries one or more base64-encoded PNG images.

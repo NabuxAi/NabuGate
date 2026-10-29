@@ -2,7 +2,6 @@ package provider
 
 import (
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -316,7 +315,7 @@ func (a *ReplicateAdapter) Image(ctx context.Context, req ImageRequest) (ImageRe
 
 	var out ImageResponse
 	for _, u := range urls {
-		b64, err := a.download(ctx, u)
+		b64, err := downloadBase64(ctx, a.name, u)
 		if err != nil {
 			return ImageResponse{}, err
 		}
@@ -480,27 +479,6 @@ func (a *ReplicateAdapter) poll(ctx context.Context, url string) (replicatePredi
 		return replicatePrediction{}, fmt.Errorf("%s: unreadable poll response: %w", a.name, err)
 	}
 	return got, nil
-}
-
-// download fetches a generated file and returns its bytes base64-encoded.
-func (a *ReplicateAdapter) download(ctx context.Context, fileURL string) (string, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fileURL, nil)
-	if err != nil {
-		return "", err
-	}
-	resp, err := sharedHTTPClient.Do(req)
-	if err != nil {
-		return "", err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode >= 400 {
-		return "", fmt.Errorf("%s: file download failed (status %d)", a.name, resp.StatusCode)
-	}
-	data, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return "", err
-	}
-	return base64.StdEncoding.EncodeToString(data), nil
 }
 
 func (a *ReplicateAdapter) headers() map[string]string {

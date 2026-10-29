@@ -17,6 +17,7 @@ type openAIImageRequest struct {
 	Prompt         string `json:"prompt"`
 	N              int    `json:"n,omitempty"`
 	Size           string `json:"size,omitempty"`
+	Quality        string `json:"quality,omitempty"`
 	ResponseFormat string `json:"response_format,omitempty"`
 }
 
@@ -35,7 +36,7 @@ func (a *OpenAIAdapter) Image(ctx context.Context, req ImageRequest) (ImageRespo
 	if n <= 0 {
 		n = 1
 	}
-	body := openAIImageRequest{Model: req.Model, Prompt: req.Prompt, N: n, Size: req.Size}
+	body := openAIImageRequest{Model: req.Model, Prompt: req.Prompt, N: n, Size: req.Size, Quality: req.Quality}
 	// dall-e models default to URL output; force base64. gpt-image-1 returns
 	// base64 by default and rejects this field, so only set it for dall-e.
 	if strings.HasPrefix(req.Model, "dall-e") {

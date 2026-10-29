@@ -118,7 +118,7 @@ func (a *PexelsAdapter) Image(ctx context.Context, req ImageRequest) (ImageRespo
 		if src == "" {
 			continue
 		}
-		b64, err := a.download(ctx, src)
+		b64, err := downloadBase64(ctx, a.name, src)
 		if err != nil {
 			return ImageResponse{}, err
 		}
@@ -190,8 +190,10 @@ func (a *PexelsAdapter) get(ctx context.Context, path string) ([]byte, int, erro
 	return raw, resp.StatusCode, nil
 }
 
-// download fetches an image URL and returns its bytes base64-encoded.
-func (a *PexelsAdapter) download(ctx context.Context, imageURL string) (string, error) {
+// downloadBase64 fetches one hosted image and returns its bytes base64-encoded,
+// the shape every image rung hands back. Shared by the adapters whose upstream
+// answers with URLs rather than bytes (Pexels, Replicate, DashScope).
+func downloadBase64(ctx context.Context, name, imageURL string) (string, error) {
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodGet, imageURL, nil)
 	if err != nil {
 		return "", err
@@ -202,7 +204,7 @@ func (a *PexelsAdapter) download(ctx context.Context, imageURL string) (string, 
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode >= 400 {
-		return "", fmt.Errorf("%s: image download failed (status %d)", a.name, resp.StatusCode)
+		return "", fmt.Errorf("%s: image download failed (status %d)", name, resp.StatusCode)
 	}
 	data, err := io.ReadAll(resp.Body)
 	if err != nil {

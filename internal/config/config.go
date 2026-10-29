@@ -497,6 +497,11 @@ func newAdapter(name string, p ProviderConfig, apiKey string) (provider.Adapter,
 		// an OpenAI-wire endpoint — there is no /chat/completions to point a
 		// base_url at, so it needs its own adapter. Chat and image both.
 		return provider.NewReplicateAdapter(name, p.BaseURL, apiKey), ""
+	case "dashscope-image":
+		// Alibaba's Wan text-to-image. Chat on the same key rides the openai
+		// adapter (compatible mode), but images only exist on the native
+		// multimodal-generation API, which answers with URLs. See the adapter.
+		return provider.NewDashScopeImageAdapter(name, p.BaseURL, apiKey), ""
 	case "gamma":
 		// gamma.app: decks, documents and social posts. Asynchronous, and a chat
 		// adapter rather than an image one because what comes back is a hosted

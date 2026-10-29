@@ -561,6 +561,17 @@ providers:
     api_key_env: "DASHSCOPE_API_KEY"
     passthrough: true
 
+  # The same Alibaba key for Wan text-to-image. Images are not on the
+  # compatible-mode endpoint above, only on the native multimodal-generation
+  # API, which answers with signed URLs, so this is its own adapter. Probed
+  # 2026-10-29: wan2.6-t2i answers synchronously at any size from 1280*720 to
+  # 1696*960; qwen-image and the flux-* names are mainland-only. Skipped while
+  # DASHSCOPE_API_KEY is unset.
+  dashscope-image:
+    enabled: true
+    type: dashscope-image
+    api_key_env: "DASHSCOPE_API_KEY"
+
   # Pexels stock photos as an image source. An image alias pointed here searches
   # Pexels for the prompt and returns real photos. Skipped when PEXELS_API_KEY
   # is unset, like any other keyed provider.
@@ -1915,6 +1926,41 @@ images:
       - provider: replicate
         model: "black-forest-labs/flux-dev"
 
+  # One alias per image model family, for callers that let a person pick the
+  # model (mrc_imagegen's `image_model`). No cross-vendor fallback on these:
+  # someone who chose FLUX would rather get an error than a GPT picture. Each
+  # rung after the first is the same family, an older generation.
+  nabu-gpt-image:
+    primary:
+      provider: openai
+      model: "gpt-image-2"
+    fallback:
+      - provider: openai
+        model: "gpt-image-1"
+
+  # Nano Banana 2. Both Google keys answered 429 (free tier, image quota 0) on
+  # 2026-10-29, so this needs billing on one of the two projects to serve.
+  nabu-gemini-image:
+    primary:
+      provider: gemini
+      model: "gemini-3.1-flash-image"
+    fallback:
+      - provider: gemini2
+        model: "gemini-3.1-flash-image"
+
+  # Alibaba Wan: photographic, strong at people and light, about $0.03 a picture.
+  nabu-wan:
+    primary:
+      provider: dashscope-image
+      model: "wan2.6-t2i"
+
+  # Stable Diffusion XL on Replicate. Not an official Replicate model, so it is
+  # addressed by version. Serves once REPLICATE_API_TOKEN is set.
+  nabu-sdxl:
+    primary:
+      provider: replicate
+      model: "stability-ai/sdxl:7762fd07cf82c948538e41f63f77d685e02b063e37e496e96eefd46c929f9bdc"
+
   # Stock photos only: search Pexels for the prompt (empty prompt → curated).
   nabu-photo:
     primary:
@@ -2623,6 +2669,13 @@ pricing:
   # 1024x1024 at high quality ($40 per 1M image tokens, 4,160 tokens). The image
   # call asks for no quality, and the API's "auto" picks high for this model.
   gpt-image-1: { per_image: 0.167 }
+  # OpenAI's own output examples for 1536x1024 at high (the default when a
+  # caller sends no quality); medium is $0.041 and low $0.005.
+  gpt-image-2: { per_image: 0.165 }
+  # ~1K output, $60 per 1M image tokens (ai.google.dev pricing, 2026).
+  gemini-3.1-flash-image: { per_image: 0.067 }
+  # 0.22 CNY a picture on the Singapore endpoint (help.aliyun.com, 2026-10-29).
+  "dashscope-image/wan2.6-t2i": { per_image: 0.031 }
 
   # ── Anthropic (OpenRouter, 2026-09-26) ───────────────────────────────────
   claude-sonnet-5: { input: 2.00, output: 10.00, input_cache_read: 0.20, input_cache_write: 2.50 }
@@ -2700,6 +2753,7 @@ pricing:
   "replicate/meta/meta-llama-3-8b-instruct": { input: 0.05, output: 0.25 }
   "replicate/black-forest-labs/flux-schnell": { per_image: 0.003 }
   "replicate/black-forest-labs/flux-dev": { per_image: 0.025 }
+  "replicate/stability-ai/sdxl:7762fd07cf82c948538e41f63f77d685e02b063e37e496e96eefd46c929f9bdc": { per_image: 0.006 }
 
   # ── Speech to text, per minute of audio (2026-10-04) ──────────────────────
   # Multilingual: most of what is transcribed here is Persian ($0.0043 English-only).

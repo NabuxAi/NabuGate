@@ -1229,6 +1229,9 @@ type imageRequestBody struct {
 	N           int    `json:"n"`
 	Size        string `json:"size"`
 	AspectRatio string `json:"aspect_ratio"`
+	Quality     string `json:"quality"`
+	// Not OpenAI's; honoured by the vendors that take one (Wan).
+	NegativePrompt string `json:"negative_prompt"`
 }
 
 func (s *Server) handleImages(w http.ResponseWriter, r *http.Request) {
@@ -1246,10 +1249,12 @@ func (s *Server) handleImages(w http.ResponseWriter, r *http.Request) {
 	}
 
 	result, err := s.router.Image(r.Context(), body.Model, provider.ImageRequest{
-		Prompt:      body.Prompt,
-		N:           body.N,
-		Size:        body.Size,
-		AspectRatio: body.AspectRatio,
+		Prompt:         body.Prompt,
+		N:              body.N,
+		Size:           body.Size,
+		AspectRatio:    body.AspectRatio,
+		Quality:        body.Quality,
+		NegativePrompt: body.NegativePrompt,
 	})
 	if err != nil {
 		writeError(w, aliasErrStatus(err, "unknown image alias"), err.Error())
