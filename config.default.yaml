@@ -1936,7 +1936,7 @@ images:
       model: "gpt-image-2"
     fallback:
       - provider: openai
-        model: "gpt-image-1"
+        model: "gpt-image-1.5"
 
   # Nano Banana 2. Both Google keys answered 429 (free tier, image quota 0) on
   # 2026-10-29, so this needs billing on one of the two projects to serve.
@@ -2672,6 +2672,8 @@ pricing:
   # OpenAI's own output examples for 1536x1024 at high (the default when a
   # caller sends no quality); medium is $0.041 and low $0.005.
   gpt-image-2: { per_image: 0.165 }
+  # developers.openai.com model page: high 1536x1024 (medium $0.05, low $0.013).
+  gpt-image-1.5: { per_image: 0.20 }
   # ~1K output, $60 per 1M image tokens (ai.google.dev pricing, 2026).
   gemini-3.1-flash-image: { per_image: 0.067 }
   # 0.22 CNY a picture on the Singapore endpoint (help.aliyun.com, 2026-10-29).
