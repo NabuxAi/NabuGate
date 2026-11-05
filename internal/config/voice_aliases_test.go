@@ -1,6 +1,9 @@
 package config
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 // Speech models that read Persian script with Persian phonology, checked
 // against each vendor's language list. A model that is not here may still
@@ -59,5 +62,33 @@ func TestGrokVoiceOnlyBehindItsOwnAlias(t *testing.T) {
 				t.Errorf("%s routes to Grok's voice, which cannot read Persian", alias)
 			}
 		}
+	}
+}
+
+// The call brain answers a caller who is waiting in silence. One vendor's
+// outage must not silence it, so its rungs span at least three providers.
+func TestVoiceBrainSpansThreeVendors(t *testing.T) {
+	cfg, err := Load("../../config.default.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	route, ok := cfg.Models["nabu-voice-brain"]
+	if !ok {
+		t.Fatal("chat alias nabu-voice-brain is missing")
+	}
+	vendors := map[string]bool{}
+	for _, target := range append([]Target{route.Primary}, route.Fallback...) {
+		coords, ok := cfg.coordinates(target)
+		if !ok {
+			t.Errorf("nabu-voice-brain rung %s/%s is not served by any provider", target.Provider, target.Model)
+			continue
+		}
+		for _, coord := range coords {
+			prov, _, _ := strings.Cut(coord, "/")
+			vendors[strings.TrimSuffix(prov, "2")] = true
+		}
+	}
+	if len(vendors) < 3 {
+		t.Errorf("nabu-voice-brain reaches only %d vendors: %v", len(vendors), vendors)
 	}
 }
