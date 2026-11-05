@@ -355,6 +355,14 @@ var catalogue = map[string]Vendor{
 		Color: "#000000",
 		Icon:  "m3.1 3 7 9.9-7 8.1h2.1l5.9-6.8 4.8 6.8h5.4l-7.4-10.4L20.6 3h-2.1l-5.5 6.4L8.5 3H3.1Zm3.1 1.5h2.5l11.1 15.6h-2.5L6.2 4.5Z",
 	},
+	"xai-voice": {
+		Label: "xAI Grok Voice", Blurb: "صدای گراک: سریع و طبیعی در بیست زبان. فارسی در فهرستش نیست.",
+		BlurbEn:      "Grok's voice: fast and natural in twenty languages. Persian is not on its list.",
+		Capabilities: []string{CapSpeech},
+		Site:         "https://docs.x.ai/developers/model-capabilities/audio/text-to-speech", KeysURL: "https://console.x.ai",
+		Color: "#000000",
+		Icon:  "m3.1 3 7 9.9-7 8.1h2.1l5.9-6.8 4.8 6.8h5.4l-7.4-10.4L20.6 3h-2.1l-5.5 6.4L8.5 3H3.1Zm3.1 1.5h2.5l11.1 15.6h-2.5L6.2 4.5Z",
+	},
 	"fireworks": {
 		Label: "Fireworks AI", Blurb: "بیش از ۱۰۰ مدلِ باز با سرعتِ بالا، و یک whisper که رینگِ رونویسی هم هست.",
 		BlurbEn:      "Over 100 open models at high speed, and a whisper that is also part of the transcription ring.",

@@ -41,8 +41,11 @@ here. A `live:` alias is declared like an `audio:` one:
 ```yaml
 live:
   nabu-live:
-    primary: { provider: openai, model: "gpt-realtime" }
+    primary: { provider: openai, model: "gpt-realtime-2.1" }
+    fallback:
+      - { provider: openai, model: "gpt-realtime" }
 pricing:
+  "openai/gpt-realtime-2.1": { per_minute: 0.30 }
   "openai/gpt-realtime": { per_minute: 0.30 }
 ```
 
@@ -74,7 +77,7 @@ administrator chose in the console (Models → Change), else the alias's `voice:
 in the config. The rest of the body travels exactly as the caller sent it.
 
 The console can also choose which configured model of an alias answers first —
-`gpt-realtime` or `gpt-realtime-mini` behind `nabu-live` — from the next session
+`gpt-realtime-2.1`, `gpt-realtime` or `gpt-realtime-mini` behind `nabu-live` — from the next session
 on, without a deploy.
 
 ## Billing — `POST /v1/live/sessions/{id}/usage`

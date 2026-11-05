@@ -16,7 +16,7 @@ and ~300 out (grows with the conversation).
 | ↳ backend `gpt-5.6-terra` ($2 / $12) | | ≈ $0.010 | $0.060 | strong reasoning, tools |
 | ↳ backend `gpt-5.6-sol` ($4 / $20) | | ≈ $0.019 | $0.069 | |
 | **ElevenLabs Agents** (ConvAI) | $0.08 pay-as-you-go ($0.16 burst); plan minutes cheaper | LLM billed on top (their rate) | **$0.08–0.12** | cloned voices, best TTS quality |
-| **OpenAI Realtime** (`gpt-realtime`) | $32 in / $64 out per 1M audio tokens (≈600 tokens/min each way) | built in | **≈ $0.25–0.35** | one model does everything; context re-billed each turn |
+| **OpenAI Realtime** (`gpt-realtime-2.1`, `gpt-realtime`) | $32 in / $64 out per 1M audio tokens (≈600 tokens/min each way) | built in | **≈ $0.25–0.35** | one model does everything; context re-billed each turn; 2.1 is the lower-latency one |
 | **Realtime mini** (`gpt-realtime-mini`) | $10 / $20 per 1M audio tokens | built in | **≈ $0.08–0.12** | |
 | **Chained** (STT → text LLM → TTS) | `gpt-4o-transcribe` $0.006 + `gpt-4o-mini-tts` ≈ $0.012 (≈1k audio tokens/min spoken) | `gpt-5.6-luna` ≈ $0.001 | **≈ $0.02–0.03** | not full-duplex, 1–2 s turn latency |
 

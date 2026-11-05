@@ -623,6 +623,16 @@ providers:
     api_key_env: "XAI_API_KEY"
     passthrough: true
 
+  # Grok's voice on the same key. Its own provider because /v1/tts takes its
+  # own body (text, voice_id, language, output_format), which the openai adapter
+  # behind "xai" cannot send. Twenty languages; Persian is not one of them, so
+  # no alias that can carry Persian text routes here (see nabu-voice-grok).
+  xai-voice:
+    enabled: true
+    type: xai-tts
+    base_url: "https://api.x.ai/v1"
+    api_key_env: "XAI_API_KEY"
+
   # Fireworks — 100+ open models at speed, and a whisper on /audio/transcriptions,
   # which is why it is also a rung in the transcription chain.
   fireworks:
@@ -2012,28 +2022,83 @@ voices:
     openai: marin
     gemini: Sulafat
     elevenlabs: Rachel
+    xai-voice: eve
   # Calm, male.
   cedar:
     openai: cedar
     gemini: Charon
     elevenlabs: Brian
+    xai-voice: rex
 
 live:
   # OpenAI rejects gpt-live-1 for realtime calls; use its supported WebRTC model.
+  # gpt-realtime-2.1 first: the same Realtime API and events as gpt-realtime at
+  # the same audio price, with OpenAI's lower-latency serving (p95 down by a
+  # quarter or more, July 2026). gpt-realtime stays right behind it, so an
+  # account or region that refuses 2.1 gets the model this alias used before,
+  # and the console can put it back in front without a deploy.
   nabu-live:
     voice: marin
     primary:
       provider: openai
-      model: "gpt-realtime"
-    # Same vendor, so the SDP answer and the Realtime events keep their shape, at
-    # about a third of the price. It covers a refusal of the model (rate limit, a
-    # retired id), not a spent key: both rungs run on OPENAI_API_KEY.
+      model: "gpt-realtime-2.1"
+    # Same vendor, so the SDP answer and the Realtime events keep their shape.
+    # These cover a refusal of the model (rate limit, a retired id), not a spent
+    # key: every rung runs on OPENAI_API_KEY.
     fallback:
+      - provider: openai
+        model: "gpt-realtime"
       - provider: openai
         model: "gpt-realtime-mini"
 
 
 audio:
+  # Spoken replies in a live conversation — a phone call, a voice agent — where
+  # the time to the first word matters as much as how it sounds. Every rung
+  # reads Persian with the right phonology, so a product can send any of its
+  # languages here without choosing (TestFastVoiceAliasesSpeakPersian).
+  #
+  #   ElevenLabs v4 Turbo  ~150 ms to first speech (vendor figure), v4 quality,
+  #                        Persian on its list; half v3's price.
+  #   Gemini 3.8 Flash TTS 130 languages incl. Persian, one round trip; the same
+  #                        voice on the second Google project next, so one
+  #                        project's quota wall keeps the voice.
+  #   gpt-4o-mini-tts      a third vendor, so a wall at both still speaks.
+  #   ElevenLabs v3        last: the slowest, but the one every product already
+  #                        hears from ElevenLabs if v4 is refused.
+  nabu-voice-fast:
+    voice: marin
+    primary:
+      provider: elevenlabs
+      model: "eleven_v4_turbo"
+    fallback:
+      - provider: gemini
+        model: "gemini-3.8-flash-tts"
+      - provider: gemini2
+        model: "gemini-3.8-flash-tts"
+      - provider: openai
+        model: "gpt-4o-mini-tts"
+      - provider: elevenlabs
+        model: "eleven_v3"
+
+  # Grok's voice first, for a caller that chose how it sounds — and only for
+  # the languages on Grok's list (English, Arabic, Turkish, Russian, German,
+  # French, Spanish, …). NOT Persian: Grok reads Persian script in the wrong
+  # phonology, and that sounds like a bad voice rather than a wrong model. A
+  # product that may speak Persian sends that text to nabu-voice-fast.
+  nabu-voice-grok:
+    voice: marin
+    primary:
+      provider: xai-voice
+      model: "grok-tts"
+    fallback:
+      - provider: elevenlabs
+        model: "eleven_v4_turbo"
+      - provider: gemini
+        model: "gemini-3.8-flash-tts"
+      - provider: openai
+        model: "gpt-4o-mini-tts"
+
   nabu-voice:
     primary:
       provider: openai
@@ -2602,6 +2667,8 @@ pricing:
   "openai/gpt-realtime": { per_minute: 0.30 }
   # About a third of gpt-realtime, as OpenAI prices mini's audio tokens.
   "openai/gpt-realtime-mini": { per_minute: 0.10 }
+  # $32 audio in and $64 out per 1M tokens, gpt-realtime's rates (2026-11-05).
+  "openai/gpt-realtime-2.1": { per_minute: 0.30 }
 
   # ── OpenAI (platform.openai.com/docs/pricing, 2026-09-26) ────────────────
   gpt-4o: { input: 2.50, output: 10.00 }
@@ -2709,6 +2776,9 @@ pricing:
   # $10 per 1M audio tokens at 25 a second, about 15 characters spoken a second,
   # plus $0.50 per 1M text tokens in: $16.80 per million characters.
   gemini-2.5-flash-preview-tts: { per_million_chars: 16.80 }
+  # $9 per 1M audio tokens (same 25 a second, 15 characters spoken a second)
+  # plus text in: $15.13 per million characters. Doubles on 2027-01-01.
+  gemini-3.8-flash-tts: { per_million_chars: 15.13 }
   # Google shut this model down on 2026-10-02; priced while nabu-image names it.
   gemini-2.5-flash-image: { per_image: 0.039 }
 
@@ -2776,6 +2846,11 @@ pricing:
   # ── Text to speech: ElevenLabs, the same rate on every plan (2026-10-04) ──
   eleven_v3: { per_million_chars: 80.00 }
   eleven_v3_conversational: { per_million_chars: 40.00 }
+  # v4 Turbo at the Flash/Turbo rate, $0.04 per 1,000 characters (2026-11-05).
+  eleven_v4_turbo: { per_million_chars: 40.00 }
+
+  # ── Text to speech: xAI Grok, docs.x.ai (2026-11-05) ─────────────────────
+  "xai-voice/grok-tts": { per_million_chars: 15.00 }
 
   # ── Gamma: 1-3 credits a card plus the images', $0.004 a credit (2026-10-04)
   "gamma/*": { per_credit: 0.004 }
