@@ -474,6 +474,10 @@ func newAdapter(name string, p ProviderConfig, apiKey string) (provider.Adapter,
 		// authenticates with xi-api-key and puts the voice in the URL, so it
 		// cannot ride the openai adapter.
 		return provider.NewElevenLabsAdapter(name, p.BaseURL, apiKey), ""
+	case "xai-tts":
+		// Grok's voice (POST /v1/tts). Same key as xAI's chat, which rides the
+		// openai adapter, but the speech endpoint has its own body. See the adapter.
+		return provider.NewXAITTSAdapter(name, p.BaseURL, apiKey), ""
 	case "imagegen":
 		// mrc_imagegen: a template renderer, not a diffusion model. See the
 		// adapter for how a prompt maps onto its fields.
