@@ -1440,6 +1440,38 @@ models:
       - provider: llamacpp
         model: "qwen-local"
 
+  # The brain of a phone call: what NabuVoice's assistant says back, sentence by
+  # sentence, while the caller waits on the line. What counts here is the time
+  # to the first sentence, so every rung is a model that answers without a
+  # thinking pass by default — a reasoning model spends the first second (and
+  # the reply's token budget) thinking, which on a phone is silence. Three
+  # vendors before the same models repeat, so one key's outage or quota wall
+  # still answers.
+  #
+  #   gpt-4.1-mini          OpenAI's own key: writes Persian well and keeps to a
+  #                         short spoken reply (the reason nabu-concierge uses it).
+  #   gemini-2.5-flash-lite the lowest-latency Google model; no thinking by
+  #                         default. Both Google projects.
+  #   claude-haiku-5-5      Anthropic, the cheapest of the three per token.
+  #   gpt-4o-mini           OpenAI again, then the Iranian aggregators.
+  #
+  # Speeds here are each vendor's published figures, not measured on this
+  # gateway: run NabuVoice's scripts/model_matrix.py against it and reorder the
+  # rungs in the console (Models → Change) without a deploy.
+  nabu-voice-brain:
+    primary:
+      provider: openai
+      model: "gpt-4.1-mini"
+    fallback:
+      - provider: gemini-openai
+        model: "gemini-2.5-flash-lite"
+      - model: claude-haiku-5-5
+      - provider: gemini-openai2
+        model: "gemini-2.5-flash-lite"
+      - provider: openai
+        model: "gpt-4o-mini"
+      - model: gpt-4.1-mini
+
   # Nabusto's menu helper: a guest asks what to eat, and the answer names dishes by
   # id in JSON, in Persian, Arabic, Kurdish or English. OpenAI's own key first,
   # because gpt-4.1-mini keeps to the JSON and writes Persian well, and because
