@@ -377,6 +377,8 @@ func (s *Server) streamAnthropicMessages(w http.ResponseWriter, r *http.Request,
 		}
 		w.Header().Set("Content-Type", "text/event-stream")
 		w.Header().Set("Cache-Control", "no-cache")
+		w.Header().Set("X-Nabu-Provider", chosenProvider)
+		w.Header().Set("X-Nabu-Model", chosenModel)
 		w.Header().Set("X-Accel-Buffering", "no")
 		w.WriteHeader(http.StatusOK)
 		headersWritten = true
