@@ -225,7 +225,7 @@ Model ID           : nabu-smart (add manually if supported)`} label="Claude Desk
   -H "Content-Type: application/json" \
   -d '{"model":"nabu-smart","max_tokens":128,"messages":[{"role":"user","content":"Hello!"}]}'`} label="bash · zsh" />
           <H2>Protocol compatibility</H2>
-          <p><code dir="ltr">${ORIGIN}/v1/chat/completions</code> is OpenAI-compatible. Claude Desktop/Code gateways use <code>/v1/messages</code>. The former does not imply the latter: a compatibility layer must convert JSON, SSE streams, and tool calls.</p>
+          <p><code dir="ltr">{ORIGIN}/v1/chat/completions</code> is OpenAI-compatible. Claude Desktop/Code gateways use <code>/v1/messages</code>. The former does not imply the latter: a compatibility layer must convert JSON, SSE streams, and tool calls.</p>
           <H2>Troubleshooting and security</H2>
           <Faq q="401 or 402 error?">Check the NabuGate key, wallet balance and model permissions. Do not place keys in custom inference headers, screenshots or chats. Revoke any exposed key.</Faq>
           <Faq q="The model is missing in Desktop">Some Desktop versions list only particular model ID patterns. Add the real ID in Models if supported and verify with an actual request.</Faq>
