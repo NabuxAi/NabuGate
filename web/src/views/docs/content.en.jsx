@@ -163,27 +163,65 @@ Model ID     : nabu-smart`} label="settings" />
       {active === 'claude-code' && (
         <section>
           <H1>Claude Code</H1>
-          <Lead>Claude Code speaks Anthropic’s native protocol and appends <code>/v1/messages</code> to the base URL itself. So the base URL goes <strong>without</strong> <code>/v1</code>, and both authentication variables must be set.</Lead>
-          <CodeBlock code={`export ANTHROPIC_BASE_URL="${ORIGIN}"
-export ANTHROPIC_API_KEY="${KEY}"
-export ANTHROPIC_AUTH_TOKEN="${KEY}"
-export ANTHROPIC_MODEL="nabu-smart"
-export ANTHROPIC_SMALL_FAST_MODEL="nabu-fast"
+          <Lead>Claude Code requires an Anthropic-compatible <code>/v1/messages</code> endpoint. NabuGate currently exposes OpenAI-compatible endpoints; configure a protocol bridge before setting <code>ANTHROPIC_*</code> variables. <button className="linklike" onClick={() => go('claude-desktop')}>Full bridge guide</button>.</Lead>
+          <p>After setting up a LiteLLM bridge, use its <strong>local</strong> address and gateway key, rather than the NabuGate OpenAI endpoint directly.</p>
+          <CodeBlock label="macOS / Linux" code={['export ANTHROPIC_BASE_URL="http://127.0.0.1:4000"', 'export ANTHROPIC_AUTH_TOKEN="YOUR_LOCAL_GATEWAY_KEY"', 'export ANTHROPIC_MODEL="nabu-claude"', 'claude'].join('\n')} />
+          <p>For Windows and persistent settings, see the <button className="linklike" onClick={() => go('claude-desktop')}>full Claude gateway guide</button>.</p>
+          <Callout kind="warn" icon="⚠️">For 404 on <code>/v1/messages</code>, check the bridge URL. For 401, distinguish the proxy key from your upstream NabuGate key. For a missing model, check the current NabuGate catalogue and the LiteLLM alias.</Callout>
+        </section>
+      )}
 
-claude`} label="bash · zsh" />
-          <H2>Persistent setup for the CLI and the VS Code extension</H2>
-          <CodeBlock code={`{
-  "env": {
-    "ANTHROPIC_BASE_URL": "${ORIGIN}",
-    "ANTHROPIC_API_KEY": "${KEY}",
-    "ANTHROPIC_AUTH_TOKEN": "${KEY}",
-    "ANTHROPIC_MODEL": "nabu-smart",
-    "ANTHROPIC_SMALL_FAST_MODEL": "nabu-fast"
-  }
-}`} label="~/.claude/settings.json" />
-          <Callout kind="warn" icon="⚠️">
-            <strong>401</strong> means one of the two variables, <code>ANTHROPIC_API_KEY</code> / <code>ANTHROPIC_AUTH_TOKEN</code>, is missing. <strong>A path error</strong> means the base URL includes <code>/v1</code>. <strong>Model not found</strong> means <code>ANTHROPIC_MODEL</code> isn’t pinned, so Claude Code sent its own default model name.
-          </Callout>
+
+      {active === 'claude-desktop' && (
+        <section>
+          <H1>Connect Claude Desktop and Claude Code through NabuGate</H1>
+          <Lead>Signing in to Claude.ai and routing model inference through an API are two different things. NabuGate is a model gateway, not a substitute for a Claude.ai subscription or account.</Lead>
+          <Callout kind="warn" icon="⚠️"><strong>Current compatibility:</strong> NabuGate exposes the OpenAI-compatible <code>/v1/chat/completions</code> endpoint; its server does not yet register the native Anthropic <code>/v1/messages</code> endpoint. Claude Desktop and Claude Code require an Anthropic-compatible intermediary, such as LiteLLM, before their calls can reach NabuGate. This is a configuration guide; end-to-end functionality requires testing with your client and model.</Callout>
+          <H2>How the bridge works</H2>
+          <p>Claude Desktop's Third-Party Inference sends Anthropic-format requests to your configured gateway. A local LiteLLM proxy can translate those requests into OpenAI chat completions for NabuGate. Some Anthropic-specific features (including special tools, caching and thinking) may not translate exactly.</p>
+          <div className="docs-flow" dir="ltr"><code>Claude Desktop / Claude Code</code><span>↓</span><code>LiteLLM · Anthropic /v1/messages</code><span>↓</span><code>NabuGate · OpenAI /v1/chat/completions</code></div>
+          <H2>1. Get a NabuGate key</H2>
+          <Steps items={[
+            <>Open the <a href="/panel/">NabuGate console</a>, check your available credit and create a dedicated API key.</>,
+            <>Check that the selected model, such as <code>nabu-claude</code>, is actually available on your deployment.</>,
+            <>Use <code dir="ltr">{BASE}</code> as the OpenAI-compatible upstream base URL; it reflects the domain used to view this page, including the Iran mirror.</>,
+          ]} />
+          <H2>2. Start an Anthropic-compatible bridge</H2>
+          <p>Create <code>config.yaml</code> for a local LiteLLM Proxy. The secrets below must be supplied as environment variables rather than committed to your repository.</p>
+          <CodeBlock label="config.yaml · LiteLLM" code={['model_list:', '  - model_name: nabu-claude', '    litellm_params:', '      model: openai/nabu-claude', '      api_base: '+BASE, '      api_key: os.environ/NABUGATE_API_KEY', '', 'general_settings:', '  master_key: os.environ/LITELLM_MASTER_KEY'].join('\n')} />
+          <Callout icon="💡">The <code>openai/</code> prefix tells LiteLLM to call an OpenAI-compatible upstream. Do not enable native <code>/v1/messages</code> pass-through for the present NabuGate server; it does not implement that endpoint.</Callout>
+          <CodeBlock label="macOS / Linux" code={['python -m pip install \"litellm[proxy]\"', 'export NABUGATE_API_KEY=\"YOUR_NABUGATE_KEY\"', 'export LITELLM_MASTER_KEY=\"YOUR_LOCAL_GATEWAY_KEY\"', 'litellm --config config.yaml --host 127.0.0.1 --port 4000'].join('\n')} />
+          <CodeBlock label="Windows · PowerShell" code={['py -m pip install \"litellm[proxy]\"', '$env:NABUGATE_API_KEY=\"YOUR_NABUGATE_KEY\"', '$env:LITELLM_MASTER_KEY=\"YOUR_LOCAL_GATEWAY_KEY\"', 'litellm --config config.yaml --host 127.0.0.1 --port 4000'].join('\n')} />
+          <p>For production, protect the gateway with HTTPS and authentication and pin/test its dependency versions. Keep a local demo bound to <code>127.0.0.1</code>.</p>
+          <H2>3. Configure Claude Desktop</H2>
+          <Steps items={[
+            <>Update Claude Desktop and select <code>Help → Troubleshooting → Enable Developer Mode</code>, restarting if necessary.</>,
+            <>Go to <code>Developer → Configure Third-Party Inference</code> and choose <code>Gateway</code>.</>,
+            <>Set Gateway base URL to <code dir="ltr">http://127.0.0.1:4000</code> with no <code>/v1</code> suffix.</>,
+            <>Choose <code>Static API key</code>, enter your local gateway master key under <code>Gateway API key</code> and set the authentication scheme to <code>Bearer</code>.</>,
+            <>Add model ID <code>nabu-claude</code> if your Claude Desktop version permits custom model names. Run <code>Test connection</code>, then <code>Save &amp; Restart</code>.</>,
+          ]} />
+          <Callout kind="warn" icon="⚠️">The available controls and model restrictions vary by Claude Desktop version. Third-party inference does not guarantee Projects, Claude.ai subscriptions or other Anthropic-only features. The Claude Console sign-in screen shown in the screenshots has no custom Base URL field.</Callout>
+          <H2>4. Configure Claude Code</H2>
+          <CodeBlock label="macOS / Linux · bash / zsh" code={['export ANTHROPIC_BASE_URL=\"http://127.0.0.1:4000\"', 'export ANTHROPIC_AUTH_TOKEN=\"YOUR_LOCAL_GATEWAY_KEY\"', 'export ANTHROPIC_MODEL=\"nabu-claude\"', 'claude'].join('\n')} />
+          <CodeBlock label="Windows · PowerShell" code={['$env:ANTHROPIC_BASE_URL=\"http://127.0.0.1:4000\"', '$env:ANTHROPIC_AUTH_TOKEN=\"YOUR_LOCAL_GATEWAY_KEY\"', '$env:ANTHROPIC_MODEL=\"nabu-claude\"', 'claude'].join('\n')} />
+          <H2>Persistent Claude Code configuration</H2>
+          <CodeBlock label="~/.claude/settings.json" code={['{', '  \"env\": {', '    \"ANTHROPIC_BASE_URL\": \"http://127.0.0.1:4000\",', '    \"ANTHROPIC_MODEL\": \"nabu-claude\"', '  }', '}'].join('\n')} />
+          <p>Inject <code>ANTHROPIC_AUTH_TOKEN</code> separately from your secure environment. Avoid exposing it in source control. Check conflicting <code>ANTHROPIC_API_KEY</code> values when authentication fails.</p>
+          <H2>Troubleshooting</H2>
+          <ul>
+            <li><strong>404 on /v1/messages:</strong> Point the client to the bridge, not the OpenAI-only NabuGate API.</li>
+            <li><strong>401:</strong> Distinguish the LiteLLM master key from the NabuGate upstream key.</li>
+            <li><strong>Model not found:</strong> Match the proxy alias against the currently available NabuGate models.</li>
+            <li><strong>Tools or stream errors:</strong> Try a simple text-only request first; not all Anthropic functionality can be translated.</li>
+            <li><strong>Claude.ai sign-in errors:</strong> API routing does not sign you into a Claude.ai account.</li>
+          </ul>
+          <H2>Frequently asked questions</H2>
+          <Faq q="Is this a direct NabuGate Anthropic API?">No. The current server is OpenAI-compatible, so a protocol bridge is required until native Anthropic support is implemented and tested.</Faq>
+          <Faq q="Will every Claude Desktop feature work?">No. Support varies by the desktop version, bridge and actual upstream model.</Faq>
+          <Faq q="Does this guarantee service availability in every region?">No. Network access, the provider's terms, and applicable restrictions still matter.</Faq>
+          <p>References: <a href="https://code.claude.com/docs/en/llm-gateway" target="_blank" rel="noreferrer">Claude Code LLM Gateway</a>, <a href="https://developers.cloudflare.com/ai-gateway/integrations/coding-agents/claude-desktop/" target="_blank" rel="noreferrer">Claude Desktop Third-Party Inference</a>, <a href="https://docs.litellm.ai/docs/anthropic_unified" target="_blank" rel="noreferrer">LiteLLM Messages API</a>.</p>
+          <p><a href="/panel/">Create a NabuGate API key</a></p>
         </section>
       )}
 
