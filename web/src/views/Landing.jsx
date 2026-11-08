@@ -6,6 +6,7 @@ import { LangSwitch, Logo, ThemeToggle } from '../components/Brand.jsx';
 import { fmtDigits, fmtInt, useI18n, useT } from '../i18n/index.jsx';
 import { gatewayBase, siteOrigin } from '../origin.js';
 import { IntroButton, IntroDialog, useIntro } from './IntroVideo.jsx';
+import ClaudeAdvisor from './ClaudeAdvisor.jsx';
 import '../styles/landing.css';
 
 /*
@@ -621,6 +622,8 @@ export default function Landing({ signedIn = false }) {
             </div>
           </div>
         </section>
+
+        <ClaudeAdvisor signedIn={signedIn} />
 
         {/* ── Features ──────────────────────────────────────────────────────── */}
         <Section id="features" eyebrow={t('featEyebrow')} title={t('featTitle')} sub={t('featSub')}>
