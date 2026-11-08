@@ -62,6 +62,7 @@ async function req(path, options = {}) {
 export const status = () => req('/status');
 export const statusNabu = () => req("/nabu/status");
 export const publicModels = () => reqPublic("/api/public/models");
+export const publicModelCosts = () => reqPublic('/api/public/model-costs');
 
 
 
