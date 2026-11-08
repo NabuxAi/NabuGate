@@ -228,6 +228,8 @@ func (s *Server) Handler() http.Handler {
 		mux.Handle("GET /", site)
 	}
 
+	mux.HandleFunc("GET /api/public/model-costs", s.publicModelCosts)
+
 	mux.HandleFunc("GET /api/public/models", func(w http.ResponseWriter, r *http.Request) {
 		infos := s.router.AliasInfos()
 		infos = append(infos, s.router.CatalogModels(r.Context())...)
