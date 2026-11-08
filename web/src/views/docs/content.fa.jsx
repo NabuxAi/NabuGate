@@ -225,7 +225,7 @@ Model ID           : nabu-smart (add manually if supported)`} label="Claude Desk
   -H "Content-Type: application/json" \
   -d '{"model":"nabu-smart","max_tokens":128,"messages":[{"role":"user","content":"سلام!"}]}'`} label="bash · zsh" />
           <H2>پروتکل‌ها چه فرقی دارند؟</H2>
-          <p><code dir="ltr">${ORIGIN}/v1/chat/completions</code> مسیر OpenAI-compatible است؛ Claude Desktop و Claude Code در حالت Gateway با <code>/v1/messages</code> کار می‌کنند. وجود مسیر اول، سازگاری با مسیر دوم را تضمین نمی‌کند. لایهٔ Anthropic باید JSON، استریم SSE و فراخوانی ابزار را تبدیل کند.</p>
+          <p><code dir="ltr">{ORIGIN}/v1/chat/completions</code> مسیر OpenAI-compatible است؛ Claude Desktop و Claude Code در حالت Gateway با <code>/v1/messages</code> کار می‌کنند. وجود مسیر اول، سازگاری با مسیر دوم را تضمین نمی‌کند. لایهٔ Anthropic باید JSON، استریم SSE و فراخوانی ابزار را تبدیل کند.</p>
           <H2>عیب‌یابی و امنیت</H2>
           <Faq q="خطای 401 یا 402 چیست؟">کلید NabuGate، اعتبار حساب و سیاست‌های اجازهٔ مدل را بررسی کنید. کلید را در پیام، اسکرین‌شات یا بخش Custom inference headers قرار ندهید. در صورت افشای کلید آن را باطل کنید.</Faq>
           <Faq q="چرا مدل در Claude Desktop دیده نمی‌شود؟">ممکن است نسخهٔ Desktop فقط شناسه‌های مدل خاصی را فهرست کند. در بخش Models شناسهٔ مدل موجود را اضافه کنید؛ پشتیبانی از شناسهٔ دلخواه را جداگانه تست کنید.</Faq>
