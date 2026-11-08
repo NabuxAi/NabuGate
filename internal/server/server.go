@@ -782,6 +782,7 @@ func (s *Server) handleResponses(w http.ResponseWriter, r *http.Request) {
 	if len(raw["model"]) > 0 {
 		_ = json.Unmarshal(raw["model"], &model)
 	}
+	model = resolveDesktopTransportName(model)
 	if model == "" {
 		writeError(w, http.StatusBadRequest, "field 'model' (alias) is required")
 		return
@@ -888,6 +889,7 @@ func (s *Server) handleChat(w http.ResponseWriter, r *http.Request) {
 	if len(raw["model"]) > 0 {
 		_ = json.Unmarshal(raw["model"], &alias)
 	}
+	alias = resolveDesktopTransportName(alias)
 	if alias == "" {
 		writeError(w, http.StatusBadRequest, "field 'model' (alias) is required")
 		return
