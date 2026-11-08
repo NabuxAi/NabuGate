@@ -311,6 +311,8 @@ func (s *Server) handleAnthropicMessages(w http.ResponseWriter, r *http.Request)
 		nabuAnthError(w, http.StatusBadRequest, "invalid_request_error", "invalid JSON body")
 		return
 	}
+	wireModel := incoming.Model
+	incoming.Model = resolveDesktopTransportName(incoming.Model)
 	if incoming.Model == "" || incoming.MaxTokens < 1 || len(incoming.Messages) == 0 {
 		nabuAnthError(w, http.StatusBadRequest, "invalid_request_error", "model, max_tokens and nonempty messages are required")
 		return
@@ -324,7 +326,7 @@ func (s *Server) handleAnthropicMessages(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	if incoming.Stream {
-		s.streamAnthropicMessages(w, r, incoming, request)
+		s.streamAnthropicMessages(w, r, incoming, request, wireModel)
 		return
 	}
 	result, err := s.router.Chat(r.Context(), incoming.Model, request)
@@ -343,7 +345,7 @@ func (s *Server) handleAnthropicMessages(w http.ResponseWriter, r *http.Request)
 	writeJSON(w, http.StatusOK, map[string]any{
 		"id": "msg_nabu_" + fmt.Sprint(time.Now().UnixNano()),
 		"type": "message", "role": "assistant", "content": blocks,
-		"model": incoming.Model, "stop_reason": reason, "stop_sequence": nil,
+		"model": wireModel, "stop_reason": reason, "stop_sequence": nil,
 		"usage": map[string]any{
 			"input_tokens": result.Response.Usage.PromptTokens,
 			"output_tokens": result.Response.Usage.CompletionTokens,
@@ -354,7 +356,7 @@ func (s *Server) handleAnthropicMessages(w http.ResponseWriter, r *http.Request)
 type nabuAnthToolAccumulator struct {
 	id, name, arguments string
 }
-func (s *Server) streamAnthropicMessages(w http.ResponseWriter, r *http.Request, in nabuAnthropicRequest, request provider.ChatRequest) {
+func (s *Server) streamAnthropicMessages(w http.ResponseWriter, r *http.Request, in nabuAnthropicRequest, request provider.ChatRequest, wireModel string) {
 	flusher, ok := w.(http.Flusher)
 	if !ok {
 		nabuAnthError(w, http.StatusInternalServerError, "api_error", "streaming not supported")
@@ -384,7 +386,7 @@ func (s *Server) streamAnthropicMessages(w http.ResponseWriter, r *http.Request,
 		headersWritten = true
 		sent("message_start", map[string]any{"type": "message_start", "message": map[string]any{
 			"id": id, "type": "message", "role": "assistant",
-			"content": []any{}, "model": in.Model, "stop_reason": nil,
+			"content": []any{}, "model": wireModel, "stop_reason": nil,
 			"stop_sequence": nil, "usage": map[string]any{"input_tokens": 0, "output_tokens": 0},
 		}})
 	}
@@ -499,6 +501,7 @@ func (s *Server) handleAnthropicTokenCount(w http.ResponseWriter, r *http.Reques
 		nabuAnthError(w, http.StatusBadRequest, "invalid_request_error", "invalid JSON body")
 		return
 	}
+	incoming.Model = resolveDesktopTransportName(incoming.Model)
 	if incoming.Model == "" || len(incoming.Messages) == 0 {
 		nabuAnthError(w, http.StatusBadRequest, "invalid_request_error", "model and messages are required")
 		return
