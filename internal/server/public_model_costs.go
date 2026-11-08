@@ -42,7 +42,7 @@ func (s *Server) publicModelCosts(w http.ResponseWriter, r *http.Request) {
 	}
 	models := make([]publicModelCosts, 0)
 	for _, info := range s.router.Routes() {
-		if info.Kind != "chat" {
+		if info.Kind != "models" {
 			continue
 		}
 		view := s.aliasView(info, adminstore.AliasSetting{})
