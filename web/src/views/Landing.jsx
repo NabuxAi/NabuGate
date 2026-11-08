@@ -348,7 +348,12 @@ function snippets(ORIGIN, BASE, KEY, hello) {
     { id: 'curl', label: 'cURL', icon: 'terminal', file: 'bash', code: `curl ${BASE}/chat/completions \\\n  -H "Authorization: Bearer ${KEY}" \\\n  -H "Content-Type: application/json" \\\n  -d '{"model":"nabu-fast","messages":[{"role":"user","content":"${hello}"}]}'` },
     { id: 'python', label: 'Python', icon: 'code', file: 'python', code: `from openai import OpenAI\n\nclient = OpenAI(base_url="${BASE}", api_key="${KEY}")\n\nr = client.chat.completions.create(\n    model="nabu-smart",\n    messages=[{"role": "user", "content": "${hello}"}],\n)\nprint(r.choices[0].message.content)` },
     { id: 'node', label: 'Node.js', icon: 'code', file: 'node', code: `import OpenAI from "openai";\n\nconst client = new OpenAI({ baseURL: "${BASE}", apiKey: "${KEY}" });\n\nconst r = await client.chat.completions.create({\n  model: "nabu-smart",\n  messages: [{ role: "user", content: "${hello}" }],\n});` },
-    { id: 'claude', label: 'Claude Code', icon: 'terminal', file: 'bash · after Gateway setup', code: `# First set up an Anthropic-compatible bridge: /docs#claude-desktop
+    { id: 'claude', label: 'Claude Code', icon: 'terminal', file: '~/.claude/settings.json', code: `# Requires /v1/messages on your NabuGate deployment
+export ANTHROPIC_BASE_URL="${ORIGIN}"
+export ANTHROPIC_API_KEY="${KEY}"
+export ANTHROPIC_AUTH_TOKEN="${KEY}"
+export ANTHROPIC_MODEL="nabu-smart"
+claude` },
 export ANTHROPIC_BASE_URL="http://127.0.0.1:4000"
 export ANTHROPIC_AUTH_TOKEN="YOUR_LOCAL_GATEWAY_KEY"
 export ANTHROPIC_MODEL="nabu-claude"
