@@ -602,21 +602,20 @@ func allowedNames(names []string, pol policy.Policy, scoped bool) []string {
 
 func (s *Server) handleModels(w http.ResponseWriter, r *http.Request) {
 	pol, hasPol := r.Context().Value(policyCtxKey{}).(policy.Policy)
-	// Configured aliases plus every passthrough provider's live-discovered and
-	// statically configured models (e.g. "parspack/openai/gpt-5.5"), plus the
-	// configured sub-agents (addressable as a "model" like anything else).
+	// Configured aliases, live passthrough catalogue, and addressable agents
+	// and flows. Never disclose routes outside the caller's key permissions.
 	infos := s.router.AliasInfos()
 	infos = append(infos, s.router.CatalogModels(r.Context())...)
 	for _, name := range s.agents.Names() {
 		infos = append(infos, router.AliasInfo{ID: name, Owner: "agent"})
 	}
-	// Flows list too, and for the same reason agents do: a caller decides what
-	// to send by reading this, and a chain they cannot discover is one they
-	// will never use.
 	for _, name := range s.flows.Names() {
 		infos = append(infos, router.AliasInfo{ID: name, Owner: "flow"})
 	}
 
+	// The shared schema deliberately includes both OpenAI's object/owned_by
+	// and Anthropic's type/display_name/has_more fields. Existing OpenAI SDKs
+	// keep working while Claude Desktop can parse the model list.
 	data := make([]map[string]string, 0, len(infos))
 	seen := make(map[string]bool, len(infos))
 	for _, a := range infos {
@@ -624,15 +623,43 @@ func (s *Server) handleModels(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 		if s.authEnforced() && hasPol && !pol.Allows(a.ID) {
-			continue // hide models this key may not use
+			continue
 		}
 		if hasPol && len(pol.Providers) > 0 && a.Owner != "agent" && a.Owner != "flow" && !contains(pol.Providers, a.Owner) {
 			continue
 		}
 		seen[a.ID] = true
-		data = append(data, map[string]string{"id": a.ID, "object": "model", "owned_by": a.Owner})
+		data = append(data, map[string]string{
+			"id": a.ID, "object": "model", "type": "model",
+			"owned_by": a.Owner, "display_name": a.ID,
+		})
+
+		// Claude Desktop's picker currently filters IDs without "claude" or
+		// "anthropic". Only configured CHAT aliases get extra discovery IDs,
+		// never images/embeddings/tools or arbitrary passthrough entries.
+		// The label explicitly identifies the actual NabuGate model and the
+		// transport alias is resolved *before* policy checks and billing.
+		kind, _ := s.router.RouteKind(a.ID)
+		if kind == "models" && !isClaudeNamed(a.ID) {
+			id := desktopTransportName(a.ID)
+			if !seen[id] {
+				seen[id] = true
+				data = append(data, map[string]string{
+					"id": id, "object": "model", "type": "model",
+					"owned_by": "nabugate",
+					"display_name": "NabuGate / " + a.ID + " (not necessarily Claude)",
+				})
+			}
+		}
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"object": "list", "data": data})
+	first, last := "", ""
+	if len(data) > 0 {
+		first, last = data[0]["id"], data[len(data)-1]["id"]
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"object": "list", "data": data,
+		"has_more": false, "first_id": first, "last_id": last,
+	})
 }
 
 // maxResponsesCapture caps how much of a proxied Responses body is kept aside
