@@ -208,6 +208,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /v1/agents", s.auth(s.handleAgents))
 	mux.HandleFunc("GET /v1/health", s.auth(s.handleKeyHealth))
 	mux.HandleFunc("POST /v1/chat/completions", s.auth(s.handleChat))
+	mux.HandleFunc("POST /v1/messages", s.auth(s.handleAnthropicMessages))
 	mux.HandleFunc("POST /v1/responses", s.auth(s.handleResponses))
 	mux.HandleFunc("POST /v1/images/generations", s.auth(s.handleImages))
 	mux.HandleFunc("POST /v1/audio/speech", s.auth(s.handleSpeech))
@@ -1538,6 +1539,12 @@ func (s *Server) auth(next http.HandlerFunc) http.HandlerFunc {
 			return
 		}
 		token := strings.TrimSpace(strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer "))
+		// Anthropic SDKs normally send x-api-key rather than Authorization.
+		// Accept that form ONLY on the native Messages endpoint. Console keys,
+		// owner policies and metering are unchanged.
+		if token == "" && r.URL.Path == "/v1/messages" {
+			token = strings.TrimSpace(r.Header.Get("x-api-key"))
+		}
 
 		// owner stays empty for a key baked into the deployment's config. Only
 		// a console-minted token belongs to a person, and only a person has
