@@ -160,18 +160,32 @@ Model ID     : nabu-smart`} label="settings" />
         </section>
       )}
 
+
       {active === 'claude-code' && (
         <section>
-          <H1>Claude Code</H1>
-          <Lead>Claude Code با پروتکل بومی Anthropic حرف می‌زند و خودش <code>/v1/messages</code> را به آدرس پایه اضافه می‌کند. پس آدرس پایه <strong>بدون</strong> <code>/v1</code> است و هر دو متغیر احراز هویت باید ست شوند.</Lead>
+          <H1>اتصال Claude Code با NabuGate</H1>
+          <Lead>Claude Code برخلاف Cursor از پروتکل Anthropic و مسیر <code>/v1/messages</code> استفاده می‌کند. برای اتصال مستقیم، استقرار NabuGate باید این مسیر را فعال داشته باشد. این اتصال به معنی ورود به Claude.ai یا دریافت اشتراک Claude نیست.</Lead>
+          <Callout kind="warn" icon="⚠️">طبق شرایط Anthropic، فروش مجدد یا واسطه‌گری مصرف Claude Code برای کاربر نهایی بدون توافق مناسب مجاز نیست. برای Claude واقعی از کلید و صورتحساب متعلق به خود کاربر (BYOK)، ارائه‌دهندهٔ مورد تأیید یا مجوز تجاری استفاده کنید. هرگز OAuth token یا کوکی Claude.ai را به درگاه ندهید.</Callout>
+          <Steps items={[
+            <>از <a href="/panel/login">پنل NabuGate</a> وارد شوید و یک کلید API مخصوص این ابزار بسازید.</>,
+            <>فعال بودن مسیر <code dir="ltr">{ORIGIN}/v1/messages</code> را مطابق بخش <button className="linklike" onClick={() => go('claude-desktop')}>آزمون Gateway</button> بررسی کنید.</>,
+            <>متغیرهای محیطی را تنظیم کنید و <code>claude</code> را اجرا کنید.</>,
+          ]} />
+          <H2>macOS / Linux</H2>
           <CodeBlock code={`export ANTHROPIC_BASE_URL="${ORIGIN}"
 export ANTHROPIC_API_KEY="${KEY}"
 export ANTHROPIC_AUTH_TOKEN="${KEY}"
 export ANTHROPIC_MODEL="nabu-smart"
 export ANTHROPIC_SMALL_FAST_MODEL="nabu-fast"
-
 claude`} label="bash · zsh" />
-          <H2>تنظیم دائمی برای CLI و افزونهٔ VS Code</H2>
+          <H2>Windows PowerShell</H2>
+          <CodeBlock code={`$env:ANTHROPIC_BASE_URL="${ORIGIN}"
+$env:ANTHROPIC_API_KEY="${KEY}"
+$env:ANTHROPIC_AUTH_TOKEN="${KEY}"
+$env:ANTHROPIC_MODEL="nabu-smart"
+$env:ANTHROPIC_SMALL_FAST_MODEL="nabu-fast"
+claude`} label="PowerShell" />
+          <H2>تنظیم دائمی (در دستگاه شخصی)</H2>
           <CodeBlock code={`{
   "env": {
     "ANTHROPIC_BASE_URL": "${ORIGIN}",
@@ -181,9 +195,43 @@ claude`} label="bash · zsh" />
     "ANTHROPIC_SMALL_FAST_MODEL": "nabu-fast"
   }
 }`} label="~/.claude/settings.json" />
-          <Callout kind="warn" icon="⚠️">
-            <strong>۴۰۱</strong> یعنی یکی از دو متغیر <code>ANTHROPIC_API_KEY</code> / <code>ANTHROPIC_AUTH_TOKEN</code> جا مانده. <strong>خطای مسیر</strong> یعنی آدرس پایه <code>/v1</code> دارد. <strong>مدل پیدا نشد</strong> یعنی <code>ANTHROPIC_MODEL</code> پین نشده و Claude Code نام پیش‌فرض خودش را فرستاده.
-          </Callout>
+          <Callout icon="💡">آدرس پایهٔ Claude Code بدون <code>/v1</code> است. برای ابزارهای OpenAI-compatible مانند Cursor باید <code>/v1</code> داشته باشد. کلیدها را در فایل‌های اشتراکی پروژه یا مخزن Git قرار ندهید.</Callout>
+        </section>
+      )}
+
+      {active === 'claude-desktop' && (
+        <section>
+          <H1>راهنمای Claude Desktop و اتصال Gateway</H1>
+          <Lead>می‌توانید پس از ورود به حساب NabuGate، یک کلید API بسازید و آن را در Claude Desktop به‌صورت <strong>Static API key</strong> وارد کنید. این یک روش اتصال به API است، نه ورود با حساب Claude.ai یا انتقال قابلیت‌های Projects و Cowork.</Lead>
+          <Callout kind="warn" icon="⚠️">این تنظیمات فقط روی نسخه‌ای از NabuGate کار می‌کنند که مسیر Anthropic-compatible <code>POST /v1/messages</code> را پیاده‌سازی و منتشر کرده باشد. پشتیبانی از تمام قابلیت‌های Claude Desktop، از جمله ابزارهای پیشرفته و مدل‌های خاص، باید جداگانه آزمایش شود. برای مدل‌های Anthropic، مجوز استفاده و کلید متعلق به کاربر را بررسی کنید.</Callout>
+          <H2>مرحلهٔ اول: کلید NabuGate</H2>
+          <Steps items={[
+            <>در <a href="/panel/login">پنل NabuGate</a> ثبت‌نام یا ورود کنید؛ سپس در «کلیدهای API» یک کلید جدید بسازید.</>,
+            <>موجودی و اجازهٔ دسترسی به مدل مدنظر را در پنل بررسی کنید. برای Claude واقعی از کلید شخصی ارائه‌دهنده یا قرارداد مجاز استفاده کنید.</>,
+            <>در Claude Desktop مسیر <code>Help → Troubleshooting → Enable Developer Mode</code> را باز کنید و پس از راه‌اندازی مجدد به <code>Developer → Configure Third-Party Inference</code> بروید.</>,
+            <>در بخش <code>Connection</code> گزینهٔ <code>Gateway</code> را انتخاب و اطلاعات زیر را وارد کنید.</>,
+          ]} />
+          <CodeBlock code={`Inference provider : Gateway
+Credential kind    : Static API key
+Gateway base URL   : ${ORIGIN}
+Gateway API key    : ${KEY}
+Gateway auth scheme: Bearer
+Model ID           : nabu-smart (add manually if supported)`} label="Claude Desktop · Connection" />
+          <p>در قسمت <strong>Models</strong> نام مدلِ واقعاً موجود در درگاه را انتخاب یا اضافه کنید. سپس <strong>Test connection</strong> و <strong>Apply Changes / Save</strong> را بزنید. اگر Model ID سفارشی در نسخهٔ فعلی Desktop پذیرفته نمی‌شود، از کلاینت سازگار یا مدلِ پشتیبانی‌شده استفاده کنید؛ نام مدل را به‌اشتباه به‌عنوان Claude معرفی نکنید.</p>
+          <H2>تست مستقل API</H2>
+          <CodeBlock code={`curl "${ORIGIN}/v1/messages" \
+  -H "Authorization: Bearer ${KEY}" \
+  -H "anthropic-version: 2023-06-01" \
+  -H "Content-Type: application/json" \
+  -d '{"model":"nabu-smart","max_tokens":128,"messages":[{"role":"user","content":"سلام!"}]}'`} label="bash · zsh" />
+          <H2>پروتکل‌ها چه فرقی دارند؟</H2>
+          <p><code dir="ltr">{ORIGIN}/v1/chat/completions</code> مسیر OpenAI-compatible است؛ Claude Desktop و Claude Code در حالت Gateway با <code>/v1/messages</code> کار می‌کنند. وجود مسیر اول، سازگاری با مسیر دوم را تضمین نمی‌کند. لایهٔ Anthropic باید JSON، استریم SSE و فراخوانی ابزار را تبدیل کند.</p>
+          <H2>عیب‌یابی و امنیت</H2>
+          <Faq q="خطای 401 یا 402 چیست؟">کلید NabuGate، اعتبار حساب و سیاست‌های اجازهٔ مدل را بررسی کنید. کلید را در پیام، اسکرین‌شات یا بخش Custom inference headers قرار ندهید. در صورت افشای کلید آن را باطل کنید.</Faq>
+          <Faq q="چرا مدل در Claude Desktop دیده نمی‌شود؟">ممکن است نسخهٔ Desktop فقط شناسه‌های مدل خاصی را فهرست کند. در بخش Models شناسهٔ مدل موجود را اضافه کنید؛ پشتیبانی از شناسهٔ دلخواه را جداگانه تست کنید.</Faq>
+          <Faq q="آیا با ورود به NabuGate وارد Claude.ai می‌شوم؟">خیر. ورود به پنل و ساخت کلید API از ورود OAuth یا اشتراک Claude.ai مستقل است. گزینهٔ Interactive sign-in / OIDC به سرور هویت مجزا و پیاده‌سازی امن نیاز دارد و در این راهنما فعال نیست.</Faq>
+          <Faq q="چرا بعضی ابزارها یا قابلیت‌ها کار نمی‌کنند؟">استریم، ابزار، مدل، تصویر، thinking و ویژگی‌های پروژه‌ای در نرم‌افزارهای مختلف متفاوت است. از API پایه شروع کنید و سازگاری هر قابلیت را با تست واقعی تأیید کنید.</Faq>
+          <p>مستندات مرجع: <a href="https://developers.cloudflare.com/ai-gateway/integrations/coding-agents/claude-desktop/" target="_blank" rel="noreferrer">راهنمای Gateway در Claude Desktop</a> و <a href="https://code.claude.com/docs/en/legal-and-compliance" target="_blank" rel="noreferrer">شرایط رسمی Claude Code</a>.</p>
         </section>
       )}
 

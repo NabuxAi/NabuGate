@@ -1,0 +1,52 @@
+/* Greater Iran / Claude use estimator. Reuses landing colour tokens. */
+.lp-advisor-section { padding: 54px 0 96px; }
+.lp-advisor-heading { max-width: 750px; margin: 0 0 28px; }
+.lp-advisor-heading h2 { font-size: clamp(27px, 3.2vw, 42px); line-height: 1.35; margin: 12px 0; font-weight: 900; }
+.lp-advisor-heading p { color: var(--lp-muted); line-height: 1.9; font-size: 15px; margin: 0; }
+.lp-advisor-layout { display: grid; grid-template-columns: minmax(0, 1.12fr) minmax(0, 0.88fr); gap: 20px; align-items: stretch; }
+.lp-advisor-controls, .lp-advisor-result {
+  border: 1px solid var(--lp-line-strong); border-radius: 24px; padding: 30px;
+  background: var(--lp-surface); min-width: 0;
+  box-shadow: 0 24px 70px -46px rgba(59, 108, 255, .42);
+}
+.lp-advisor-controls { display: grid; gap: 22px; }
+.lp-advisor-field { display: flex; flex-direction: column; gap: 9px; min-width: 0; color: var(--lp-heading); font-size: 14px; font-weight: 700; }
+.lp-advisor-field > span { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px; }
+.lp-advisor-field small { color: var(--lp-muted); font-size: 12.5px; font-weight: 400; line-height: 1.7; }
+.lp-advisor-field select, .lp-advisor-wallet select {
+  width: 100%; min-height: 46px; font: inherit; font-size: 15px;
+  color: var(--lp-heading); background: var(--lp-surface-solid);
+  border: 1px solid var(--lp-line-strong); border-radius: 12px;
+  padding: 8px 14px; cursor: pointer;
+}
+.lp-advisor-field select:focus-visible, .lp-advisor-wallet select:focus-visible, .lp-advisor-field input:focus-visible {
+  outline: 2px solid var(--ng-accent); outline-offset: 3px;
+}
+.lp-advisor-sliders { display: grid; gap: 22px; padding-top: 10px; border-top: 1px solid var(--lp-line); }
+.lp-advisor-field input[type=range] { width: 100%; min-height: 28px; accent-color: var(--ng-accent); cursor: pointer; }
+.lp-advisor-result {
+  display: flex; flex-direction: column; align-items: stretch; gap: 17px;
+  background:
+    radial-gradient(ellipse at 100% 0%, rgba(109, 93, 252, .20), transparent 50%),
+    var(--lp-surface-solid);
+}
+.lp-advisor-result-caption { font-weight: 600; color: var(--lp-muted); font-size: 14px; }
+.lp-advisor-price { font-size: clamp(36px, 4vw, 58px); font-weight: 900; color: var(--lp-heading); letter-spacing: -.03em; line-height: 1; align-self: flex-start; }
+.lp-advisor-metrics { display: grid; gap: 0; margin: 4px 0 0; }
+.lp-advisor-metrics > div { display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 12px; border-bottom: 1px solid var(--lp-line); padding: 14px 0; }
+.lp-advisor-metrics dt { font-size: 13px; color: var(--lp-muted); }
+.lp-advisor-metrics dd { margin: 0; color: var(--lp-heading); font-weight: 800; font-size: 15px; }
+.lp-advisor-wallet { padding: 18px; display: grid; gap: 10px; border: 1px solid var(--lp-line-strong); border-radius: 16px; background: var(--lp-surface); }
+.lp-advisor-wallet label { font-size: 13px; color: var(--lp-muted); font-weight: 700; }
+.lp-advisor-wallet strong { color: var(--lp-heading); font-size: 20px; }
+.lp-advisor-wallet > span { color: var(--lp-muted); font-size: 13px; }
+.lp-advisor-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: auto; padding-top: 8px; }
+.lp-advisor-actions .lp-btn { flex: 1 1 150px; }
+.lp-advisor-disclaimer { margin: 18px 0 0; font-size: 12.5px; line-height: 1.95; color: var(--lp-muted); max-width: 1020px; }
+.lp-advisor-disclaimer strong { color: var(--lp-text); font-weight: 700; }
+@media (max-width: 860px) { .lp-advisor-layout { grid-template-columns: 1fr; } }
+@media (max-width: 640px) {
+  .lp-advisor-section { padding: 36px 0 62px; }
+  .lp-advisor-controls, .lp-advisor-result { padding: 20px 18px; border-radius: 19px; }
+  .lp-advisor-actions .lp-btn { flex: 1 1 100%; }
+}

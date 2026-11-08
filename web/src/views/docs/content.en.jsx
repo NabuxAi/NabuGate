@@ -160,18 +160,32 @@ Model ID     : nabu-smart`} label="settings" />
         </section>
       )}
 
+
       {active === 'claude-code' && (
         <section>
-          <H1>Claude Code</H1>
-          <Lead>Claude Code speaks Anthropic’s native protocol and appends <code>/v1/messages</code> to the base URL itself. So the base URL goes <strong>without</strong> <code>/v1</code>, and both authentication variables must be set.</Lead>
+          <H1>Connecting Claude Code through NabuGate</H1>
+          <Lead>Claude Code uses the Anthropic Messages protocol at <code>/v1/messages</code>, not the OpenAI chat endpoint. Direct connection requires a deployment of NabuGate with this endpoint enabled. It does not sign you into Claude.ai or confer a Claude subscription.</Lead>
+          <Callout kind="warn" icon="⚠️">Anthropic's terms restrict reselling or intermediating Claude Code usage for end users without an appropriate agreement. Use credentials and billing owned by the end user (BYOK), a supported provider or an authorized agreement. Never share Claude.ai cookies or OAuth session tokens.</Callout>
+          <Steps items={[
+            <>Sign in to the <a href="/panel/login">NabuGate console</a> and create an API key for this client.</>,
+            <>Check that <code dir="ltr">{ORIGIN}/v1/messages</code> is available, using the <button className="linklike" onClick={() => go('claude-desktop')}>gateway test</button>.</>,
+            <>Set the environment variables and run <code>claude</code>.</>,
+          ]} />
+          <H2>macOS / Linux</H2>
           <CodeBlock code={`export ANTHROPIC_BASE_URL="${ORIGIN}"
 export ANTHROPIC_API_KEY="${KEY}"
 export ANTHROPIC_AUTH_TOKEN="${KEY}"
 export ANTHROPIC_MODEL="nabu-smart"
 export ANTHROPIC_SMALL_FAST_MODEL="nabu-fast"
-
 claude`} label="bash · zsh" />
-          <H2>Persistent setup for the CLI and the VS Code extension</H2>
+          <H2>Windows PowerShell</H2>
+          <CodeBlock code={`$env:ANTHROPIC_BASE_URL="${ORIGIN}"
+$env:ANTHROPIC_API_KEY="${KEY}"
+$env:ANTHROPIC_AUTH_TOKEN="${KEY}"
+$env:ANTHROPIC_MODEL="nabu-smart"
+$env:ANTHROPIC_SMALL_FAST_MODEL="nabu-fast"
+claude`} label="PowerShell" />
+          <H2>Persistent per-user configuration</H2>
           <CodeBlock code={`{
   "env": {
     "ANTHROPIC_BASE_URL": "${ORIGIN}",
@@ -181,9 +195,43 @@ claude`} label="bash · zsh" />
     "ANTHROPIC_SMALL_FAST_MODEL": "nabu-fast"
   }
 }`} label="~/.claude/settings.json" />
-          <Callout kind="warn" icon="⚠️">
-            <strong>401</strong> means one of the two variables, <code>ANTHROPIC_API_KEY</code> / <code>ANTHROPIC_AUTH_TOKEN</code>, is missing. <strong>A path error</strong> means the base URL includes <code>/v1</code>. <strong>Model not found</strong> means <code>ANTHROPIC_MODEL</code> isn’t pinned, so Claude Code sent its own default model name.
-          </Callout>
+          <Callout icon="💡">Claude Code's base URL does not end in <code>/v1</code>. OpenAI-compatible clients such as Cursor use a URL with <code>/v1</code>. Never commit personal credentials to a project settings file.</Callout>
+        </section>
+      )}
+
+      {active === 'claude-desktop' && (
+        <section>
+          <H1>Claude Desktop: connect a third-party inference Gateway</H1>
+          <Lead>Sign in to your NabuGate account to create a key, then use the <strong>Static API key</strong> option in Claude Desktop. This is API routing, not Claude.ai login, and does not transfer Projects or Cowork features.</Lead>
+          <Callout kind="warn" icon="⚠️">This configuration requires a NabuGate deployment that actually exposes Anthropic-compatible <code>POST /v1/messages</code>. Claude Desktop features and model IDs must be separately tested. For genuine Claude usage, verify per-user credentials and permitted licensing.</Callout>
+          <H2>Step 1: create a key</H2>
+          <Steps items={[
+            <>Sign up or sign in to the <a href="/panel/login">NabuGate console</a> and create an API key.</>,
+            <>Check wallet balance and model permissions. Genuine Claude usage requires the user's own credential or a permitted commercial arrangement.</>,
+            <>In Claude Desktop, open <code>Help → Troubleshooting → Enable Developer Mode</code>. After restarting, open <code>Developer → Configure Third-Party Inference</code>.</>,
+            <>Choose <code>Connection → Gateway</code> and enter the settings below.</>,
+          ]} />
+          <CodeBlock code={`Inference provider : Gateway
+Credential kind    : Static API key
+Gateway base URL   : ${ORIGIN}
+Gateway API key    : ${KEY}
+Gateway auth scheme: Bearer
+Model ID           : nabu-smart (add manually if supported)`} label="Claude Desktop · Connection" />
+          <p>Under <strong>Models</strong>, select or add a model that is actually available on the gateway. Use <strong>Test connection</strong> and <strong>Apply Changes / Save</strong>. If your Desktop version rejects a custom model ID, use a supported model/client; do not mislabel a non-Claude model as Claude.</p>
+          <H2>Verify the API separately</H2>
+          <CodeBlock code={`curl "${ORIGIN}/v1/messages" \
+  -H "Authorization: Bearer ${KEY}" \
+  -H "anthropic-version: 2023-06-01" \
+  -H "Content-Type: application/json" \
+  -d '{"model":"nabu-smart","max_tokens":128,"messages":[{"role":"user","content":"Hello!"}]}'`} label="bash · zsh" />
+          <H2>Protocol compatibility</H2>
+          <p><code dir="ltr">{ORIGIN}/v1/chat/completions</code> is OpenAI-compatible. Claude Desktop/Code gateways use <code>/v1/messages</code>. The former does not imply the latter: a compatibility layer must convert JSON, SSE streams, and tool calls.</p>
+          <H2>Troubleshooting and security</H2>
+          <Faq q="401 or 402 error?">Check the NabuGate key, wallet balance and model permissions. Do not place keys in custom inference headers, screenshots or chats. Revoke any exposed key.</Faq>
+          <Faq q="The model is missing in Desktop">Some Desktop versions list only particular model ID patterns. Add the real ID in Models if supported and verify with an actual request.</Faq>
+          <Faq q="Does NabuGate login sign me into Claude.ai?">No. The console and API key are independent of Claude.ai OAuth. Interactive sign-in / OIDC needs its own identity-server integration and is not enabled here.</Faq>
+          <Faq q="Why are some features unavailable?">Streaming, tools, thinking, images, model capabilities and Projects vary by client and backend. Verify each feature rather than assuming parity.</Faq>
+          <p>References: <a href="https://developers.cloudflare.com/ai-gateway/integrations/coding-agents/claude-desktop/" target="_blank" rel="noreferrer">Desktop gateway instructions</a> and <a href="https://code.claude.com/docs/en/legal-and-compliance" target="_blank" rel="noreferrer">Claude Code terms</a>.</p>
         </section>
       )}
 

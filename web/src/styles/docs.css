@@ -160,3 +160,9 @@ html[lang="en"] .docs-rail h4 { text-transform: uppercase; letter-spacing: 0.07e
 @media (max-width: 480px) {
   .docs-top-actions .btn { display: none; }
 }
+
+
+/* Protocol diagram for Claude Desktop / Claude Code setup guides. */
+.docs-flow { display: flex; flex-direction: column; gap: 10px; align-items: center; padding: 20px; border-radius: 16px; border: 1px solid var(--ng-border, rgba(148,163,184,.2)); margin: 20px 0; text-align: center; }
+.docs-flow code { display: block; max-width: 100%; padding: 12px 16px; border-radius: 10px; background: var(--ng-surface, rgba(128,128,128,.08)); overflow-wrap: anywhere; white-space: normal; }
+.docs-flow span { color: var(--ng-accent); font-size: 20px; }

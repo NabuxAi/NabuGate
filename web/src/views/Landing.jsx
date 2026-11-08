@@ -6,6 +6,7 @@ import { LangSwitch, Logo, ThemeToggle } from '../components/Brand.jsx';
 import { fmtDigits, fmtInt, useI18n, useT } from '../i18n/index.jsx';
 import { gatewayBase, siteOrigin } from '../origin.js';
 import { IntroButton, IntroDialog, useIntro } from './IntroVideo.jsx';
+import ClaudeAdvisor from './ClaudeAdvisor.jsx';
 import '../styles/landing.css';
 
 /*
@@ -90,6 +91,16 @@ const T = {
     faqTitle: 'پاسخ پرسش‌های رایج',
     faqSub: 'جوابتان اینجا نیست؟ مستندات همه‌چیز را با جزئیات توضیح می‌دهد.',
     fullDocs: 'مستندات کامل',
+    iranEyebrow: "ایران بزرگ · راهنمای اتصال Claude",
+    iranTitle: "راهی روشن برای اتصال به Claude",
+    iranSub: "ورود به Claude.ai با استفاده از API متفاوت است. برای اتصال Claude Desktop یا Claude Code به مدل‌های NabuGate، راهنمای Gateway تبدیل‌کننده، مراحل راه‌اندازی و عیب‌یابی را ببینید.",
+    iranGuide: "راهنمای کامل اتصال Claude",
+    iranStart: "ساخت کلید NabuGate",
+    iranDisclaimer: "این راهکار جایگزین اشتراک Claude.ai نیست و تمام قابلیت‌های Claude Desktop یا دسترسی بدون محدودیت را تضمین نمی‌کند.",
+    iranFlowA: "Claude Desktop / Code",
+    iranFlowB: "Anthropic-compatible Gateway",
+    iranFlowC: "NabuGate · OpenAI API",
+    iranFlowNote: "اتصال از طریق یک واسط تبدیل پروتکل",
     ctaTitle: 'همین امروز با همهٔ مدل‌ها بسازید',
     ctaSub: 'حساب بسازید، کلید بگیرید و اولین درخواست را در کمتر از یک دقیقه بفرستید.',
     footTag: 'دروازهٔ یکپارچهٔ هوش مصنوعی: یک API سازگار با OpenAI برای همهٔ مدل‌ها.',
@@ -177,6 +188,16 @@ const T = {
     faqTitle: 'Common questions',
     faqSub: 'Not here? The docs cover everything in detail.',
     fullDocs: 'Full documentation',
+    iranEyebrow: "Greater Iran · Claude connection guide",
+    iranTitle: "A clearer path to Claude",
+    iranSub: "Signing in to Claude.ai is different from using an API. Learn how a protocol-converting gateway can connect Claude Desktop or Claude Code to models available through NabuGate.",
+    iranGuide: "Read the full Claude guide",
+    iranStart: "Create a NabuGate key",
+    iranDisclaimer: "This is not a Claude.ai subscription and does not guarantee access to every Claude Desktop feature or unrestricted service availability.",
+    iranFlowA: "Claude Desktop / Code",
+    iranFlowB: "Anthropic-compatible Gateway",
+    iranFlowC: "NabuGate · OpenAI API",
+    iranFlowNote: "A protocol adapter connects the two APIs",
     ctaTitle: 'Start building with every model today',
     ctaSub: 'Create an account, get a key and send your first request in under a minute.',
     footTag: 'The unified AI gateway: one OpenAI-compatible API for every model.',
@@ -264,6 +285,16 @@ const T = {
     faqTitle: 'إجابات الأسئلة المتكررة',
     faqSub: 'ليست هنا؟ التوثيق يشرح كل شيء بالتفصيل.',
     fullDocs: 'التوثيق الكامل',
+    iranEyebrow: "إيران الكبرى · دليل Claude",
+    iranTitle: "طريقة واضحة للاتصال بـ Claude",
+    iranSub: "تسجيل الدخول إلى Claude.ai يختلف عن استخدام API. تعرف على طريقة ربط Claude Desktop أو Claude Code بنماذج NabuGate عبر بوابة تحوّل البروتوكول.",
+    iranGuide: "دليل Claude خطوة بخطوة",
+    iranStart: "إنشاء مفتاح NabuGate",
+    iranDisclaimer: "هذا لا يغني عن اشتراك Claude.ai ولا يضمن جميع ميزات Claude Desktop أو توفر الخدمة دون قيود.",
+    iranFlowA: "Claude Desktop / Code",
+    iranFlowB: "Anthropic-compatible Gateway",
+    iranFlowC: "NabuGate · OpenAI API",
+    iranFlowNote: "بوابة تحول البروتوكول بين الواجهتين",
     ctaTitle: 'ابدأ البناء بكل النماذج اليوم',
     ctaSub: 'أنشئ حسابًا، خذ مفتاحًا، وأرسل أول طلب.',
     footTag: 'بوابة الذكاء الاصطناعي الموحّدة: واجهة متوافقة مع OpenAI لكل النماذج.',
@@ -281,21 +312,21 @@ const T = {
 const FAQ = {
   fa: [
     ['NabuGate چیست؟', 'یک درگاه سازگار با OpenAI که پشت یک آدرس و یک کلید، مدل‌های OpenAI، Anthropic، Google و بقیه را با fallback خودکار ارائه می‌دهد.'],
-    ['با Cursor و Claude Code کار می‌کند؟', 'بله. Cursor، Cline، Roo Code، Codex و SDK‌های OpenAI با تغییر آدرس پایه وصل می‌شوند؛ Claude Code با متغیرهای ANTHROPIC_*. راهنمای هر کدام در مستندات است.'],
+    ['با Cursor و Claude Code کار می‌کند؟', 'ابزارهای OpenAI-compatible مستقیم متصل می‌شوند. Claude Code به پروتکل Anthropic نیاز دارد و برای NabuGate در وضعیت فعلی باید از واسط تبدیل پروتکل استفاده کنید؛ راهنمای کامل در مستندات است.'],
     ['هزینه چطور حساب می‌شود؟', 'کیف پول دلاری. هر درخواست به قیمت واقعی مدل (به‌ازای میلیون توکن) کم می‌شود و هر پاسخ موجودی باقی‌مانده را در هدر برمی‌گرداند.'],
     ['اگر پرداختم مشکل داشت؟', 'فاکتور پیش از رفتن به بانک به نام حساب شما ثبت می‌شود و پنل هر بار از خودِ درگاه می‌پرسد. پول کم‌شده‌ای که تأیید نشود ظرف ۷۲ ساعت برمی‌گردد. بخش «مشکلات پرداخت» در مستندات همه را پوشش می‌دهد.'],
     ['کلید API چطور کار می‌کند؟', 'برای هر برنامه یک کلید می‌سازید، با محدودیت مدل، مبدأ و سقف درخواست. متن کامل کلید فقط یک‌بار نمایش داده می‌شود.'],
   ],
   en: [
     ['What is NabuGate?', 'An OpenAI-compatible gateway: one URL and one key for models from OpenAI, Anthropic, Google and more, with automatic fallback.'],
-    ['Does it work with Cursor and Claude Code?', 'Yes. Cursor, Cline, Roo Code, Codex and the OpenAI SDKs connect by changing the base URL; Claude Code through the ANTHROPIC_* variables. The docs have a guide for each.'],
+    ['Does it work with Cursor and Claude Code?', 'OpenAI-compatible tools connect directly. Claude Code needs an Anthropic-compatible endpoint, so the current NabuGate API requires a protocol-converting bridge. See the complete setup guide.'],
     ['How is it billed?', 'A USD wallet. Each request deducts the model’s real per-million-token price, and every response reports the remaining balance in a header.'],
     ['What if my payment fails?', 'The invoice is bound to your account before you leave for the bank, and the console re-asks the gateway on every visit. An unconfirmed charge is reversed within 72 hours. “Payment issues” in the docs covers every case.'],
     ['How do API keys work?', 'One key per app, limited by model, origin and rate. The full key is shown only once.'],
   ],
   ar: [
     ['ما هو نابوغيت؟', 'بوابة متوافقة مع OpenAI: عنوان واحد ومفتاح واحد لنماذج OpenAI وAnthropic وGoogle وغيرها، مع احتياط تلقائي.'],
-    ['هل يعمل مع Cursor وClaude Code؟', 'نعم. Cursor وCline وRoo Code وCodex وحزم OpenAI تتصل بتغيير عنوان الأساس؛ وClaude Code عبر متغيرات ANTHROPIC_*. لكل أداة دليل في التوثيق.'],
+    ['هل يعمل مع Cursor وClaude Code؟', 'تتصل أدوات OpenAI-compatible مباشرة. يحتاج Claude Code إلى واجهة Anthropic، لذلك يلزم استخدام جسر لتحويل البروتوكول مع NabuGate حالياً. راجع دليل الإعداد.'],
     ['كيف تُحسب التكلفة؟', 'محفظة بالدولار. كل طلب يُخصم بسعر النموذج الحقيقي لكل مليون رمز، وكل رد يعيد الرصيد المتبقي في ترويسة.'],
     ['ماذا لو فشلت عملية الدفع؟', 'تُسجَّل الفاتورة على حسابك قبل الذهاب إلى البنك، واللوحة تسأل البوابة في كل زيارة. المبلغ غير المؤكَّد يُعاد خلال ٧٢ ساعة. قسم «مشكلات الدفع» في التوثيق يغطي الحالات.'],
     ['كيف يعمل مفتاح API؟', 'مفتاح لكل تطبيق، بحدود النموذج والمصدر والمعدّل. النص الكامل للمفتاح يُعرض مرة واحدة.'],
@@ -317,7 +348,16 @@ function snippets(ORIGIN, BASE, KEY, hello) {
     { id: 'curl', label: 'cURL', icon: 'terminal', file: 'bash', code: `curl ${BASE}/chat/completions \\\n  -H "Authorization: Bearer ${KEY}" \\\n  -H "Content-Type: application/json" \\\n  -d '{"model":"nabu-fast","messages":[{"role":"user","content":"${hello}"}]}'` },
     { id: 'python', label: 'Python', icon: 'code', file: 'python', code: `from openai import OpenAI\n\nclient = OpenAI(base_url="${BASE}", api_key="${KEY}")\n\nr = client.chat.completions.create(\n    model="nabu-smart",\n    messages=[{"role": "user", "content": "${hello}"}],\n)\nprint(r.choices[0].message.content)` },
     { id: 'node', label: 'Node.js', icon: 'code', file: 'node', code: `import OpenAI from "openai";\n\nconst client = new OpenAI({ baseURL: "${BASE}", apiKey: "${KEY}" });\n\nconst r = await client.chat.completions.create({\n  model: "nabu-smart",\n  messages: [{ role: "user", content: "${hello}" }],\n});` },
-    { id: 'claude', label: 'Claude Code', icon: 'terminal', file: '~/.claude/settings.json', code: `{\n  "env": {\n    "ANTHROPIC_BASE_URL": "${ORIGIN}",\n    "ANTHROPIC_API_KEY": "${KEY}",\n    "ANTHROPIC_AUTH_TOKEN": "${KEY}",\n    "ANTHROPIC_MODEL": "nabu-smart",\n    "ANTHROPIC_SMALL_FAST_MODEL": "nabu-fast"\n  }\n}` },
+    { id: 'claude', label: 'Claude Code', icon: 'terminal', file: '~/.claude/settings.json', code: `# Requires /v1/messages on your NabuGate deployment
+export ANTHROPIC_BASE_URL="${ORIGIN}"
+export ANTHROPIC_API_KEY="${KEY}"
+export ANTHROPIC_AUTH_TOKEN="${KEY}"
+export ANTHROPIC_MODEL="nabu-smart"
+claude` },
+export ANTHROPIC_BASE_URL="http://127.0.0.1:4000"
+export ANTHROPIC_AUTH_TOKEN="YOUR_LOCAL_GATEWAY_KEY"
+export ANTHROPIC_MODEL="nabu-claude"
+claude` },
     { id: 'cursor', label: 'Cursor', icon: 'wand', file: 'Settings → Models', code: `OpenAI API Key          ${KEY}\nOverride OpenAI Base URL ${BASE}\nAdd model               nabu-smart` },
     { id: 'codex', label: 'Codex CLI', icon: 'terminal', file: '~/.codex/config.toml', code: `model = "nabu-smart"\nmodel_provider = "nabugate"\n\n[model_providers.nabugate]\nname = "NabuGate"\nbase_url = "${BASE}"\nenv_key = "OPENAI_API_KEY"\nwire_api = "responses"` },
     { id: 'cline', label: 'Cline / Roo', icon: 'bot', file: 'settings', code: `API Provider : OpenAI Compatible\nBase URL     : ${BASE}\nAPI Key      : ${KEY}\nModel ID     : nabu-smart` },
@@ -559,6 +599,36 @@ export default function Landing({ signedIn = false }) {
             </div>
           </div>
         </section>
+
+        {/* ── Iran · Claude Gateway guide ─────────────────────────────────── */}
+        <section id="iran-claude" className="lp-iran-wrap" aria-labelledby="lp-iran-heading">
+          <div className="lp-container">
+            <div className="lp-iran-card lp-reveal">
+              <div className="lp-iran-copy">
+                <span className="lp-eyebrow">{t('iranEyebrow')}</span>
+                <h2 id="lp-iran-heading">{t('iranTitle')}</h2>
+                <p>{t('iranSub')}</p>
+                <div className="lp-iran-actions">
+                  <a href="/docs#claude-desktop" className="lp-btn lp-btn-primary lp-btn-lg">
+                    {t('iranGuide')}<Icon name="arrow" size={18} className="flip-rtl" />
+                  </a>
+                  <a href={cta} className="lp-btn lp-btn-outline lp-btn-lg">{t('iranStart')}</a>
+                </div>
+                <small>{t('iranDisclaimer')}</small>
+              </div>
+              <div className="lp-iran-visual" aria-label={t('iranFlowNote')}>
+                <span className="lp-iran-visual-caption">{t('iranFlowNote')}</span>
+                <div className="lp-iran-flow-item"><Icon name="monitor" size={20} /><span dir="ltr">{t('iranFlowA')}</span></div>
+                <div className="lp-iran-flow-down" aria-hidden="true"><Icon name="arrow" size={17} /></div>
+                <div className="lp-iran-flow-item bridge"><Icon name="route" size={20} /><span dir="ltr">{t('iranFlowB')}</span></div>
+                <div className="lp-iran-flow-down" aria-hidden="true"><Icon name="arrow" size={17} /></div>
+                <div className="lp-iran-flow-item"><Icon name="zap" size={20} /><span dir="ltr">{t('iranFlowC')}</span></div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <ClaudeAdvisor signedIn={signedIn} />
 
         {/* ── Features ──────────────────────────────────────────────────────── */}
         <Section id="features" eyebrow={t('featEyebrow')} title={t('featTitle')} sub={t('featSub')}>
