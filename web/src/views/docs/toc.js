@@ -15,6 +15,7 @@ export const GROUPS = [
     { id: 'cursor', fa: 'Cursor', en: 'Cursor' },
     { id: 'cline', fa: 'Cline / Roo Code / Continue', en: 'Cline / Roo Code / Continue' },
     { id: 'claude-code', fa: 'Claude Code', en: 'Claude Code' },
+    { id: 'claude-desktop', fa: 'راهنمای Claude Desktop و Gateway', en: 'Claude Desktop & Gateway' },
     { id: 'codex', fa: 'Codex CLI', en: 'Codex CLI' },
     { id: 'vscode', fa: 'VS Code', en: 'VS Code' },
     { id: 'sdk', fa: 'SDK پایتون و Node', en: 'Python & Node SDKs' },
