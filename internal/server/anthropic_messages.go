@@ -488,3 +488,35 @@ func (s *Server) streamAnthropicMessages(w http.ResponseWriter, r *http.Request,
 	})
 	sent("message_stop", map[string]any{"type": "message_stop"})
 }
+
+
+// Token counting is only an estimate: NabuGate may route to different models,
+// each with its own tokenizer. It is not metered as inference and must never
+// be presented as exact billing. The header makes this visible to clients.
+func (s *Server) handleAnthropicTokenCount(w http.ResponseWriter, r *http.Request) {
+	var incoming nabuAnthropicRequest
+	if err := json.NewDecoder(r.Body).Decode(&incoming); err != nil {
+		nabuAnthError(w, http.StatusBadRequest, "invalid_request_error", "invalid JSON body")
+		return
+	}
+	if incoming.Model == "" || len(incoming.Messages) == 0 {
+		nabuAnthError(w, http.StatusBadRequest, "invalid_request_error", "model and messages are required")
+		return
+	}
+	if !s.aliasAllowed(w, r, incoming.Model) {
+		return
+	}
+	incoming.MaxTokens = 1
+	req, err := nabuAnthConvert(incoming)
+	if err != nil {
+		nabuAnthError(w, http.StatusBadRequest, "invalid_request_error", err.Error())
+		return
+	}
+	totalBytes := len(req.Raw["messages"]) + len(req.Raw["tools"])
+	count := provider.EstimateTokens(totalBytes)
+	if count == 0 {
+		count = 1
+	}
+	w.Header().Set("X-Nabu-Token-Count-Estimated", "true")
+	writeJSON(w, http.StatusOK, map[string]any{"input_tokens": count})
+}
