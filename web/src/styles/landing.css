@@ -585,3 +585,52 @@ html[lang="en"] .lp-card p { line-height: 1.65; }
   .lp-reveal { opacity: 1; transform: none; transition: none; }
   .lp-window { transform: none !important; }
 }
+
+
+/* Greater Iran / Claude Gateway feature — intentionally distinct from generic cards. */
+.lp-iran-wrap { padding: 56px 0 14px; }
+.lp-iran-card {
+  position: relative; overflow: hidden;
+  display: grid; grid-template-columns: minmax(0, 1.12fr) minmax(310px, .88fr);
+  gap: 44px; align-items: center; padding: 54px;
+  border: 1px solid color-mix(in srgb, var(--ng-accent) 36%, var(--lp-line));
+  background:
+    radial-gradient(420px 330px at 90% 0%, rgba(109, 93, 252, .22), transparent 78%),
+    radial-gradient(390px 310px at 0% 100%, rgba(59, 130, 246, .13), transparent 75%),
+    var(--lp-surface);
+  box-shadow: 0 35px 100px -68px rgba(109, 93, 252, .85);
+  border-radius: 28px;
+}
+.lp-iran-copy { min-width: 0; }
+.lp-iran-copy h2 { font-size: clamp(30px, 3.5vw, 48px); line-height: 1.4; font-weight: 900; letter-spacing: -.025em; margin: 15px 0; }
+.lp-iran-copy > p { color: var(--lp-text); font-size: 16px; line-height: 1.9; margin: 0 0 22px; max-width: 640px; }
+.lp-iran-copy > small { display: block; color: var(--lp-muted); font-size: 12px; line-height: 1.9; margin-top: 16px; }
+.lp-iran-actions { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+.lp-iran-visual {
+  min-width: 0; padding: 20px; border: 1px solid var(--lp-line-strong);
+  border-radius: 22px; display: flex; flex-direction: column; align-items: stretch;
+  background: color-mix(in srgb, var(--lp-bg) 68%, transparent);
+}
+.lp-iran-visual-caption { text-align: center; color: var(--lp-muted); font-size: 12px; margin-bottom: 16px; }
+.lp-iran-flow-item {
+  display: flex; align-items: center; justify-content: center; gap: 12px;
+  min-height: 60px; padding: 12px; border-radius: 13px; text-align: center;
+  border: 1px solid var(--lp-line-strong);
+  background: var(--lp-surface-solid); color: var(--lp-heading);
+  font-size: 13px; font-weight: 750;
+}
+.lp-iran-flow-item .ico { color: var(--ng-accent); }
+.lp-iran-flow-item.bridge {
+  background: linear-gradient(115deg, rgba(78, 106, 242, .16), rgba(168, 85, 247, .16));
+  border-color: color-mix(in srgb, var(--ng-accent) 60%, var(--lp-line));
+}
+.lp-iran-flow-down { display: grid; place-items: center; color: var(--ng-accent); height: 32px; transform: rotate(90deg); }
+@media (max-width: 900px) {
+  .lp-iran-card { grid-template-columns: minmax(0, 1fr); padding: 34px; gap: 28px; }
+  .lp-iran-visual { max-width: 580px; width: 100%; }
+}
+@media (max-width: 640px) {
+  .lp-iran-wrap { padding-top: 32px; }
+  .lp-iran-card { padding: 24px 18px; border-radius: 20px; }
+  .lp-iran-actions .lp-btn { flex: 1 1 100%; white-space: normal; text-align: center; }
+}
