@@ -42,6 +42,7 @@ services:
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - GROQ_API_KEY=${GROQ_API_KEY}
       - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+      - ROUTERAH_API_KEY=${ROUTERAH_API_KEY:-}
       - HF_TOKEN=${HF_TOKEN}
       # MiniMax and Xiaomi MiMo. Empty skips the provider; the gateway still boots.
       - MINIMAX_API_KEY=${MINIMAX_API_KEY:-}

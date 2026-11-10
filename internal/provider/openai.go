@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 	"strings"
 )
 
@@ -15,6 +16,7 @@ import (
 type OpenAIAdapter struct {
 	name         string
 	baseURL      string
+	modelsURL    string
 	apiKey       string
 	extraHeaders map[string]string
 
@@ -29,6 +31,26 @@ type OpenAIAdapter struct {
 // SetTranscribeFormat overrides the transcription response_format. Called from
 // the config when a provider declares transcribe_format.
 func (a *OpenAIAdapter) SetTranscribeFormat(f string) { a.transcribeFormat = f }
+
+// SetModelsURL selects an alternate public catalogue endpoint. It must be on
+// exactly the same origin as the inference API: discovery sends the API key.
+func (a *OpenAIAdapter) SetModelsURL(raw string) error {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		a.modelsURL = ""
+		return nil
+	}
+	base, baseErr := url.Parse(a.baseURL)
+	target, err := url.Parse(raw)
+	if baseErr != nil || err != nil || target.User != nil ||
+		target.Host == "" || !strings.EqualFold(base.Scheme, target.Scheme) ||
+		!strings.EqualFold(base.Host, target.Host) ||
+		(target.Scheme != "https" && target.Scheme != "http") {
+		return fmt.Errorf("models_url must be an absolute URL on the provider's base_url origin")
+	}
+	a.modelsURL = target.String()
+	return nil
+}
 
 // NewOpenAIAdapter builds an OpenAI-compatible adapter.
 func NewOpenAIAdapter(name, baseURL, apiKey string, extraHeaders map[string]string) *OpenAIAdapter {

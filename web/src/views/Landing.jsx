@@ -354,10 +354,6 @@ export ANTHROPIC_API_KEY="${KEY}"
 export ANTHROPIC_AUTH_TOKEN="${KEY}"
 export ANTHROPIC_MODEL="nabu-smart"
 claude` },
-export ANTHROPIC_BASE_URL="http://127.0.0.1:4000"
-export ANTHROPIC_AUTH_TOKEN="YOUR_LOCAL_GATEWAY_KEY"
-export ANTHROPIC_MODEL="nabu-claude"
-claude` },
     { id: 'cursor', label: 'Cursor', icon: 'wand', file: 'Settings → Models', code: `OpenAI API Key          ${KEY}\nOverride OpenAI Base URL ${BASE}\nAdd model               nabu-smart` },
     { id: 'codex', label: 'Codex CLI', icon: 'terminal', file: '~/.codex/config.toml', code: `model = "nabu-smart"\nmodel_provider = "nabugate"\n\n[model_providers.nabugate]\nname = "NabuGate"\nbase_url = "${BASE}"\nenv_key = "OPENAI_API_KEY"\nwire_api = "responses"` },
     { id: 'cline', label: 'Cline / Roo', icon: 'bot', file: 'settings', code: `API Provider : OpenAI Compatible\nBase URL     : ${BASE}\nAPI Key      : ${KEY}\nModel ID     : nabu-smart` },

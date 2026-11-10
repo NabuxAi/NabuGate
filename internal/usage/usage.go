@@ -186,10 +186,11 @@ func (s *Stat) add(e Entry) {
 
 // Tracker accumulates usage. It is safe for concurrent use.
 type Tracker struct {
-	mu        sync.Mutex
-	prices    map[string]Price
-	byProject map[string]*Stat
-	byModel   map[string]*Stat
+	mu            sync.RWMutex
+	prices        map[string]Price
+	providerRates map[string]map[string]Price // refreshed provider-specific rates
+	byProject     map[string]*Stat
+	byModel       map[string]*Stat
 }
 
 // New builds a Tracker with the given price table.
@@ -204,8 +205,34 @@ func New(prices map[string]Price) *Tracker {
 	}
 }
 
-// Price is the price one upstream coordinate is billed at; see Lookup.
+// SetProviderPrices atomically replaces a provider's live price catalogue.
+// The caller owns the input map; a copy keeps refreshes race-free.
+func (t *Tracker) SetProviderPrices(providerName string, rates map[string]Price) {
+	copied := make(map[string]Price, len(rates))
+	for id, price := range rates {
+		copied[id] = price
+	}
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if t.providerRates == nil {
+		t.providerRates = make(map[string]map[string]Price)
+	}
+	t.providerRates[providerName] = copied
+}
+
+// Price prefers an explicit config override, then this provider's live
+// catalogue, then the shared identity / free-suffix / wildcard defaults.
 func (t *Tracker) Price(providerName, model string) (Price, bool) {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+	if p, ok := t.prices[providerName+"/"+model]; ok {
+		return p, true
+	}
+	if rates := t.providerRates[providerName]; rates != nil {
+		if p, ok := rates[model]; ok {
+			return p, true
+		}
+	}
 	return Lookup(t.prices, providerName, model)
 }
 

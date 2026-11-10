@@ -150,6 +150,20 @@ func (r *Router) resolvePassthrough(model string) (config.Target, bool) {
 	return config.Target{Provider: prov, Model: upstream}, true
 }
 
+// capabilityRoute preserves configured aliases and also permits direct model
+// coordinates on media/embedding endpoints. Passthrough is safe only for
+// providers with a live adapter; individual capabilities are still checked
+// before sending a request to the vendor.
+func (r *Router) capabilityRoute(alias string, configured map[string]config.ModelRoute) (config.ModelRoute, bool) {
+	if route, ok := configured[alias]; ok {
+		return route, true
+	}
+	if target, ok := r.resolvePassthrough(alias); ok {
+		return config.ModelRoute{Primary: target}, true
+	}
+	return config.ModelRoute{}, false
+}
+
 // SetRegistry installs the logical-model registry and builds the reverse index
 // used to recover a logical model from a concrete provider coordinate.
 // Separate from New so the existing call sites and their tests keep working.
@@ -465,7 +479,7 @@ type ImageResult struct {
 
 // Image resolves an image alias and tries primary then fallbacks.
 func (r *Router) Image(ctx context.Context, alias string, req provider.ImageRequest) (ImageResult, error) {
-	route, ok := r.images[alias]
+	route, ok := r.capabilityRoute(alias, r.images)
 	if !ok {
 		return ImageResult{}, fmt.Errorf("unknown image alias %q", alias)
 	}
@@ -516,7 +530,7 @@ type SpeechResult struct {
 
 // Speech resolves an audio alias and tries primary then fallbacks.
 func (r *Router) Speech(ctx context.Context, alias string, req provider.SpeechRequest) (SpeechResult, error) {
-	route, ok := r.audio[alias]
+	route, ok := r.capabilityRoute(alias, r.audio)
 	if !ok {
 		return SpeechResult{}, fmt.Errorf("unknown audio alias %q", alias)
 	}
@@ -591,7 +605,7 @@ type EmbedResult struct {
 
 // Embed resolves an embedding alias and tries primary then fallbacks.
 func (r *Router) Embed(ctx context.Context, alias string, req provider.EmbeddingRequest) (EmbedResult, error) {
-	route, ok := r.embeddings[alias]
+	route, ok := r.capabilityRoute(alias, r.embeddings)
 	if !ok {
 		return EmbedResult{}, fmt.Errorf("unknown embedding alias %q", alias)
 	}
@@ -877,7 +891,7 @@ type TranscribeResult struct {
 // to re-read a consumed stream could not retry at all, and re-uploading a few
 // megabytes is the cheap half of this call.
 func (r *Router) Transcribe(ctx context.Context, alias string, req provider.TranscriptionRequest) (TranscribeResult, error) {
-	route, ok := r.transcription[alias]
+	route, ok := r.capabilityRoute(alias, r.transcription)
 	if !ok {
 		return TranscribeResult{}, fmt.Errorf("unknown transcription alias %q", alias)
 	}

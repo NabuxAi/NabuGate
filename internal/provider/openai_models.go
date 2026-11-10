@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 )
 
 // openAIModelsResponse is the OpenAI GET /v1/models shape ({"data":[{"id":…}]}).
@@ -24,7 +25,11 @@ type openAIModelsResponse struct {
 // ({"data":[{"id":…}]}) is preferred; a bare array of objects or of strings —
 // which some OpenAI-wire aggregators return — is accepted as a fallback.
 func (a *OpenAIAdapter) ListModels(ctx context.Context) ([]string, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, a.baseURL+"/models", nil)
+	modelsURL := a.baseURL + "/models"
+	if a.modelsURL != "" {
+		modelsURL = a.modelsURL
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, modelsURL, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -57,6 +62,30 @@ func (a *OpenAIAdapter) ListModels(ctx context.Context) ([]string, error) {
 		}
 		return out, nil
 	}
+	// Routerah's public /api/pricing/catalog returns every available model
+	// under models[].model_name, across chat, image, audio, video and
+	// embeddings. This keeps the gateway catalogue in sync without hardcoding
+	// hundreds of IDs; actual inference still uses the OpenAI-wire base_url.
+	var catalogue struct {
+		Models []struct {
+			ModelName string `json:"model_name"`
+		} `json:"models"`
+	}
+	if json.Unmarshal(raw, &catalogue) == nil && len(catalogue.Models) > 0 {
+		out := make([]string, 0, len(catalogue.Models))
+		seen := make(map[string]bool, len(catalogue.Models))
+		for _, m := range catalogue.Models {
+			id := strings.TrimSpace(m.ModelName)
+			if id != "" && !seen[id] {
+				seen[id] = true
+				out = append(out, id)
+			}
+		}
+		if len(out) > 0 {
+			return out, nil
+		}
+	}
+
 	// Fallback: a bare array of {"id":…} objects.
 	var bareObjs []struct {
 		ID string `json:"id"`

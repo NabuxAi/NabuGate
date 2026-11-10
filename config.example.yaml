@@ -32,6 +32,16 @@ providers:
     base_url: "https://openrouter.ai/api/v1"
     api_key_env: "OPENROUTER_API_KEY"
 
+  # Routerah: 821 models in its public catalog (the count changes over time).
+  # Model IDs are exposed as routerah/<upstream-id> when your key is set.
+  routerah:
+    enabled: true
+    type: openai
+    base_url: "https://api.routerah.app/v1"
+    models_url: "https://api.routerah.app/api/pricing/catalog"
+    api_key_env: "ROUTERAH_API_KEY"
+    passthrough: true
+
   # MiniMax chat (api.minimax.io). OpenAI-compatible, Bearer auth.
   # Skipped while MINIMAX_API_KEY is unset. config.default.yaml adds OpenRouter
   # and Hugging Face fallbacks for the same aliases.

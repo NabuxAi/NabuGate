@@ -111,6 +111,13 @@ var catalogue = map[string]Vendor{
 		Color: "#F55036",
 		Icon:  "M12 1.5a6.6 6.6 0 0 0-6.6 6.6v1.2A6.6 6.6 0 0 0 12 15.9h2.3v-2.6H12a4 4 0 1 1 4-4v6.3a3.9 3.9 0 0 1-3.9 3.9 3.9 3.9 0 0 1-2.8-1.1l-1.7 1.7A6.3 6.3 0 0 0 12 22.1h.1a6.3 6.3 0 0 0 6.2-6.3V8.1A6.6 6.6 0 0 0 12 1.5Z",
 	},
+	"routerah": {
+		Label: "Routerah", Blurb: "یک کلید برای صدها مدل متن، تصویر، صدا و امبدینگ؛ مدل‌های رایگان هم دارد.",
+		BlurbEn:      "One API key for hundreds of text, image, audio and embedding models, including free options.",
+		Capabilities: []string{CapChat, CapImage, CapSpeech, CapEmbed},
+		Site:         "https://routerah.app", KeysURL: "https://routerah.app/fa/token",
+		Color: "#6A4CE4",
+	},
 	"openrouter": {
 		Label: "OpenRouter", Blurb: "یک کلید، صدها مدل از ده‌ها فروشنده. برای وقتی نمی‌خواهی حساب جدا باز کنی.",
 		BlurbEn:      "One key, hundreds of models from dozens of vendors. For when you don't want to open separate accounts.",
