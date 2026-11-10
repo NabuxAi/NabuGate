@@ -61,6 +61,24 @@ func main() {
 		os.Exit(runSelfTest(cfg, *selfTestAll))
 	}
 
+	// Routerah publishes a complete public price catalogue separately from
+	// /v1/models. Do not turn on a gateway-paid provider without its rates:
+	// an unpriced request would otherwise charge a customer $0 while spending
+	// the upstream account's money. An absent key keeps it disabled as usual.
+	var routerahRates map[string]usage.Price
+	if p, ok := cfg.Providers["routerah"]; ok && p.Enabled &&
+		strings.TrimSpace(os.Getenv(p.APIKeyEnv)) != "" {
+		rates, err := fetchRouterahRates(p.ModelsURL)
+		if err != nil {
+			log.Error("routerah disabled: price catalog could not be loaded", "error", err)
+			p.Enabled = false
+			cfg.Providers["routerah"] = p
+		} else {
+			routerahRates = rates
+			log.Info("routerah catalogue prices loaded", "count", len(rates))
+		}
+	}
+
 	adapters, warnings := cfg.BuildAdapters()
 	for _, w := range warnings {
 		log.Warn(w)
@@ -96,6 +114,25 @@ func main() {
 	}
 	enforcer := policy.New(cfg.Server.APIKeys, cfg.Server.Keys)
 	tracker := usage.New(cfg.Pricing)
+	if routerahRates != nil {
+		tracker.SetProviderPrices("routerah", routerahRates)
+		// Keep catalog prices current without rebuilding the gateway or
+		// interrupting traffic. Failed refreshes retain the last good rates.
+		modelsURL := cfg.Providers["routerah"].ModelsURL
+		go func() {
+			ticker := time.NewTicker(15 * time.Minute)
+			defer ticker.Stop()
+			for range ticker.C {
+				rates, err := fetchRouterahRates(modelsURL)
+				if err != nil {
+					log.Warn("routerah price refresh failed; keeping last good rates", "error", err)
+					continue
+				}
+				tracker.SetProviderPrices("routerah", rates)
+				log.Info("routerah catalogue prices refreshed", "count", len(rates))
+			}
+		}()
+	}
 	agents, agentWarnings := cfg.BuildAgents()
 	for _, w := range agentWarnings {
 		log.Warn(w)

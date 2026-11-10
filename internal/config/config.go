@@ -239,6 +239,10 @@ type ProviderConfig struct {
 	Type      string `yaml:"type"` // "openai" | "anthropic" | "gemini" | "pexels"
 	BaseURL   string `yaml:"base_url"`
 	APIKeyEnv string `yaml:"api_key_env"`
+	// ModelsURL optionally points live discovery to a catalogue on the same
+	// origin as BaseURL; inference still uses BaseURL. Never send a key to an
+	// unrelated origin just to discover models.
+	ModelsURL string `yaml:"models_url"`
 
 	// AuthScheme overrides the Authorization header scheme for an OpenAI-wire
 	// provider. It defaults to "Bearer" (empty or "bearer" keeps that default);
@@ -461,6 +465,9 @@ func newAdapter(name string, p ProviderConfig, apiKey string) (provider.Adapter,
 		// non-Bearer Authorization scheme; the adapter applies these extra
 		// headers over its Bearer default across every endpoint it calls.
 		oa := provider.NewOpenAIAdapter(name, p.BaseURL, apiKey, authHeaderOverride(p.AuthScheme, apiKey))
+		if err := oa.SetModelsURL(p.ModelsURL); err != nil {
+			return nil, fmt.Sprintf("provider %q disabled: %v", name, err)
+		}
 		oa.SetTranscribeFormat(strings.TrimSpace(p.TranscribeFormat))
 		return oa, ""
 	case "anthropic":

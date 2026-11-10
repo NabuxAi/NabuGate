@@ -199,6 +199,19 @@ providers:
     # nothing to reach while this was off.
     passthrough: true
 
+  # Routerah (routerah.app) — OpenAI-compatible inference via a single key.
+  # Its public pricing catalog lists ALL models (including free and media
+  # models), not merely the subset visible to the currently active API key.
+  # Discovery refreshes every 5 minutes and routes as routerah/<model-id>.
+  # No key means no routable provider and no misleading model entries.
+  routerah:
+    enabled: true
+    type: openai
+    base_url: "https://api.routerah.app/v1"
+    models_url: "https://api.routerah.app/api/pricing/catalog"
+    api_key_env: "ROUTERAH_API_KEY"
+    passthrough: true
+
   # Cloudflare Workers AI (developers.cloudflare.com/workers-ai) — OpenAI-wire
   # serverless inference (Llama / gpt-oss / Qwen / Mistral / DeepSeek / bge). The
   # account id is templated into base_url; auth is a Bearer token. Both
