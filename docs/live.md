@@ -157,6 +157,80 @@ capture a real one in a browser (`pc.localDescription.sdp` after ICE
 gathering), save it, and pass `NABUGATE_LIVE_SMOKE_OFFER=/path/to/offer.sdp`.
 The only complete test is a person on a microphone.
 
+## Gemini Live — `POST /v1/live/gemini/token`
+
+Gemini Live does not use the WebRTC handshake above. The gateway mints a
+one-use ephemeral token with its own `GEMINI_API_KEY` (`POST
+/v1alpha/auth_tokens` on the Gemini host, header `x-goog-api-key`) and
+returns the token, when it expires, and the websocket the client should
+open. The caller authenticates with a normal gateway key. The same rate
+limit and balance check as every other route run first.
+
+```json
+{
+  "setup": {
+    "model": "models/gemini-2.5-flash-native-audio-preview-12-2025",
+    "generationConfig": { "responseModalities": ["AUDIO"] },
+    "systemInstruction": { "parts": [{ "text": "You are the shop assistant." }] },
+    "tools": [{
+      "functionDeclarations": [{
+        "name": "search_products",
+        "description": "Find products",
+        "parameters": { "type": "object", "properties": { "q": { "type": "string" } } }
+      }]
+    }]
+  }
+}
+```
+
+`setup` is sent as `bidiGenerateContentSetup` without being remodelled, so
+`tools[].functionDeclarations` — `name`, `description`, `parameters`, and
+any other field — reach Gemini intact. `uses` is 1.
+
+```json
+{
+  "name": "auth_tokens/…",
+  "token": "auth_tokens/…",
+  "expireTime": "2026-11-16T16:30:00Z",
+  "expires_at": "2026-11-16T16:30:00Z",
+  "url": "wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContentConstrained?access_token=auth_tokens%2F…",
+  "session_id": "live_…"
+}
+```
+
+While `live_relay.enabled` is false, `url` is that Google socket. The
+browser then speaks to Google directly. Tool calls travel on that socket,
+not through the gateway: the server message is `toolCall.functionCalls`
+(`id`, `name`, `args`) and the client answers `toolResponse.functionResponses`
+(`id`, `name`, `response`).
+
+Bill the returned `session_id` with the same usage route as GPT-Live.
+The first minute is prepaid when the token is minted. A missing
+`GEMINI_API_KEY` is `503`. The price is
+`pricing."gemini/gemini-2.5-flash-native-audio-preview-12-2025".per_minute`.
+
+## Media relay
+
+`live_relay` in the config is off unless an operator sets `enabled: true`.
+The gateway then returns `url` as `wss://<the host the client called>/v1/live/ws?ticket=…`
+instead of Google's host. `POST /v1/live/ws/session` with
+`{"provider":"openai","model":"nabu-live"}` issues the same kind of ticket
+for OpenAI's Realtime websocket (`/realtime?model=…` on the OpenAI base).
+The ticket is single use and lasts a minute. The upgrade copies frames in
+both directions and does not parse them, so a Gemini `toolCall` /
+`toolResponse` and an OpenAI Realtime event are the same bytes on the way
+out as on the way in.
+
+`max_minutes` (default 30) closes the relayed socket. `max_sessions_per_key`
+(default 10) is how many live sessions one key may hold open. The relay
+needs `OPENAI_API_KEY` for the OpenAI side and `GEMINI_API_KEY` for the
+Gemini side. Turning it on is a deploy decision: the gateway holds the
+audio sockets and dials the vendors.
+
+The Iran mirror (`deploy/iran`) already upgrades websockets. `location
+/v1/live/` repeats that upgrade and gives the path a two-hour proxy
+timeout so a call is not cut at the mirror.
+
 ## Actions and the browser SDK
 
 A call that can *do* things — search, create, book — needs the actions

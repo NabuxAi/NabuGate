@@ -42,8 +42,11 @@ type Config struct {
 	// Live is realtime full-duplex voice (GPT-Live): the browser speaks to the
 	// vendor over WebRTC and the gateway does the signalling. Billed per
 	// minute (usage.Price.PerMinute), not per token.
-	Live    map[string]ModelRoute  `yaml:"live"`
-	Pricing map[string]usage.Price `yaml:"pricing"` // USD per unit; keys and lookup order in usage.Lookup
+	Live map[string]ModelRoute `yaml:"live"`
+	// LiveRelay carries realtime audio through the gateway when the browser
+	// cannot reach the vendor. Off leaves signalling exactly as it was.
+	LiveRelay LiveRelayConfig        `yaml:"live_relay"`
+	Pricing   map[string]usage.Price `yaml:"pricing"` // USD per unit; keys and lookup order in usage.Lookup
 
 	// Voices are names a caller can give a speech or live alias without knowing
 	// which vendor will speak: each maps a provider to that vendor's own voice.
@@ -78,6 +81,15 @@ type Config struct {
 	// to reach a gated provider stays an admin's approval — which is exactly
 	// how every deployment behaves before this file gains a `plans:` block.
 	Plans []Plan `yaml:"plans"`
+}
+
+// LiveRelayConfig is the media relay for realtime voice. Enabled is off unless
+// an operator turns it on: signalling works either way, and the relay is what
+// carries the audio when the browser cannot reach the vendor.
+type LiveRelayConfig struct {
+	Enabled           bool `yaml:"enabled"`
+	MaxMinutes        int  `yaml:"max_minutes"`
+	MaxSessionsPerKey int  `yaml:"max_sessions_per_key"`
 }
 
 // Plan is one subscription offer.

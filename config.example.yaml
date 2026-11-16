@@ -630,6 +630,13 @@ images:
 # WebRTC; the gateway only signals (POST /v1/live/sessions) and bills the
 # minutes the caller reports back (POST /v1/live/sessions/{id}/usage).
 # No fallback across vendors: the SDP answer comes from exactly one of them.
+#
+# Off until an operator enables it. See docs/live.md.
+live_relay:
+  enabled: false
+  max_minutes: 30
+  max_sessions_per_key: 10
+
 live:
   # OpenAI rejects gpt-live-1 for realtime calls; use its supported WebRTC model.
   nabu-live:

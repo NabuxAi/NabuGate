@@ -37,6 +37,31 @@ const defaultPayGateway = "aqayepardakht"
 // carrying it — the same rule every provider key here follows.
 const defaultMCPTokenEnv = "NABUGATE_MCP_TOKEN"
 
+// liveRelayFrom reads the relay flag and the vendor keys the relay dials with.
+// The keys are the same env vars the chat adapters already use. An empty key
+// leaves that side of the relay answering 503; it is never written into the
+// config file.
+func liveRelayFrom(cfg *config.Config) server.LiveRelay {
+	r := server.LiveRelay{
+		Enabled:     cfg.LiveRelay.Enabled,
+		MaxSession:  time.Duration(cfg.LiveRelay.MaxMinutes) * time.Minute,
+		MaxSessions: cfg.LiveRelay.MaxSessionsPerKey,
+	}
+	if p, ok := cfg.Providers["openai"]; ok {
+		r.OpenAIBase = p.BaseURL
+		if p.APIKeyEnv != "" {
+			r.OpenAIKey = os.Getenv(p.APIKeyEnv)
+		}
+	}
+	if p, ok := cfg.Providers["gemini"]; ok {
+		r.GeminiBase = p.BaseURL
+		if p.APIKeyEnv != "" {
+			r.GeminiKey = os.Getenv(p.APIKeyEnv)
+		}
+	}
+	return r
+}
+
 func main() {
 	configPath := flag.String("config", envOr("NABU_CONFIG", "config.yaml"),
 		"path to the YAML config file (ignored when the NABU_CONFIG_YAML env var holds the config inline)")
@@ -150,6 +175,7 @@ func main() {
 	// Browser origins allowed to call the gateway. Empty — the default — sends
 	// no CORS headers at all, so a deployment that names none is unchanged.
 	srv.SetCORSOrigins(cfg.Server.CORSOrigins)
+	srv.SetLiveRelay(liveRelayFrom(cfg))
 
 	// Real payments, through the NabuPay bridge NabuDesk exposes. The gateways
 	// themselves are configured there; NabuGate owns the wallet and so decides

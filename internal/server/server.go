@@ -77,6 +77,10 @@ type Server struct {
 	// live is the registry of realtime voice sessions this gateway signalled
 	// and has not yet billed to completion. See live.go.
 	live *liveSessions
+	// relay is the optional media path. tickets are the single-use grants a
+	// client exchanges for a websocket.
+	relay   LiveRelay
+	tickets *relayTickets
 
 	// pay starts and confirms real payments through NabuPay. nil when the
 	// deployment has no gateway configured, in which case the panel says
@@ -146,7 +150,7 @@ func (s *Server) loadManagedAgents() {
 // (dev mode) and a warning is logged by the caller. agents may be nil or empty
 // when no sub-agents are configured.
 func New(r *router.Router, enforcer *policy.Enforcer, tracker *usage.Tracker, agents *agent.Registry, log *slog.Logger) *Server {
-	return &Server{router: r, policy: enforcer, usage: tracker, agents: agents, log: log, logins: newThrottle(), toolExec: agent.NewToolExecutor(), requests: adminstore.NewRequestLog(500), live: newLiveSessions()}
+	return &Server{router: r, policy: enforcer, usage: tracker, agents: agents, log: log, logins: newThrottle(), toolExec: agent.NewToolExecutor(), requests: adminstore.NewRequestLog(500), live: newLiveSessions(), tickets: newRelayTickets()}
 }
 
 // WithToolExecutor overrides the agent-tool executor — tests use it to permit
@@ -215,6 +219,9 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /v1/audio/speech", s.auth(s.handleSpeech))
 	mux.HandleFunc("POST /v1/live/sessions", s.auth(s.handleLiveSession))
 	mux.HandleFunc("POST /v1/live/sessions/{id}/usage", s.auth(s.handleLiveUsage))
+	mux.HandleFunc("POST /v1/live/gemini/token", s.auth(s.handleGeminiLiveToken))
+	mux.HandleFunc("POST /v1/live/ws/session", s.auth(s.handleLiveRelaySession))
+	mux.HandleFunc("GET /v1/live/ws", s.handleLiveRelay)
 	mux.HandleFunc("POST /v1/audio/transcriptions", s.auth(s.handleTranscription))
 	mux.HandleFunc("POST /v1/embeddings", s.auth(s.handleEmbeddings))
 	mux.HandleFunc("POST /v1/systemone", s.auth(s.handleDecisions))

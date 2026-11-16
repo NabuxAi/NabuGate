@@ -56,6 +56,27 @@ server {
         return 200 "ok\n";
     }
 
+    # Live voice sockets stay up for the whole call. Upgrade and the long
+    # timeouts are also on location /, and are repeated here so a later
+    # change to the catch-all cannot drop them for this path.
+    location /v1/live/ {
+        resolver 127.0.0.11 valid=30s ipv6=off;
+        set $upstream_host ${UPSTREAM_HOST};
+        proxy_pass https://$upstream_host;
+        proxy_ssl_server_name on;
+        proxy_ssl_name ${UPSTREAM_HOST};
+        proxy_set_header Host ${UPSTREAM_HOST};
+        proxy_set_header X-Forwarded-Host ${MIRROR_HOST};
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header Accept-Encoding $http_accept_encoding;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection $connection_upgrade;
+        proxy_read_timeout 7200s;
+        proxy_send_timeout 7200s;
+        send_timeout 7200s;
+    }
+
     location / {
         # Resolve on each request through Docker's DNS. A startup lookup would
         # pin one address for the life of the process.

@@ -105,7 +105,7 @@ X-Nabu-Balance-Warning: low       # only when the balance is below $1`} label="r
           <p style={{ marginTop: 12 }}>The output includes every alias, sub-agent, flow, and direct model. Put any of these names in the <code>model</code> field.</p>
           <H2>Three kinds of names</H2>
           <ul style={{ paddingInlineStart: 20, display: 'flex', flexDirection: 'column', gap: 8 }}>
-            <li><strong>Aliases</strong> such as <code>nabu-fast</code>, <code>nabu-smart</code>, <code>nabu-embed</code>: a chain across several providers, with fallback. Choose these for everyday work.</li>
+            <li><strong>Aliases</strong> such as <code>nabu-fast</code>, <code>nabu-smart</code>, <code>nabu-embed</code>, <code>nabu-vision</code>: a chain across several providers, with fallback. Choose these for everyday work. <code>nabu-vision</code> reads screenshots: <code>gpt-4o</code> first, then Gemini 2.5 Flash on Google’s OpenAI-compatible endpoint (and a second Google project), then Qwen3-VL, then Claude. Send images as <code>image_url</code> parts, either a <code>data:</code> URL or <code>https</code>.</li>
             <li><strong>Direct models</strong> such as <code dir="ltr">openai/gpt-…</code>, <code dir="ltr">openrouter/…</code> (the whole OpenRouter catalogue) or <code dir="ltr">huggingface/…</code> (Hugging Face Inference Providers): no fallback, exactly that model. Use these when you need reproducible results.</li>
             <li><strong>Agents / flows</strong> such as <code>cine-motion-designer</code>: an assistant with a ready-made system prompt, called just like a model.</li>
           </ul>
@@ -407,6 +407,23 @@ llm = OpenAILike(model="nabu-smart", api_base="${BASE}", api_key="${KEY}",
         </section>
       )}
 
+      {active === 'live-voice' && (
+        <section>
+          <H1>Live voice</H1>
+          <Lead>A duplex call is signalled here and billed by the minute. With the relay off, the audio still goes to the vendor. With the relay on, the browser talks only to this gateway.</Lead>
+          <H2>GPT-Live</H2>
+          <p><code>POST /v1/live/sessions</code> with <code>model: &quot;nabu-live&quot;</code> and the browser’s SDP offer. <code>session.tools</code> is forwarded unchanged. Report time with <code>POST /v1/live/sessions/&#123;id&#125;/usage</code> and <code>&#123;&quot;seconds&quot;: 90, &quot;final&quot;: true&#125;</code>. Seconds are a cumulative snapshot. The first minute is prepaid. The charge shows up on <code>GET /v1/usage</code>.</p>
+          <H2>Gemini Live</H2>
+          <p><code>POST /v1/live/gemini/token</code> takes the same bearer key as every other route, so the rate limit and the balance check apply. The body is <code>&#123;&quot;setup&quot;: &#123;…&#125;&#125;</code>. <code>setup.tools[].functionDeclarations</code> is locked into the ephemeral token. The reply is <code>token</code>, <code>expireTime</code>, <code>url</code> and <code>session_id</code>. Bill that id with the usage route above.</p>
+          <CodeBlock code={`curl -X POST ${BASE}/live/gemini/token \\
+  -H "Authorization: Bearer ${KEY}" \\
+  -H "Content-Type: application/json" \\
+  -d '{"setup":{"model":"models/gemini-2.5-flash-native-audio-preview-12-2025","generationConfig":{"responseModalities":["AUDIO"]},"tools":[{"functionDeclarations":[{"name":"search_products","description":"Find products","parameters":{"type":"object","properties":{"q":{"type":"string"}}}}]}]}}'`} />
+          <H2>Relay</H2>
+          <p>Set <code>live_relay.enabled</code> in the gateway config. The Gemini reply’s <code>url</code> is then <code>wss://&lt;this host&gt;/v1/live/ws?ticket=…</code>. <code>POST /v1/live/ws/session</code> with <code>&#123;&quot;provider&quot;:&quot;openai&quot;,&quot;model&quot;:&quot;nabu-live&quot;&#125;</code> does the same for OpenAI Realtime. Tool-call frames pass through unchanged. One call is capped at <code>max_minutes</code> (30) and a key at <code>max_sessions_per_key</code> (10). The relay needs <code>GEMINI_API_KEY</code> and <code>OPENAI_API_KEY</code> on the gateway, and it stays off until an operator turns it on.</p>
+        </section>
+      )}
+
       {active === 'api-reference' && (
         <section>
           <H1>API reference</H1>
@@ -419,6 +436,11 @@ llm = OpenAILike(model="nabu-smart", api_base="${BASE}", api_key="${KEY}",
               ['POST', '/v1/images/generations', 'Image generation; with the photo alias, a stock image search.'],
               ['POST', '/v1/audio/speech', 'Text to speech.'],
               ['POST', '/v1/audio/transcriptions', 'Speech to text.'],
+              ['POST', '/v1/live/sessions', 'Open a GPT-Live WebRTC session. The alias is nabu-live. session.tools is forwarded.'],
+              ['POST', '/v1/live/sessions/{id}/usage', 'Report cumulative seconds for a live session. The key is billed in GET /v1/usage.'],
+              ['POST', '/v1/live/gemini/token', 'Mint a Gemini Live ephemeral token with the gateway key. Returns token, expiry, websocket URL and session_id.'],
+              ['POST', '/v1/live/ws/session', 'When the live relay is enabled, a ticket for an OpenAI Realtime or Gemini Live websocket on this host.'],
+              ['GET', '/v1/live/ws', 'The relay socket. Upgrade with the ticket from the call above. Frames, including tool calls, are copied through.'],
               ['GET', '/v1/models', 'Live list of aliases, agents, flows, and direct models.'],
               ['GET', '/v1/agents', 'Sub-agents with their models and tools.'],
               ['GET', '/v1/usage', 'Usage for this key: tokens and cost, broken down by model.'],

@@ -36,8 +36,8 @@ type geminiPart struct {
 }
 
 type geminiContent struct {
-	Role  string       `json:"role,omitempty"`
-	Parts []geminiPart `json:"parts"`
+	Role  string `json:"role,omitempty"`
+	Parts []any  `json:"parts"`
 }
 
 type geminiRequest struct {
@@ -96,21 +96,9 @@ type geminiResponse struct {
 }
 
 func (a *GeminiAdapter) Chat(ctx context.Context, req ChatRequest) (ChatResponse, error) {
-	var system *geminiContent
-	contents := make([]geminiContent, 0, len(req.Messages))
-	for _, m := range req.Messages {
-		switch m.Role {
-		case "system":
-			if system == nil {
-				system = &geminiContent{Parts: []geminiPart{{Text: m.Content}}}
-			} else {
-				system.Parts = append(system.Parts, geminiPart{Text: m.Content})
-			}
-		case "assistant":
-			contents = append(contents, geminiContent{Role: "model", Parts: []geminiPart{{Text: m.Content}}})
-		default:
-			contents = append(contents, geminiContent{Role: "user", Parts: []geminiPart{{Text: m.Content}}})
-		}
+	system, contents, err := buildGeminiContents(req)
+	if err != nil {
+		return ChatResponse{}, err
 	}
 
 	genCfg := geminiGenConfig(req)
@@ -183,21 +171,9 @@ func (a *GeminiAdapter) Chat(ctx context.Context, req ChatRequest) (ChatResponse
 
 // ChatStream implements StreamAdapter using Gemini's streamGenerateContent.
 func (a *GeminiAdapter) ChatStream(ctx context.Context, req ChatRequest, onDelta DeltaFunc) (Usage, error) {
-	var system *geminiContent
-	contents := make([]geminiContent, 0, len(req.Messages))
-	for _, m := range req.Messages {
-		switch m.Role {
-		case "system":
-			if system == nil {
-				system = &geminiContent{Parts: []geminiPart{{Text: m.Content}}}
-			} else {
-				system.Parts = append(system.Parts, geminiPart{Text: m.Content})
-			}
-		case "assistant":
-			contents = append(contents, geminiContent{Role: "model", Parts: []geminiPart{{Text: m.Content}}})
-		default:
-			contents = append(contents, geminiContent{Role: "user", Parts: []geminiPart{{Text: m.Content}}})
-		}
+	system, contents, err := buildGeminiContents(req)
+	if err != nil {
+		return Usage{}, err
 	}
 
 	genCfg := geminiGenConfig(req)
