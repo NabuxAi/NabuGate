@@ -28,7 +28,17 @@ gateway alias, either at the top level (like every other endpoint) or inside
 
 The gateway replaces the alias with the upstream model and forwards the rest
 untouched; whatever the vendor answers comes back verbatim with a `201`, plus
-the usual `X-Nabu-Provider` / `X-Nabu-Model` headers:
+the usual `X-Nabu-Provider` / `X-Nabu-Model` headers.
+
+A body with no SDP offer is not a WebRTC call yet. The gateway mints an
+ephemeral client secret (`POST /realtime/client_secrets`) and returns it as
+`token` and `client_secret.value`, with `url` set to the vendor's
+`/v1/realtime/calls` endpoint. The browser posts its offer there with that
+secret. `session.tools`, `instructions` and the voice travel in the GA
+session object (`type: "realtime"`). A proxy that still only has the retired
+`/realtime/sessions` route answers 404 on `client_secrets`; the gateway then
+tries that older route. OpenAI's own API answers 404 "Invalid URL" on
+`/realtime/sessions`, so that route is not the one a current key uses.
 
 ```json
 { "session": { "id": "live_123" }, "transport": { "type": "webrtc", "sdp": "<answer>" } }
