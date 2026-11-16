@@ -150,9 +150,24 @@ func (a *OpenAIAdapter) CreateLiveSession(ctx context.Context, req LiveSessionRe
 			// endpoint said, which is always "Invalid URL" and explains nothing.
 			gaRefusal = &LiveUpstreamError{Status: status, Message: vendorErrorMessage(raw)}
 		}
+	} else {
+		// No SDP offer: the GA way to hand the browser a credential is
+		// POST /realtime/client_secrets. The retired /realtime/sessions
+		// answers 404 "Invalid URL" on the current API, which used to
+		// become a 502 for every JSON session create.
+		secret, refusal, err := a.mintRealtimeClientSecret(ctx, req)
+		if err != nil {
+			return LiveSessionResponse{}, err
+		}
+		if refusal == nil {
+			return secret, nil
+		}
+		gaRefusal = refusal
 	}
 
-	// Fallback path: legacy JSON POST to /realtime/sessions (used by test mocks or older proxies)
+	// Legacy JSON POST to /realtime/sessions. Used when client_secrets (or,
+	// for an SDP offer, /realtime/calls) answers 404, which is what the test
+	// mocks and older proxies still do.
 	body, err := rewriteLiveModel(req.Body, req.Model)
 	if err != nil {
 		return LiveSessionResponse{}, err
@@ -277,6 +292,170 @@ func vendorErrorMessage(raw []byte) string {
 		return "(empty response)"
 	}
 	return truncateBody([]byte(msg), 300)
+}
+
+// mintRealtimeClientSecret calls the GA ephemeral-key endpoint. refusal is
+// set only for 404 and 405, which means "this upstream does not have the
+// endpoint" and the caller may try the legacy sessions route. Any other
+// status is the vendor's answer and is returned as err.
+func (a *OpenAIAdapter) mintRealtimeClientSecret(ctx context.Context, req LiveSessionRequest) (LiveSessionResponse, *LiveUpstreamError, error) {
+	body, err := realtimeClientSecretBody(req.Body, req.Model)
+	if err != nil {
+		return LiveSessionResponse{}, nil, err
+	}
+	status, _, raw, err := postRequestOnce(ctx, a.baseURL+"/realtime/client_secrets", a.headers(), body)
+	if err != nil {
+		return LiveSessionResponse{}, nil, fmt.Errorf("live client secret request failed: %w", err)
+	}
+	if status == http.StatusNotFound || status == http.StatusMethodNotAllowed {
+		return LiveSessionResponse{}, &LiveUpstreamError{Status: status, Message: vendorErrorMessage(raw)}, nil
+	}
+	if status < 200 || status >= 300 {
+		return LiveSessionResponse{}, nil, &LiveUpstreamError{Status: status, Message: vendorErrorMessage(raw)}
+	}
+	resp, err := clientSecretResponse(a.baseURL, raw)
+	if err != nil {
+		return LiveSessionResponse{}, nil, err
+	}
+	return resp, nil, nil
+}
+
+// realtimeClientSecretBody is the GA client_secrets body: {"session":{...}}.
+// tools, instructions and the voice are copied from the caller's session
+// (or the same fields at the top level, which is the older shape) without
+// rewriting tools. The model is the upstream model. type defaults to
+// "realtime". A beta "voice" string is written to session.audio.output.voice,
+// which is where the GA session reads it.
+func realtimeClientSecretBody(body json.RawMessage, model string) ([]byte, error) {
+	top := map[string]json.RawMessage{}
+	if len(bytes.TrimSpace(body)) > 0 {
+		if err := json.Unmarshal(body, &top); err != nil {
+			return nil, fmt.Errorf("live session body is not a JSON object: %w", err)
+		}
+	}
+	session := map[string]json.RawMessage{}
+	if raw, ok := top["session"]; ok && len(bytes.TrimSpace(raw)) > 0 && string(bytes.TrimSpace(raw)) != "null" {
+		if err := json.Unmarshal(raw, &session); err != nil {
+			return nil, fmt.Errorf("live session \"session\" is not a JSON object: %w", err)
+		}
+	}
+	for _, key := range []string{"instructions", "tools", "tool_choice"} {
+		if _, ok := session[key]; ok {
+			continue
+		}
+		if raw, ok := top[key]; ok && len(bytes.TrimSpace(raw)) > 0 {
+			session[key] = raw
+		}
+	}
+	if err := promoteLiveVoice(session, top["voice"]); err != nil {
+		return nil, err
+	}
+	if _, ok := session["type"]; !ok {
+		session["type"] = json.RawMessage(`"realtime"`)
+	}
+	modelJSON, err := json.Marshal(model)
+	if err != nil {
+		return nil, err
+	}
+	session["model"] = modelJSON
+	sessionJSON, err := json.Marshal(session)
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(map[string]json.RawMessage{"session": sessionJSON})
+}
+
+// promoteLiveVoice writes a voice into session.audio.output.voice when that
+// is where the GA session looks and the caller put the name somewhere else.
+// An explicit audio.output.voice is left alone. tools and the rest of audio
+// are not rewritten.
+func promoteLiveVoice(session map[string]json.RawMessage, topVoice json.RawMessage) error {
+	audio := map[string]json.RawMessage{}
+	if raw, ok := session["audio"]; ok && len(bytes.TrimSpace(raw)) > 0 {
+		if err := json.Unmarshal(raw, &audio); err != nil {
+			return fmt.Errorf("live session \"audio\" is not a JSON object: %w", err)
+		}
+	}
+	output := map[string]json.RawMessage{}
+	if raw, ok := audio["output"]; ok && len(bytes.TrimSpace(raw)) > 0 {
+		if err := json.Unmarshal(raw, &output); err != nil {
+			return fmt.Errorf("live session \"audio.output\" is not a JSON object: %w", err)
+		}
+	}
+	if _, ok := output["voice"]; ok {
+		// The GA field is already set. Drop a beta "voice" sibling so the
+		// vendor is not handed two names for one speaker.
+		delete(session, "voice")
+		return nil
+	}
+	voice := session["voice"]
+	if len(bytes.TrimSpace(voice)) == 0 || string(bytes.TrimSpace(voice)) == "null" {
+		voice = topVoice
+	}
+	if len(bytes.TrimSpace(voice)) == 0 || string(bytes.TrimSpace(voice)) == "null" {
+		return nil
+	}
+	output["voice"] = voice
+	delete(session, "voice")
+	var err error
+	if audio["output"], err = json.Marshal(output); err != nil {
+		return err
+	}
+	if session["audio"], err = json.Marshal(audio); err != nil {
+		return err
+	}
+	return nil
+}
+
+// clientSecretResponse turns the GA answer ({value, expires_at, session})
+// into the shape callers of this gateway already read: client_secret.value
+// and token hold the ephemeral key, and url is the WebRTC calls endpoint
+// the browser posts its SDP offer to with that key.
+func clientSecretResponse(baseURL string, raw []byte) (LiveSessionResponse, error) {
+	var parsed struct {
+		Value     string          `json:"value"`
+		ExpiresAt json.RawMessage `json:"expires_at"`
+		Session   json.RawMessage `json:"session"`
+	}
+	if err := json.Unmarshal(raw, &parsed); err != nil {
+		return LiveSessionResponse{}, fmt.Errorf("live client secret: invalid response: %s", truncateBody(raw, 200))
+	}
+	if strings.TrimSpace(parsed.Value) == "" {
+		return LiveSessionResponse{}, fmt.Errorf("live client secret upstream returned no value")
+	}
+	var session struct {
+		ID string `json:"id"`
+	}
+	_ = json.Unmarshal(parsed.Session, &session)
+	id := session.ID
+	if id == "" {
+		return LiveSessionResponse{}, fmt.Errorf("live client secret upstream returned no session id")
+	}
+	secret := map[string]any{"value": parsed.Value}
+	if len(bytes.TrimSpace(parsed.ExpiresAt)) > 0 {
+		secret["expires_at"] = parsed.ExpiresAt
+	}
+	out := map[string]any{
+		"id":            id,
+		"value":         parsed.Value,
+		"token":         parsed.Value,
+		"client_secret": secret,
+		"session": map[string]any{
+			"id": id,
+		},
+		"url": strings.TrimRight(baseURL, "/") + "/realtime/calls",
+	}
+	if len(bytes.TrimSpace(parsed.ExpiresAt)) > 0 {
+		out["expires_at"] = parsed.ExpiresAt
+	}
+	if len(bytes.TrimSpace(parsed.Session)) > 0 {
+		out["session"] = parsed.Session
+	}
+	body, err := json.Marshal(out)
+	if err != nil {
+		return LiveSessionResponse{}, err
+	}
+	return LiveSessionResponse{ID: id, Body: body}, nil
 }
 
 // rewriteLiveModel sets session.model on the caller's body. The alias the

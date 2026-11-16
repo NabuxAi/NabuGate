@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -245,6 +246,151 @@ func TestCreateLiveSessionSurfacesTheVendorsMessageWithoutSecrets(t *testing.T) 
 				t.Fatalf("message leaked %q: %q", c.mustNot, refusal.Message)
 			}
 		})
+	}
+}
+
+func TestCreateLiveSessionMintsAGAClientSecretAndKeepsTools(t *testing.T) {
+	tools := `[{"type":"function","name":"search_products","description":"Find products","parameters":{"type":"object","properties":{"q":{"type":"string"}},"required":["q"],"additionalProperties":false}}]`
+	body := `{"model":"nabu-live","session":{"instructions":"shop","voice":"marin","tool_choice":"auto","tools":` + tools + `}}`
+	var got []byte
+	var path, auth string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		path, auth = r.URL.Path, r.Header.Get("Authorization")
+		if r.URL.Path == "/realtime/sessions" {
+			t.Errorf("the retired sessions endpoint was called")
+			w.WriteHeader(http.StatusNotFound)
+			_, _ = w.Write([]byte(`{"error":{"message":"Invalid URL (POST /v1/realtime/sessions)"}}`))
+			return
+		}
+		got, _ = io.ReadAll(r.Body)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"value":"ek_test_secret","expires_at":1893456000,"session":{"id":"sess_ga","type":"realtime","model":"gpt-realtime-2.1"}}`))
+	}))
+	defer srv.Close()
+
+	resp, err := NewOpenAIAdapter("openai", srv.URL, "k", nil).CreateLiveSession(context.Background(),
+		LiveSessionRequest{Model: "gpt-realtime-2.1", Body: json.RawMessage(body)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if path != "/realtime/client_secrets" || auth != "Bearer k" {
+		t.Fatalf("auth %q path %q", auth, path)
+	}
+	var sent struct {
+		Session struct {
+			Type         string          `json:"type"`
+			Model        string          `json:"model"`
+			Instructions string          `json:"instructions"`
+			ToolChoice   string          `json:"tool_choice"`
+			Voice        string          `json:"voice"`
+			Tools        json.RawMessage `json:"tools"`
+			Audio        struct {
+				Output struct {
+					Voice string `json:"voice"`
+				} `json:"output"`
+			} `json:"audio"`
+		} `json:"session"`
+	}
+	if err := json.Unmarshal(got, &sent); err != nil {
+		t.Fatal(err)
+	}
+	if sent.Session.Type != "realtime" || sent.Session.Model != "gpt-realtime-2.1" {
+		t.Fatalf("session identity = %+v", sent.Session)
+	}
+	if sent.Session.Instructions != "shop" || sent.Session.ToolChoice != "auto" || sent.Session.Voice != "" {
+		t.Fatalf("session fields = %+v", sent.Session)
+	}
+	if sent.Session.Audio.Output.Voice != "marin" {
+		t.Fatalf("voice = %q", sent.Session.Audio.Output.Voice)
+	}
+	var want, decoded any
+	if err := json.Unmarshal([]byte(tools), &want); err != nil {
+		t.Fatal(err)
+	}
+	if err := json.Unmarshal(sent.Session.Tools, &decoded); err != nil {
+		t.Fatalf("tools = %s", sent.Session.Tools)
+	}
+	wantJSON, _ := json.Marshal(want)
+	gotJSON, _ := json.Marshal(decoded)
+	if string(wantJSON) != string(gotJSON) {
+		t.Fatalf("tools changed\nwant %s\ngot  %s", wantJSON, gotJSON)
+	}
+	if resp.ID != "sess_ga" {
+		t.Fatalf("id = %q", resp.ID)
+	}
+	var answer struct {
+		Token        string `json:"token"`
+		Value        string `json:"value"`
+		URL          string `json:"url"`
+		ClientSecret struct {
+			Value string `json:"value"`
+		} `json:"client_secret"`
+		Session struct {
+			ID string `json:"id"`
+		} `json:"session"`
+	}
+	if err := json.Unmarshal(resp.Body, &answer); err != nil {
+		t.Fatal(err)
+	}
+	if answer.Token != "ek_test_secret" || answer.Value != "ek_test_secret" || answer.ClientSecret.Value != "ek_test_secret" {
+		t.Fatalf("ephemeral key not in the client shape: %s", resp.Body)
+	}
+	if answer.Session.ID != "sess_ga" || !strings.HasSuffix(answer.URL, "/realtime/calls") {
+		t.Fatalf("answer = %+v", answer)
+	}
+}
+
+func TestCreateLiveSessionIgnoresARetiredSessions404WhenTheClientSecretWorks(t *testing.T) {
+	// OpenAI's GA API answers 404 "Invalid URL" for POST /realtime/sessions.
+	// A JSON create with no SDP offer must still succeed via client_secrets.
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/realtime/sessions" {
+			w.WriteHeader(http.StatusNotFound)
+			_, _ = w.Write([]byte(`{"error":{"message":"Invalid URL (POST /v1/realtime/sessions)"}}`))
+			return
+		}
+		if r.URL.Path != "/realtime/client_secrets" {
+			http.NotFound(w, r)
+			return
+		}
+		_, _ = w.Write([]byte(`{"value":"ek_ok","expires_at":1893456000,"session":{"id":"sess_ok"}}`))
+	}))
+	defer srv.Close()
+
+	resp, err := NewOpenAIAdapter("openai", srv.URL, "k", nil).CreateLiveSession(context.Background(),
+		LiveSessionRequest{Model: "gpt-realtime-2.1", Body: json.RawMessage(`{"model":"nabu-live"}`)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.ID != "sess_ok" || !strings.Contains(string(resp.Body), "ek_ok") || !strings.Contains(string(resp.Body), "/realtime/calls") {
+		t.Fatalf("answer = %s err=%v", resp.Body, err)
+	}
+}
+
+func TestCreateLiveSessionFallsBackToLegacySessionsWhenClientSecrets404(t *testing.T) {
+	var paths []string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		paths = append(paths, r.URL.Path)
+		if r.URL.Path == "/realtime/client_secrets" {
+			w.WriteHeader(http.StatusNotFound)
+			_, _ = w.Write([]byte(`{"error":{"message":"no client secrets here"}}`))
+			return
+		}
+		w.WriteHeader(http.StatusCreated)
+		_, _ = w.Write([]byte(`{"session":{"id":"live_legacy"},"client_secret":{"value":"ek_legacy"}}`))
+	}))
+	defer srv.Close()
+
+	resp, err := NewOpenAIAdapter("openai", srv.URL, "k", nil).CreateLiveSession(context.Background(),
+		LiveSessionRequest{Model: "gpt-live-1", Body: json.RawMessage(`{"model":"nabu-live"}`)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.ID != "live_legacy" || !strings.Contains(string(resp.Body), "ek_legacy") {
+		t.Fatalf("legacy answer = %s", resp.Body)
+	}
+	if len(paths) != 2 || paths[0] != "/realtime/client_secrets" || paths[1] != "/realtime/sessions" {
+		t.Fatalf("paths = %v", paths)
 	}
 }
 
