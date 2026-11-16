@@ -2056,15 +2056,15 @@ images:
 # minutes the caller reports back (POST /v1/live/sessions/{id}/usage).
 # No fallback across vendors: the SDP answer comes from exactly one of them.
 #
-# The media relay is off until an operator enables it. Signalling
+# The media relay is on. Signalling
 # (POST /v1/live/sessions, POST /v1/live/gemini/token and the usage report)
-# works either way. When enabled, the client opens wss://<this host>/v1/live/ws
-# and the gateway carries frames to OpenAI Realtime or Gemini Live, which is
-# the path that still works where those hosts are filtered. max_minutes caps
-# one relayed call. max_sessions_per_key caps how many live sessions one key
-# may hold, including these.
+# still works, and the client opens wss://<this host>/v1/live/ws so the
+# gateway carries frames to OpenAI Realtime or Gemini Live. That is the path
+# that still works where those hosts are filtered. max_minutes caps one
+# relayed call. max_sessions_per_key caps how many live sessions one key may
+# hold, including these.
 live_relay:
-  enabled: false
+  enabled: true
   max_minutes: 30
   max_sessions_per_key: 10
 # ─────────────────────────── named voices ────────────────────────────────────
