@@ -105,7 +105,7 @@ X-Nabu-Balance-Warning: low       # فقط وقتی موجودی زیر ۱ دل�
           <p style={{ marginTop: 12 }}>خروجی همهٔ alias‌ها، ساب‌ایجنت‌ها، فلوها و مدل‌های مستقیم را دارد. همین نام‌ها را در فیلد <code>model</code> بگذارید.</p>
           <H2>سه نوع نام</H2>
           <ul style={{ paddingInlineStart: 20, display: 'flex', flexDirection: 'column', gap: 8 }}>
-            <li><strong>alias</strong> مثل <code>nabu-fast</code>، <code>nabu-smart</code>، <code>nabu-embed</code>: زنجیرهٔ چند ارائه‌دهنده با fallback. برای کار روزمره این را انتخاب کنید.</li>
+            <li><strong>alias</strong> مثل <code>nabu-fast</code>، <code>nabu-smart</code>، <code>nabu-embed</code>، <code>nabu-vision</code>: زنجیرهٔ چند ارائه‌دهنده با fallback. برای کار روزمره این را انتخاب کنید. <code>nabu-vision</code> اسکرین‌شات را می‌خواند: اول <code>gpt-4o</code>، بعد Gemini 2.5 Flash روی نقطهٔ سازگار با OpenAI گوگل (و پروژهٔ دوم گوگل)، بعد Qwen3-VL، بعد Claude. تصویر را به‌صورت <code>image_url</code> بفرستید، چه <code>data:</code> و چه <code>https</code>.</li>
             <li><strong>مدل مستقیم</strong> مثل <code dir="ltr">openai/gpt-…</code>، <code dir="ltr">openrouter/…</code> (کلِ کاتالوگِ OpenRouter) یا <code dir="ltr">huggingface/…</code> (Inference Providersِ Hugging Face): بدون fallback، دقیقاً همان مدل. وقتی نتیجهٔ تکرارپذیر می‌خواهید.</li>
             <li><strong>ایجنت / فلو</strong> مثل <code>cine-motion-designer</code>: یک دستیار با system prompt آماده که مثل یک مدل صدا زده می‌شود.</li>
           </ul>
@@ -407,6 +407,23 @@ llm = OpenAILike(model="nabu-smart", api_base="${BASE}", api_key="${KEY}",
         </section>
       )}
 
+      {active === 'live-voice' && (
+        <section>
+          <H1>صدای زنده</H1>
+          <Lead>تماس دوطرفه اینجا علامت‌گذاری می‌شود و دقیقه‌ای حساب می‌شود. تا وقتی رله خاموش است صدا هنوز پیش فروشنده می‌رود. با رله روشن، مرورگر فقط با همین دروازه حرف می‌زند.</Lead>
+          <H2>GPT-Live</H2>
+          <p><code>POST /v1/live/sessions</code> با <code dir="ltr">model: &quot;nabu-live&quot;</code> و پیشنهاد SDP مرورگر. <code>session.tools</code> دست‌نخورده جلو می‌رود. زمان را با <code>POST /v1/live/sessions/&#123;id&#125;/usage</code> و <code dir="ltr">&#123;&quot;seconds&quot;: 90, &quot;final&quot;: true&#125;</code> بگویید. ثانیه‌ها عکس تجمعی‌اند. دقیقهٔ اول پیش‌پرداخت است. هزینه در <code>GET /v1/usage</code> دیده می‌شود.</p>
+          <H2>Gemini Live</H2>
+          <p><code>POST /v1/live/gemini/token</code> همان کلید بقیهٔ مسیرها را می‌خواهد، پس محدودیت نرخ و موجودی هم اعمال می‌شود. بدنه <code dir="ltr">&#123;&quot;setup&quot;: &#123;…&#125;&#125;</code> است. <code>setup.tools[].functionDeclarations</code> داخل توکن موقت قفل می‌شود. پاسخ <code>token</code>، <code>expireTime</code>، <code>url</code> و <code>session_id</code> است. همان شناسه را با مسیر مصرف بالا حساب کنید.</p>
+          <CodeBlock code={`curl -X POST ${BASE}/live/gemini/token \\
+  -H "Authorization: Bearer ${KEY}" \\
+  -H "Content-Type: application/json" \\
+  -d '{"setup":{"model":"models/gemini-2.5-flash-native-audio-preview-12-2025","generationConfig":{"responseModalities":["AUDIO"]},"tools":[{"functionDeclarations":[{"name":"search_products","description":"Find products","parameters":{"type":"object","properties":{"q":{"type":"string"}}}}]}]}}'`} />
+          <H2>رله</H2>
+          <p><code>live_relay.enabled</code> را در پیکربندی دروازه روشن کنید. آن‌وقت <code>url</code> پاسخ جمینی <code dir="ltr">wss://&lt;this host&gt;/v1/live/ws?ticket=…</code> است. <code>POST /v1/live/ws/session</code> با <code dir="ltr">&#123;&quot;provider&quot;:&quot;openai&quot;,&quot;model&quot;:&quot;nabu-live&quot;&#125;</code> همین کار را برای OpenAI Realtime می‌کند. فریم فراخوانی ابزار دست‌نخورده رد می‌شود. هر تماس تا <code>max_minutes</code> (۳۰) و هر کلید تا <code>max_sessions_per_key</code> (۱۰) نشست باز دارد. رله به <code>GEMINI_API_KEY</code> و <code>OPENAI_API_KEY</code> روی دروازه نیاز دارد و تا اپراتور روشن‌اش نکند خاموش می‌ماند.</p>
+        </section>
+      )}
+
       {active === 'api-reference' && (
         <section>
           <H1>مرجع API</H1>
@@ -419,6 +436,11 @@ llm = OpenAILike(model="nabu-smart", api_base="${BASE}", api_key="${KEY}",
               ['POST', '/v1/images/generations', 'تولید تصویر؛ با alias عکس، جست‌وجوی تصویر استوک.'],
               ['POST', '/v1/audio/speech', 'تبدیل متن به گفتار.'],
               ['POST', '/v1/audio/transcriptions', 'تبدیل گفتار به متن.'],
+              ['POST', '/v1/live/sessions', 'باز کردن نشست WebRTC برای GPT-Live. alias برابر nabu-live است و session.tools دست‌نخورده می‌رود.'],
+              ['POST', '/v1/live/sessions/{id}/usage', 'گزارش ثانیه‌های تجمعی یک نشست زنده. هزینه روی کلید در GET /v1/usage می‌نشیند.'],
+              ['POST', '/v1/live/gemini/token', 'ساخت توکن موقت Gemini Live با کلید دروازه. توکن، انقضا، آدرس وب‌سوکت و session_id برمی‌گردد.'],
+              ['POST', '/v1/live/ws/session', 'وقتی رلهٔ زنده روشن است، بلیت یک وب‌سوکت OpenAI Realtime یا Gemini Live روی همین میزبان.'],
+              ['GET', '/v1/live/ws', 'سوکت رله. با بلیت مرحلهٔ قبل ارتقا می‌شود. فریم‌ها، از جمله فراخوانی ابزار، دست‌نخورده رد می‌شوند.'],
               ['GET', '/v1/models', 'فهرست زندهٔ alias‌ها، ایجنت‌ها، فلوها و مدل‌های مستقیم.'],
               ['GET', '/v1/agents', 'ساب‌ایجنت‌ها با مدل و ابزارهایشان.'],
               ['GET', '/v1/usage', 'مصرف همین کلید: توکن و هزینه به تفکیک مدل.'],

@@ -106,6 +106,17 @@ func (r *Router) liveHealth(alias string, h *AliasHealth) {
 	}
 }
 
+// LivePrimary is the first rung of a live alias: the provider and the upstream
+// model a relay dials. ok is false when the alias is missing or the rung does
+// not name both.
+func (r *Router) LivePrimary(alias string) (providerName, model string, ok bool) {
+	route, found := r.live[alias]
+	if !found || route.Primary.Provider == "" || route.Primary.Model == "" {
+		return "", "", false
+	}
+	return route.Primary.Provider, route.Primary.Model, true
+}
+
 // LiveResult is a signalled realtime session: which upstream took it and what
 // it answered.
 type LiveResult struct {

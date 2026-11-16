@@ -11,6 +11,83 @@ import (
 	"testing"
 )
 
+func TestCreateLiveSessionForwardsSessionToolsUnchanged(t *testing.T) {
+	tools := `[{"type":"function","name":"search_products","description":"Find products","parameters":{"type":"object","properties":{"q":{"type":"string","description":"query"}},"required":["q"],"additionalProperties":false}}]`
+	body := `{"model":"nabu-live","session":{"type":"realtime","instructions":"shop","tool_choice":"auto","tools":` + tools + `},"transport":{"type":"webrtc","sdp":"v=0 offer"}}`
+	var sessionField string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/realtime/calls" {
+			t.Errorf("path %s", r.URL.Path)
+			http.NotFound(w, r)
+			return
+		}
+		if err := r.ParseMultipartForm(1 << 20); err != nil {
+			t.Error(err)
+			return
+		}
+		sessionField = r.FormValue("session")
+		w.Header().Set("Location", "/v1/realtime/calls/call_tools")
+		w.WriteHeader(http.StatusCreated)
+		_, _ = w.Write([]byte("v=0\r\n"))
+	}))
+	defer srv.Close()
+
+	_, err := NewOpenAIAdapter("openai", srv.URL, "test-key", nil).CreateLiveSession(context.Background(),
+		LiveSessionRequest{Model: "gpt-realtime-2.1", Body: json.RawMessage(body)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var session map[string]any
+	if err := json.Unmarshal([]byte(sessionField), &session); err != nil {
+		t.Fatalf("session field: %s", sessionField)
+	}
+	if session["model"] != "gpt-realtime-2.1" {
+		t.Fatalf("model = %v", session["model"])
+	}
+	got, _ := json.Marshal(session["tools"])
+	var want, decoded any
+	if err := json.Unmarshal([]byte(tools), &want); err != nil {
+		t.Fatal(err)
+	}
+	if err := json.Unmarshal(got, &decoded); err != nil {
+		t.Fatal(err)
+	}
+	wantJSON, _ := json.Marshal(want)
+	gotJSON, _ := json.Marshal(decoded)
+	if string(wantJSON) != string(gotJSON) {
+		t.Fatalf("tools changed\nwant %s\ngot  %s", wantJSON, gotJSON)
+	}
+	if session["tool_choice"] != "auto" || session["instructions"] != "shop" {
+		t.Fatalf("session fields dropped: %s", sessionField)
+	}
+}
+
+func TestRewriteLiveModelKeepsSessionTools(t *testing.T) {
+	tools := `[{"type":"function","name":"add_to_cart","description":"Add","parameters":{"type":"object","properties":{"sku":{"type":"string"}}}}]`
+	out, err := rewriteLiveModel(json.RawMessage(
+		`{"model":"nabu-live","session":{"model":"nabu-live","tools":`+tools+`,"tool_choice":"auto"}}`,
+	), "gpt-realtime")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var top struct {
+		Session struct {
+			Model      string          `json:"model"`
+			ToolChoice string          `json:"tool_choice"`
+			Tools      json.RawMessage `json:"tools"`
+		} `json:"session"`
+	}
+	if err := json.Unmarshal(out, &top); err != nil {
+		t.Fatal(err)
+	}
+	if top.Session.Model != "gpt-realtime" || top.Session.ToolChoice != "auto" {
+		t.Fatalf("session = %+v", top.Session)
+	}
+	if string(top.Session.Tools) != tools {
+		t.Fatalf("tools = %s", top.Session.Tools)
+	}
+}
+
 func TestRewriteLiveModelReplacesTheAliasWithTheUpstreamModel(t *testing.T) {
 	out, err := rewriteLiveModel(json.RawMessage(
 		`{"model":"nabu-live","session":{"model":"nabu-live","instructions":"be brief"},"transport":{"type":"webrtc","sdp":"v=0 offer"}}`,

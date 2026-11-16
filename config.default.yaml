@@ -1587,6 +1587,11 @@ models:
   #
   # The Gemini rung is checked against ListModels rather than assumed — that is
   # what made the old one rot silently.
+  #
+  # Screenshots arrive as OpenAI image_url parts (a data URL or https). The
+  # Gemini rungs below are Google's OpenAI-compatible endpoint, so those parts
+  # are forwarded as written. The native Gemini adapter converts the same
+  # parts (data URL → inlineData, https → fileData) if a rung ever uses it.
   nabu-vision:
     primary:
       model: gpt-4o
@@ -2050,6 +2055,18 @@ images:
 # WebRTC; the gateway only signals (POST /v1/live/sessions) and bills the
 # minutes the caller reports back (POST /v1/live/sessions/{id}/usage).
 # No fallback across vendors: the SDP answer comes from exactly one of them.
+#
+# The media relay is off until an operator enables it. Signalling
+# (POST /v1/live/sessions, POST /v1/live/gemini/token and the usage report)
+# works either way. When enabled, the client opens wss://<this host>/v1/live/ws
+# and the gateway carries frames to OpenAI Realtime or Gemini Live, which is
+# the path that still works where those hosts are filtered. max_minutes caps
+# one relayed call. max_sessions_per_key caps how many live sessions one key
+# may hold, including these.
+live_relay:
+  enabled: false
+  max_minutes: 30
+  max_sessions_per_key: 10
 # ─────────────────────────── named voices ────────────────────────────────────
 #
 # A voice a caller can name without knowing which vendor will speak. A speech or
@@ -2714,6 +2731,11 @@ pricing:
   "openai/gpt-realtime-mini": { per_minute: 0.10 }
   # $32 audio in and $64 out per 1M tokens, gpt-realtime's rates (2026-11-05).
   "openai/gpt-realtime-2.1": { per_minute: 0.30 }
+  # Gemini Live native audio. 25 audio tokens a second; input $3 and output
+  # $12 per 1M tokens (ai.google.dev/gemini-api/docs/pricing). A minute with
+  # audio both ways is 1500 + 1500 tokens, about $0.023. Confirm the figure
+  # before a deployment relies on it.
+  "gemini/gemini-2.5-flash-native-audio-preview-12-2025": { per_minute: 0.023 }
 
   # ── OpenAI (platform.openai.com/docs/pricing, 2026-09-26) ────────────────
   gpt-4o: { input: 2.50, output: 10.00 }

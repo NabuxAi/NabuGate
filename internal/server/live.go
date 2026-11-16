@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -72,6 +73,11 @@ type liveSession struct {
 	// reaped marks a session already billed as abandoned, so it is billed
 	// that way once and no longer counts as open.
 	reaped bool
+	// rate is the plan markup from the request that opened the session.
+	// A relayed socket closes on its own, with no later request to read the
+	// plan from, so the close uses this. It is not written to disk: a usage
+	// report after a restart comes in on a request that carries the plan.
+	rate gatewayRate
 }
 
 // liveSessionRecord is a session as it is kept on disk.
@@ -445,7 +451,11 @@ func (s *Server) billLive(r *http.Request, project string, session liveSession, 
 		return 0
 	}
 	list, priced := s.usage.PriceOf(session.provider, session.model, usage.Metered{Seconds: float64(seconds)})
-	cost, providerCost := s.charge(r.Context(), session.byCaller, list)
+	ctx := r.Context()
+	if cur := gatewayRateFrom(ctx); cur.markup == 0 && cur.minCharge == 0 && (session.rate.markup > 0 || session.rate.minCharge > 0) {
+		ctx = context.WithValue(ctx, gatewayRateCtxKey{}, session.rate)
+	}
+	cost, providerCost := s.charge(ctx, session.byCaller, list)
 	e := adminstore.UsageEntry{
 		CostUSD:         cost,
 		ProviderCostUSD: providerCost,

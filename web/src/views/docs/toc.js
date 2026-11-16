@@ -23,6 +23,7 @@ export const GROUPS = [
     { id: 'curl', fa: 'cURL', en: 'cURL' },
   ] },
   { title: { fa: 'مرجع', en: 'Reference' }, icon: 'book', items: [
+    { id: 'live-voice', fa: 'صدای زنده', en: 'Live voice', ar: 'الصوت المباشر' },
     { id: 'api-reference', fa: 'مرجع API', en: 'API reference' },
     { id: 'errors', fa: 'خطاها و عیب‌یابی', en: 'Errors & troubleshooting' },
     { id: 'keys', fa: 'کلیدها و امنیت', en: 'Keys & security' },
