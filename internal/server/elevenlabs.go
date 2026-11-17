@@ -14,10 +14,10 @@ import (
 	"nabugate/internal/usage"
 )
 
-// maxElevenLabsBody is the largest upload the proxy will read. Forced alignment
+// elevenBodyLimit is the largest upload the proxy will read. Forced alignment
 // and dubbing accept up to about a gigabyte at the vendor; the chat cap (16 MiB)
-// would reject a real video before ElevenLabs had a chance to.
-const maxElevenLabsBody = 1 << 30
+// would reject a real video before ElevenLabs had a chance to. A test lowers it.
+var elevenBodyLimit int64 = 1 << 30
 
 // maxElevenJSON is how much of a JSON body is held in memory so it can be
 // metered and then forwarded. Inline images on the video API are capped at
@@ -137,18 +137,42 @@ func (s *Server) handleElevenLabs(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	durationHeader := provider.ElevenDurationHeader(r.Header)
+	if r.ContentLength > elevenBodyLimit {
+		writeError(w, http.StatusRequestEntityTooLarge, "upload exceeds the ElevenLabs proxy limit")
+		return
+	}
+
 	var body io.Reader
 	var contentLength int64
+	var uploadCh <-chan provider.ElevenUpload
 	if reqBody != nil {
 		body = bytes.NewReader(reqBody)
 		contentLength = int64(len(reqBody))
 	} else {
-		body = r.Body
-		contentLength = r.ContentLength
+		// A second cap, read at request time, so a chunked upload with no
+		// Content-Length still stops at the limit. The auth wrapper's cap was
+		// fixed when the route was registered.
+		r.Body = http.MaxBytesReader(w, r.Body, elevenBodyLimit)
+		if provider.ElevenMeasuresUpload(upstream) {
+			body, uploadCh = provider.InspectElevenUpload(r.Body, reqCT, elevenFamilyOf(upstream))
+		} else {
+			body = r.Body
+			contentLength = r.ContentLength
+		}
 	}
 
 	resp, err := proxy.Forward(r.Context(), r.Method, upstream, r.URL.RawQuery, r.Header, body, contentLength, apiKey)
+	var upload provider.ElevenUpload
+	if uploadCh != nil {
+		upload = <-uploadCh
+	}
+	if elevenTooLarge(err) || elevenTooLarge(upload.Err) {
+		if resp != nil {
+			resp.Body.Close()
+		}
+		writeError(w, http.StatusRequestEntityTooLarge, "upload exceeds the ElevenLabs proxy limit")
+		return
+	}
 	if err != nil {
 		s.log.Warn("elevenlabs upstream unreachable", "project", s.project(r), "method", r.Method, "path", upstream, "error", err)
 		writeError(w, http.StatusBadGateway, "ElevenLabs did not answer")
@@ -157,7 +181,9 @@ func (s *Server) handleElevenLabs(w http.ResponseWriter, r *http.Request) {
 	defer resp.Body.Close()
 
 	respCT := resp.Header.Get("Content-Type")
-	respBody, streamed, err := readElevenResponse(resp)
+	// stream/with-timestamps is a JSON chunk stream. Buffering it until EOF
+	// would hold the first chunk until synthesis finished.
+	respBody, streamed, err := readElevenResponse(resp, strings.Contains(upstream, "/stream"))
 	if err != nil {
 		s.log.Warn("elevenlabs response unreadable", "project", s.project(r), "path", upstream, "error", err)
 		writeError(w, http.StatusBadGateway, "ElevenLabs response could not be read")
@@ -168,7 +194,8 @@ func (s *Server) handleElevenLabs(w http.ResponseWriter, r *http.Request) {
 	if reqBody != nil {
 		measuredBody = reqBody
 	}
-	bill := provider.MeasureEleven(r.Method, upstream, reqCT, measuredBody, durationHeader, resp.StatusCode, respCT, respBody)
+	bill := provider.MeasureEleven(r.Method, upstream, reqCT, measuredBody, resp.StatusCode, respCT, respBody)
+	bill.ApplyUpload(upload.Seconds, upload.Characters, upload.SecondsEstimated)
 	cost := s.chargeEleven(r, bill)
 
 	copyElevenResponseHeaders(w.Header(), resp.Header)
@@ -223,9 +250,27 @@ func readElevenRequest(r *http.Request) (body []byte, contentType string, err er
 // duration can be read off it. Past that, the prefix is returned and the
 // remainder is left in streamed for the handler to copy. Audio and video are
 // never buffered.
-func readElevenResponse(resp *http.Response) (prefix []byte, streamed io.Reader, err error) {
+func elevenFamilyOf(upstream string) string {
+	switch {
+	case strings.Contains(upstream, "/voice-changer/"):
+		return "sts"
+	case strings.Contains(upstream, "/audio-isolation"):
+		return "iso"
+	case strings.Contains(upstream, "/audio-native"):
+		return "native"
+	default:
+		return ""
+	}
+}
+
+func elevenTooLarge(err error) bool {
+	var maxErr *http.MaxBytesError
+	return errors.As(err, &maxErr)
+}
+
+func readElevenResponse(resp *http.Response, stream bool) (prefix []byte, streamed io.Reader, err error) {
 	ct := strings.ToLower(resp.Header.Get("Content-Type"))
-	if !strings.Contains(ct, "json") {
+	if stream || !strings.Contains(ct, "json") {
 		return nil, resp.Body, nil
 	}
 	buf, err := io.ReadAll(io.LimitReader(resp.Body, maxElevenResponseJSON+1))

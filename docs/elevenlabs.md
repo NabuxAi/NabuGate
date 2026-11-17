@@ -66,7 +66,8 @@ A poll of a job that was already billed returns `X-Nabu-Cost-USD: 0.000000`.
 
 JSON is forwarded byte for byte (`language_code`, `voice_settings`, audio tags
 such as `[whispers]`, `seed`, pronunciation dictionaries). Multipart uploads
-are streamed, not buffered. Audio and video responses are streamed back.
+are streamed, not buffered. Audio, video, and JSON timestamp streams
+(`/stream/with-timestamps`) are forwarded as chunks.
 Redirects are not followed, so the API key cannot ride along to another host.
 
 The body cap is 1 GiB. Inline base64 on the video API is the vendor's own
@@ -91,17 +92,13 @@ is in memory; a restart can charge one late poll a second time.
 | Scribe v1 and v3 | $0.20 / hour | same, when the response names that model |
 | Sound effects | $0.12 / minute | `duration_seconds`. If omitted, 10 seconds, marked estimated. |
 | Music | $0.15 / minute | `music_length_ms`. If omitted, 30 seconds, marked estimated. `/music/plan`, `/music/upload` and finetunes are not billed as minutes. |
-| Voice changer and voice isolator | $0.12 / minute | `X-Nabu-Duration-Seconds`, because the response is audio and has no duration. Without the header the call is recorded unpriced (cost $0, flagged). |
+| Voice changer and voice isolator | $0.12 / minute | Duration read from the uploaded WAV (exact) or MP3 (first-frame bitrate, marked estimated). Other containers are recorded unpriced. A caller-supplied duration is not used. |
 | Legacy dubbing `POST /v1/dubbing` | $0.50 / minute | `expected_duration_sec` on create, or `media_metadata.duration` on the first completed poll. This is the no-watermark API default. |
-| Dubbing v2 `POST /v1/dubbing/project` | $2.20 / minute | same. The project API defaults to `dubbing_v2`; the gateway bills that rate for every project-API create. |
+| Dubbing v2 `POST /v1/dubbing/project` | $2.20 / minute | same, once a poll or the create body includes a duration. The project API defaults to `dubbing_v2`. |
 | Forced alignment | $0.20 / hour | the last word or character `end` in the response. ElevenLabs does not publish a separate alignment price; this is Scribe's rate. |
-| Lip-sync `sync-lipsync-v3`, `sync-3`, `creatify-aurora` | $7.20 / minute ($0.12 / second) | `duration_secs` in the JSON, otherwise `X-Nabu-Duration-Seconds`. sync.so lists sync-3 at about $0.107–$0.133/s. |
+| Lip-sync `sync-lipsync-v3`, `sync-3`, `creatify-aurora` | $7.20 / minute ($0.12 / second) | `duration_secs` in the JSON, the model's own field. Without it the job is recorded unpriced. sync.so lists sync-3 at about $0.107–$0.133/s. |
 | Other video model ids (Veo, Seedance, …) | unpriced until a row is added | forwarded as-is. An unpriced 2xx is recorded with cost $0 and the unpriced flag. |
 | Voice list / get / edit / delete, asset upload, model list | not billed | still authenticated and rate-limited |
-
-`X-Nabu-Duration-Seconds` is a number of seconds, must be greater than 0 and at
-most 6 hours, and is stripped before the request reaches ElevenLabs. Send it on
-voice changer, isolator, and any lip-sync body that has no `duration_secs`.
 
 ## Speech
 
@@ -275,14 +272,12 @@ curl "$GATEWAY/elevenlabs/v1/dubbing/$DUBBING_ID/audio/en" \
 ```
 
 Dubbing v2 is the project API and defaults to `dubbing_v2` ($2.20/min). Create
-returns before the source is fetched (`queued`, then `ready`). Pass
-`X-Nabu-Duration-Seconds` if you know the source length at create time;
-otherwise the first poll that includes `media_metadata.duration` is billed.
+returns before the source is fetched (`queued`, then `ready`). The first poll
+that includes `media_metadata.duration` is billed.
 
 ```bash
 curl -X POST "$GATEWAY/elevenlabs/v1/dubbing/project" \
   -H "Authorization: Bearer $NABU_KEY" \
-  -H "X-Nabu-Duration-Seconds: 45" \
   -F "model_id=dubbing_v2" \
   -F "source_language=fa" \
   -F "target_language=en" \
@@ -327,37 +322,33 @@ Also proxied: `POST /v1/music/detailed`, `POST /v1/music/detailed/stream`,
 
 ElevenLabs serves this at `/v1/voice-changer/{voice_id}`. The gateway also
 accepts `/v1/speech-to-speech/{voice_id}` and rewrites it to that path. The
-file field is `audio`. Send `X-Nabu-Duration-Seconds` so the minute rate can
-be applied.
+file field is `audio`. Duration is read from the WAV or MP3; send one of those
+if the call should be priced. Anything else is recorded unpriced.
 
 ```bash
 curl -X POST "$GATEWAY/elevenlabs/v1/speech-to-speech/$VOICE_ID" \
   -H "Authorization: Bearer $NABU_KEY" \
-  -H "X-Nabu-Duration-Seconds: 12" \
   -F "model_id=eleven_multilingual_sts_v2" \
   -F "audio=@in.wav" \
   --output changed.mp3
 
 curl -X POST "$GATEWAY/elevenlabs/v1/voice-changer/$VOICE_ID/stream" \
   -H "Authorization: Bearer $NABU_KEY" \
-  -H "X-Nabu-Duration-Seconds: 12" \
   -F "audio=@in.wav"
 ```
 
 ## Voice isolator
 
-File field `audio`. Same duration header.
+File field `audio`. Same WAV/MP3 duration rule as the voice changer.
 
 ```bash
 curl -X POST "$GATEWAY/elevenlabs/v1/audio-isolation" \
   -H "Authorization: Bearer $NABU_KEY" \
-  -H "X-Nabu-Duration-Seconds: 20" \
   -F "audio=@noisy.wav" \
   --output isolated.wav
 
 curl -X POST "$GATEWAY/elevenlabs/v1/audio-isolation/stream" \
   -H "Authorization: Bearer $NABU_KEY" \
-  -H "X-Nabu-Duration-Seconds: 20" \
   -F "audio=@noisy.wav"
 ```
 
@@ -400,9 +391,9 @@ for a fresh one. The gateway does not proxy the file host.
 `veo-3.1-fast-generate-001`, and the `bytedance-seedance-*` ids. Any other id
 is forwarded; if ElevenLabs rejects it, you get their error body unchanged.
 
-Send `duration_secs` when the model accepts it. For a lipsync body that has no
-duration field, send `X-Nabu-Duration-Seconds` on the create. A create that
-has neither is not billed (the completed poll does not carry a duration).
+Send `duration_secs` when the model accepts it. A create that has no duration
+is recorded unpriced: the completed poll does not carry one, and a caller
+header is not a measurement.
 
 ```bash
 # 1. Large inputs: upload, then reference the asset.
@@ -415,9 +406,9 @@ curl -X POST "$GATEWAY/elevenlabs/v1/assets" \
 curl -X POST "$GATEWAY/elevenlabs/v1/flows/video" \
   -H "Authorization: Bearer $NABU_KEY" \
   -H "Content-Type: application/json" \
-  -H "X-Nabu-Duration-Seconds: 8" \
   -d '{
     "model_id": "sync-lipsync-v3",
+    "duration_secs": 8,
     "image": {"type": "asset", "asset_id": "'"$IMAGE_ASSET"'"},
     "audio": {"type": "asset", "asset_id": "'"$AUDIO_ASSET"'"}
   }'
@@ -441,17 +432,17 @@ does not need the header:
 curl -X POST "$GATEWAY/elevenlabs/v1/flows/video" \
   -H "Authorization: Bearer $NABU_KEY" \
   -H "Content-Type: application/json" \
-  -H "X-Nabu-Duration-Seconds: 8" \
   -d '{
     "model_id": "creatify-aurora",
+    "duration_secs": 8,
     "image": {"type": "asset", "asset_id": "'"$IMAGE_ASSET"'"},
     "audio": {"type": "asset", "asset_id": "'"$AUDIO_ASSET"'"}
   }'
 ```
 
-`creatify-aurora` takes `image` and `audio` and has no `duration_secs`. The
-header is how that job is metered. Models that do have `duration_secs` (Veo,
-Seedance) should send it in the JSON and can omit the header.
+`duration_secs` is forwarded with the rest of the body. Models whose schema
+rejects it answer with ElevenLabs' own error. Veo and Seedance take the field
+as the output length.
 
 Inline images (25 MiB decoded) use
 `{"type":"inline_base64","content_base64":"...","mime_type":"image/png"}`

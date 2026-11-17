@@ -87,7 +87,13 @@ func (p *ElevenLabsProxy) Forward(ctx context.Context, method, path, rawQuery st
 	if err != nil {
 		return nil, err
 	}
-	endpoint.Path = path
+	// Keep a path the operator put on base_url. Replacing Path would turn
+	// https://proxy.example/vendor/elevenlabs into https://proxy.example/v1/...
+	// and skip the prefix the speech adapter still uses.
+	if !strings.HasPrefix(path, "/") {
+		path = "/" + path
+	}
+	endpoint.Path = strings.TrimRight(endpoint.Path, "/") + path
 	endpoint.RawQuery = rawQuery
 	req, err := http.NewRequestWithContext(ctx, method, endpoint.String(), body)
 	if err != nil {
@@ -213,11 +219,12 @@ type ElevenUsage struct {
 // MeasureEleven decides what a proxied call consumed.
 //
 // Request JSON is enough for speech, music and sound effects. Transcription,
-// dubbing and forced alignment put the duration in the response, and a lip-sync
-// job is billed from duration_secs or from the caller's X-Nabu-Duration-Seconds
-// (passed in as durationHeader; it is not part of the vendor body). respStatus
-// 0 means the response is not known yet.
-func MeasureEleven(method, upstreamPath, reqContentType string, reqBody []byte, durationHeader float64, respStatus int, respContentType string, respBody []byte) ElevenUsage {
+// dubbing and forced alignment put the duration in the response. A lip-sync job
+// is billed from duration_secs in that JSON, which is the model's own field.
+// A caller-supplied duration header is not a measurement: the tenant chooses
+// it. Uploaded audio is measured separately, from the file, and applied with
+// ApplyUpload. respStatus 0 means the response is not known yet.
+func MeasureEleven(method, upstreamPath, reqContentType string, reqBody []byte, respStatus int, respContentType string, respBody []byte) ElevenUsage {
 	path := strings.Split(upstreamPath, "?")[0]
 	family := elevenFamily(path)
 	u := ElevenUsage{Family: family, Model: elevenDefaultModel(family, path)}
@@ -230,7 +237,7 @@ func MeasureEleven(method, upstreamPath, reqContentType string, reqBody []byte, 
 		u.Model = model
 	}
 	if method == http.MethodPost || method == http.MethodPut || method == http.MethodPatch {
-		applyElevenRequest(&u, req, durationHeader)
+		applyElevenRequest(&u, req)
 	}
 
 	if respStatus == 0 {
@@ -362,13 +369,24 @@ func elevenAsync(family string) bool {
 	}
 }
 
-func applyElevenRequest(u *ElevenUsage, body map[string]any, durationHeader float64) {
+func applyElevenRequest(u *ElevenUsage, body map[string]any) {
 	switch u.Family {
-	case "tts", "native":
+	case "tts":
 		n := elevenSpokenChars(body)
 		if n > 0 {
 			u.Characters = n
 			u.Charge = true
+			u.Measured = true
+		}
+	case "native":
+		// The document is usually a multipart file, so the JSON body has no
+		// character count. Charge stays on so a conversion we could not read
+		// is recorded unpriced rather than treated as free. ApplyUpload fills
+		// the count when the file part was text.
+		n := elevenSpokenChars(body)
+		u.Charge = true
+		if n > 0 {
+			u.Characters = n
 			u.Measured = true
 		}
 	case "design":
@@ -417,14 +435,41 @@ func applyElevenRequest(u *ElevenUsage, body map[string]any, durationHeader floa
 			u.Seconds = secs
 			u.Charge = true
 			u.Measured = true
-		} else if durationHeader > 0 {
-			u.Seconds = durationHeader
-			u.Charge = true
-			u.Measured = true
 		} else {
 			u.Charge = true
 			u.Measured = false
 		}
+	}
+}
+
+// ApplyUpload adds a quantity read from the uploaded file itself: seconds from
+// a WAV or MP3, or characters from an Audio Native document. It never replaces
+// a quantity the vendor's own JSON already named.
+func (u *ElevenUsage) ApplyUpload(seconds float64, characters int, secondsEstimated bool) {
+	if u == nil || !u.Charge || u.Measured {
+		return
+	}
+	if characters > 0 && (u.Family == "native" || u.Family == "tts") {
+		u.Characters = characters
+		u.Measured = true
+		u.Estimated = false
+		return
+	}
+	if seconds > 0 && elevenBilledInSeconds(u.Family) {
+		u.Seconds = seconds
+		u.Measured = true
+		u.Estimated = secondsEstimated
+	}
+}
+
+// ElevenMeasuresUpload reports whether the request body is the thing being
+// billed and is not JSON: voice changer, isolator, and Audio Native.
+func ElevenMeasuresUpload(upstreamPath string) bool {
+	switch elevenFamily(strings.Split(upstreamPath, "?")[0]) {
+	case "sts", "iso", "native":
+		return true
+	default:
+		return false
 	}
 }
 
@@ -597,24 +642,6 @@ func elevenWordEnd(v any) float64 {
 		}
 	}
 	return max
-}
-
-// ElevenDurationHeader reads the metering hint the gateway strips before the
-// vendor sees the request. A value past six hours is refused: a typo there
-// would be a very large bill, and no ElevenLabs job this proxy accepts is longer.
-func ElevenDurationHeader(h http.Header) float64 {
-	if h == nil {
-		return 0
-	}
-	raw := strings.TrimSpace(h.Get("X-Nabu-Duration-Seconds"))
-	if raw == "" {
-		return 0
-	}
-	f, err := strconv.ParseFloat(raw, 64)
-	if err != nil || f <= 0 || f > 6*60*60 {
-		return 0
-	}
-	return f
 }
 
 // ReadElevenJSONBody buffers a JSON request so it can be metered and then

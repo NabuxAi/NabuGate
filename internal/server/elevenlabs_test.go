@@ -3,12 +3,14 @@ package server
 import (
 	"bytes"
 	"context"
+	"encoding/binary"
 	"io"
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"nabugate/internal/policy"
 	"nabugate/internal/provider"
@@ -148,24 +150,24 @@ func TestElevenLabsProxyStreamsMultipartAndAudio(t *testing.T) {
 		_, _ = w.Write([]byte("CHANGED"))
 	}, nil)
 
+	wav := makeWAV(1, 8000, 1, 16)
 	var buf bytes.Buffer
 	form := multipart.NewWriter(&buf)
 	part, _ := form.CreateFormFile("audio", "in.wav")
-	_, _ = part.Write([]byte("WAVDATA"))
+	_, _ = part.Write(wav)
 	_ = form.WriteField("model_id", "eleven_multilingual_sts_v2")
 	_ = form.Close()
 
 	req, _ := http.NewRequest(http.MethodPost, ts.URL+"/elevenlabs/v1/speech-to-speech/voice1", &buf)
 	req.Header.Set("Content-Type", form.FormDataContentType())
-	req.Header.Set("X-Nabu-Duration-Seconds", "30")
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer resp.Body.Close()
 	out, _ := io.ReadAll(resp.Body)
-	if string(out) != "CHANGED" || string(gotFile) != "WAVDATA" {
-		t.Fatalf("file %q out %q", gotFile, out)
+	if string(out) != "CHANGED" || !bytes.HasPrefix(gotFile, []byte("RIFF")) {
+		t.Fatalf("file prefix %q out %q", gotFile[:min(12, len(gotFile))], out)
 	}
 	if !strings.Contains(gotCT, "multipart/form-data") {
 		t.Fatalf("content-type %q", gotCT)
@@ -173,9 +175,9 @@ func TestElevenLabsProxyStreamsMultipartAndAudio(t *testing.T) {
 	if gotPath != "/v1/voice-changer/voice1" {
 		t.Fatalf("speech-to-speech was not rewritten: %s", gotPath)
 	}
-	// The alias path is the voice changer.
-	// 30 seconds at $0.12 / minute = $0.06.
-	if resp.Header.Get("X-Nabu-Cost-USD") != "0.060000" {
+	// One second of WAV at $0.12 / minute. The duration comes from the file,
+	// not from a caller header.
+	if resp.Header.Get("X-Nabu-Cost-USD") != "0.002000" {
 		t.Fatalf("cost %q model %q", resp.Header.Get("X-Nabu-Cost-USD"), resp.Header.Get("X-Nabu-Model"))
 	}
 }
@@ -416,4 +418,168 @@ func TestElevenProviderAllowList(t *testing.T) {
 	if !elevenProviderAllowed(req) {
 		t.Fatal("elevenlabs key was refused")
 	}
+}
+
+func TestElevenLabsProxyEnforcesConfiguredProviderList(t *testing.T) {
+	keys := policy.New(nil, []policy.KeyConfig{{
+		Key: "openai-only", Project: "nabugen", Allow: []string{"*"}, Providers: []string{"openai"},
+	}})
+	called := false
+	ts := elevenGateway(t, func(w http.ResponseWriter, r *http.Request) {
+		called = true
+		w.WriteHeader(http.StatusOK)
+	}, keys)
+	req, _ := http.NewRequest(http.MethodGet, ts.URL+"/elevenlabs/v1/voices", nil)
+	req.Header.Set("Authorization", "Bearer openai-only")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusForbidden {
+		t.Fatalf("status %d", resp.StatusCode)
+	}
+	if called {
+		t.Fatal("a key limited to openai reached ElevenLabs")
+	}
+}
+
+func TestElevenLabsProxyStreamsTimestampJSON(t *testing.T) {
+	release := make(chan struct{})
+	ts := elevenGateway(t, func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"chunk":1}`))
+		if f, ok := w.(http.Flusher); ok {
+			f.Flush()
+		}
+		<-release
+		_, _ = w.Write([]byte(`{"chunk":2}`))
+	}, nil)
+	t.Cleanup(func() {
+		select {
+		case <-release:
+		default:
+			close(release)
+		}
+	})
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	req, _ := http.NewRequestWithContext(ctx, http.MethodPost, ts.URL+"/elevenlabs/v1/text-to-speech/voice/stream/with-timestamps",
+		strings.NewReader(`{"text":"hi","model_id":"eleven_v3"}`))
+	req.Header.Set("Content-Type", "application/json")
+	type result struct {
+		resp *http.Response
+		err  error
+	}
+	done := make(chan result, 1)
+	go func() {
+		resp, err := http.DefaultClient.Do(req)
+		done <- result{resp, err}
+	}()
+	var resp *http.Response
+	select {
+	case got := <-done:
+		if got.err != nil {
+			t.Fatal(got.err)
+		}
+		resp = got.resp
+	case <-time.After(2 * time.Second):
+		t.Fatal("timestamp stream was buffered until the upstream closed")
+	}
+	defer resp.Body.Close()
+	buf := make([]byte, 32)
+	n, err := resp.Body.Read(buf)
+	if err != nil && n == 0 {
+		t.Fatal(err)
+	}
+	if !bytes.Contains(buf[:n], []byte(`"chunk":1`)) {
+		t.Fatalf("first chunk %q", buf[:n])
+	}
+	close(release)
+}
+
+func TestElevenLabsProxyRejectsOversizedUpload(t *testing.T) {
+	old := elevenBodyLimit
+	elevenBodyLimit = 64
+	t.Cleanup(func() { elevenBodyLimit = old })
+	called := false
+	ts := elevenGateway(t, func(w http.ResponseWriter, r *http.Request) {
+		called = true
+		_, _ = io.Copy(io.Discard, r.Body)
+		w.WriteHeader(http.StatusOK)
+	}, nil)
+	req, _ := http.NewRequest(http.MethodPost, ts.URL+"/elevenlabs/v1/dubbing", bytes.NewReader(bytes.Repeat([]byte("a"), 200)))
+	req.Header.Set("Content-Type", "application/octet-stream")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusRequestEntityTooLarge {
+		t.Fatalf("declared length: status %d", resp.StatusCode)
+	}
+	if called {
+		t.Fatal("oversized Content-Length was forwarded")
+	}
+
+	req, _ = http.NewRequest(http.MethodPost, ts.URL+"/elevenlabs/v1/dubbing", bytes.NewReader(bytes.Repeat([]byte("b"), 200)))
+	req.Header.Set("Content-Type", "application/octet-stream")
+	req.ContentLength = -1
+	resp, err = http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusRequestEntityTooLarge {
+		t.Fatalf("chunked upload: status %d", resp.StatusCode)
+	}
+}
+
+func TestElevenLabsProxyMetersAudioNativeText(t *testing.T) {
+	ts := elevenGateway(t, func(w http.ResponseWriter, r *http.Request) {
+		if _, _, err := r.FormFile("file"); err != nil {
+			t.Errorf("file: %v", err)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = io.WriteString(w, `{"project_id":"p1"}`)
+	}, nil)
+	var buf bytes.Buffer
+	form := multipart.NewWriter(&buf)
+	part, _ := form.CreateFormFile("file", "article.html")
+	_, _ = part.Write([]byte("hello"))
+	_ = form.WriteField("auto_convert", "true")
+	_ = form.Close()
+	resp, err := http.Post(ts.URL+"/elevenlabs/v1/audio-native", form.FormDataContentType(), &buf)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	// 5 characters at $80 / 1M.
+	if resp.Header.Get("X-Nabu-Cost-USD") != "0.000400" {
+		body, _ := io.ReadAll(resp.Body)
+		t.Fatalf("cost %q status %d body %s", resp.Header.Get("X-Nabu-Cost-USD"), resp.StatusCode, body)
+	}
+}
+
+func makeWAV(seconds, rate, channels, bits int) []byte {
+	dataSize := seconds * rate * channels * bits / 8
+	byteRate := rate * channels * bits / 8
+	block := channels * bits / 8
+	buf := make([]byte, 44+dataSize)
+	copy(buf[0:], "RIFF")
+	binary.LittleEndian.PutUint32(buf[4:], uint32(36+dataSize))
+	copy(buf[8:], "WAVE")
+	copy(buf[12:], "fmt ")
+	binary.LittleEndian.PutUint32(buf[16:], 16)
+	binary.LittleEndian.PutUint16(buf[20:], 1)
+	binary.LittleEndian.PutUint16(buf[22:], uint16(channels))
+	binary.LittleEndian.PutUint32(buf[24:], uint32(rate))
+	binary.LittleEndian.PutUint32(buf[28:], uint32(byteRate))
+	binary.LittleEndian.PutUint16(buf[32:], uint16(block))
+	binary.LittleEndian.PutUint16(buf[34:], uint16(bits))
+	copy(buf[36:], "data")
+	binary.LittleEndian.PutUint32(buf[40:], uint32(dataSize))
+	return buf
 }

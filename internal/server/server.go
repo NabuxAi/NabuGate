@@ -242,7 +242,7 @@ func (s *Server) Handler() http.Handler {
 	// Go 1.22 rejects two patterns where neither is a subset of the other.
 	// Naming the methods makes each one a subset of nothing it overlaps.
 	for _, method := range []string{"GET", "POST", "PUT", "PATCH", "DELETE", "HEAD"} {
-		mux.HandleFunc(method+" /elevenlabs/", s.authWithLimit(maxElevenLabsBody, s.handleElevenLabs))
+		mux.HandleFunc(method+" /elevenlabs/", s.authWithLimit(elevenBodyLimit, s.handleElevenLabs))
 	}
 
 	site := s.webSite()
