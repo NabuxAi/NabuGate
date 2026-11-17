@@ -198,9 +198,9 @@ var catalogue = map[string]Vendor{
 		Icon:  "M16.5 16.3c.2-.5.1-1-.1-1.4-.2-.3-.6-.5-1-.6l-7.7-.1a.15.15 0 0 1-.1-.1v-.2l.2-.1 7.8-.1c.9 0 1.9-.8 2.2-1.7l.5-1.2a10.7 10.7 0 0 0-20.1 1.4c.5-.4 1.2-.6 1.9-.5l4.6.6.2.1v.2l-.2.1-4.5.6C-.5 13.6-1 15-.7 16.3h17.2Z",
 	},
 	"elevenlabs": {
-		Label: "ElevenLabs", Blurb: "طبیعی‌ترین صدای مصنوعی، و Scribe که روی زبان‌های کم‌منبع بهتر از whisper است.",
-		BlurbEn:      "The most natural synthetic voices, and Scribe, which beats whisper on low-resource languages.",
-		Capabilities: []string{CapSpeech, CapTranscribe},
+		Label: "ElevenLabs", Blurb: "طبیعی‌ترین صدای مصنوعی، و Scribe که روی زبان‌های کم‌منبع بهتر از whisper است. دوبله، موسیقی، افکت و لب‌خوانی هم از همین کلید.",
+		BlurbEn:      "The most natural synthetic voices, and Scribe, which beats whisper on low-resource languages. Dubbing, music, sound effects and lip-sync use the same key.",
+		Capabilities: []string{CapSpeech, CapTranscribe, CapVideo},
 		Site:         "https://elevenlabs.io", KeysURL: "https://elevenlabs.io/app/settings/api-keys",
 		Color: "#000000",
 		Icon:  "M9 3h3.2v18H9V3Zm5.8 0H18v18h-3.2V3Z",
