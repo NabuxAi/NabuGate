@@ -594,9 +594,6 @@ providers:
     base_url: "https://api.pexels.com/v1"
     api_key_env: "PEXELS_API_KEY"
 
-  # ElevenLabs — text to speech only. Authenticates with xi-api-key and puts the
-  # voice id in the URL, so it needs its own adapter rather than the openai one.
-  # The key already exists in BIKO's environment; set the same value here.
   # پارسی‌گو (github.com/nimaone/persian_tts) — Persian text to speech, run on
   # this deployment's own machine. No key and no vendor: the base_url is the
   # whole address of it, so it belongs on a private network, never on a public
@@ -610,6 +607,10 @@ providers:
     type: parsigo
     base_url: "${PARSIGO_BASE_URL}"
 
+  # ElevenLabs — speech, transcription, and the /elevenlabs/* proxy (dubbing,
+  # music, sound effects, voice cloning, lip-sync). The adapter speaks xi-api-key.
+  # The same key serves both the OpenAI-shaped aliases and the proxy. See
+  # docs/elevenlabs.md. Inert until ELEVENLABS_API_KEY is set.
   elevenlabs:
     enabled: true
     type: elevenlabs
@@ -2915,6 +2916,39 @@ pricing:
   eleven_v3_conversational: { per_million_chars: 40.00 }
   # v4 Turbo at the Flash/Turbo rate, $0.04 per 1,000 characters (2026-11-05).
   eleven_v4_turbo: { per_million_chars: 40.00 }
+  # The /elevenlabs proxy meters these. Rates are the API list on
+  # elevenlabs.io/pricing/api as of 2026-11-17: $0.08 / 1K characters for
+  # multilingual and v3, $0.04 for flash/turbo. Scribe v2 stays at the rate above.
+  eleven_multilingual_v2: { per_million_chars: 80.00 }
+  eleven_v4: { per_million_chars: 80.00 }
+  eleven_turbo_v2: { per_million_chars: 40.00 }
+  eleven_turbo_v2_5: { per_million_chars: 40.00 }
+  eleven_flash_v2: { per_million_chars: 40.00 }
+  eleven_flash_v2_5: { per_million_chars: 40.00 }
+  # Voice-design previews are spoken characters.
+  eleven_multilingual_ttv_v2: { per_million_chars: 80.00 }
+  # Scribe v1 and v3 are $0.20/hour. Realtime is $0.22/hour.
+  scribe_v1: { per_minute: 0.003333 }
+  scribe_v3: { per_minute: 0.003333 }
+  scribe_v2_realtime: { per_minute: 0.003667 }
+  # Music $0.15/min. Sound effects, voice changer and voice isolator $0.12/min.
+  music_v1: { per_minute: 0.15 }
+  eleven_text_to_sound_v2: { per_minute: 0.12 }
+  eleven_multilingual_sts_v2: { per_minute: 0.12 }
+  eleven_english_sts_v2: { per_minute: 0.12 }
+  eleven_audio_isolation: { per_minute: 0.12 }
+  # Legacy POST /v1/dubbing, no watermark (the API default): $0.50/min.
+  # Dubbing v2 (POST /v1/dubbing/project, the default model there): $2.20/min.
+  "elevenlabs/dubbing": { per_minute: 0.50 }
+  "elevenlabs/dubbing_v2": { per_minute: 2.20 }
+  # Forced alignment has no separate list price; metered at Scribe's $0.20/hour.
+  "elevenlabs/forced-alignment": { per_minute: 0.003333 }
+  # Sync lipsync. sync.so lists sync-3 at about $0.107–$0.133 per second;
+  # $0.12/sec is $7.20 per minute. creatify-aurora is the lipsync model the
+  # current video API documents; priced the same until its own rate is published.
+  "sync-lipsync-v3": { per_minute: 7.20 }
+  "sync-3": { per_minute: 7.20 }
+  creatify-aurora: { per_minute: 7.20 }
 
   # ── Text to speech: xAI Grok, docs.x.ai (2026-11-05) ─────────────────────
   "xai-voice/grok-tts": { per_million_chars: 15.00 }

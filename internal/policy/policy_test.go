@@ -27,6 +27,16 @@ func TestAdminOnlyForSimpleKeys(t *testing.T) {
 	}
 }
 
+func TestRichKeyKeepsItsProviderList(t *testing.T) {
+	e := New(nil, []KeyConfig{{
+		Key: "k", Project: "crm", Allow: []string{"*"}, Providers: []string{"openai"},
+	}})
+	pol, ok := e.Lookup("k")
+	if !ok || len(pol.Providers) != 1 || pol.Providers[0] != "openai" {
+		t.Fatalf("providers = %#v ok=%v", pol.Providers, ok)
+	}
+}
+
 // TestEmptyKeysDisableAuth documents that blank keys are skipped, so an unset
 // ${VAR} in api_keys can't become a usable empty-string token.
 func TestEmptyKeysDisableAuth(t *testing.T) {

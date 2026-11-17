@@ -43,6 +43,11 @@ type ElevenLabsAdapter struct {
 
 	mu     sync.RWMutex
 	voices map[string]string // lower-cased name -> voice_id
+
+	// proxy is the 1:1 HTTP forwarder for /elevenlabs/*. Built once; the speech
+	// and transcribe methods above keep their own calls.
+	proxyOnce sync.Once
+	proxy     *ElevenLabsProxy
 }
 
 // NewElevenLabsAdapter builds the adapter. baseURL defaults to the public API.
@@ -59,6 +64,20 @@ func NewElevenLabsAdapter(name, baseURL, apiKey string) *ElevenLabsAdapter {
 }
 
 func (a *ElevenLabsAdapter) Name() string { return a.name }
+
+// Proxy is the pass-through client for the ElevenLabs REST API. The speech and
+// transcription methods above reshape requests into the OpenAI wire format;
+// callers that need ElevenLabs' own bodies (audio tags, timestamps, dubbing,
+// lip-sync) use this instead. The API key stays inside the proxy.
+func (a *ElevenLabsAdapter) Proxy() *ElevenLabsProxy {
+	if a == nil {
+		return nil
+	}
+	a.proxyOnce.Do(func() {
+		a.proxy = newElevenLabsProxy(a.baseURL, a.apiKey)
+	})
+	return a.proxy
+}
 
 // Chat exists only so the adapter satisfies Adapter and can live in the shared
 // adapter map; ElevenLabs speaks audio and nothing else. The router skips a

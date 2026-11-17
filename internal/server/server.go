@@ -74,6 +74,11 @@ type Server struct {
 	// bounded — see adminstore.RequestLog for why it is not persisted.
 	requests *adminstore.RequestLog
 
+	// elevenBills remembers async ElevenLabs jobs already charged, so a poll
+	// does not bill the same dub or lip-sync twice. In memory, like the live
+	// session registry: a restart can bill one late poll again.
+	elevenBills *elevenBills
+
 	// live is the registry of realtime voice sessions this gateway signalled
 	// and has not yet billed to completion. See live.go.
 	live *liveSessions
@@ -150,7 +155,7 @@ func (s *Server) loadManagedAgents() {
 // (dev mode) and a warning is logged by the caller. agents may be nil or empty
 // when no sub-agents are configured.
 func New(r *router.Router, enforcer *policy.Enforcer, tracker *usage.Tracker, agents *agent.Registry, log *slog.Logger) *Server {
-	return &Server{router: r, policy: enforcer, usage: tracker, agents: agents, log: log, logins: newThrottle(), toolExec: agent.NewToolExecutor(), requests: adminstore.NewRequestLog(500), live: newLiveSessions(), tickets: newRelayTickets()}
+	return &Server{router: r, policy: enforcer, usage: tracker, agents: agents, log: log, logins: newThrottle(), toolExec: agent.NewToolExecutor(), requests: adminstore.NewRequestLog(500), live: newLiveSessions(), tickets: newRelayTickets(), elevenBills: newElevenBills()}
 }
 
 // WithToolExecutor overrides the agent-tool executor — tests use it to permit
@@ -229,6 +234,16 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /v1/decisions/calibrate", s.auth(s.handleDecisionCalibrate))
 	mux.HandleFunc("GET /v1/usage", s.auth(s.handleUsage))
 	mux.HandleFunc("GET /v1/photos/search", s.auth(s.handlePhotoSearch))
+	// ElevenLabs' own REST API, under /elevenlabs/, so a client can keep the
+	// vendor's paths and bodies. The body cap is the vendor's, not the chat
+	// cap: a dub or a lip-sync upload is a video, not a prompt.
+	//
+	// One method-less pattern conflicts with "GET /" (the console bundle):
+	// Go 1.22 rejects two patterns where neither is a subset of the other.
+	// Naming the methods makes each one a subset of nothing it overlaps.
+	for _, method := range []string{"GET", "POST", "PUT", "PATCH", "DELETE", "HEAD"} {
+		mux.HandleFunc(method+" /elevenlabs/", s.authWithLimit(elevenBodyLimit, s.handleElevenLabs))
+	}
 
 	site := s.webSite()
 	if site != nil {
@@ -1535,9 +1550,19 @@ const lowBalanceUSD = 1.0
 // the resolved policy in the request context for later alias checks. When no
 // keys are configured, requests pass through (dev mode).
 func (s *Server) auth(next http.HandlerFunc) http.HandlerFunc {
+	return s.authWithLimit(maxRequestBytes, next)
+}
+
+// authWithLimit is auth with a caller-chosen body cap. Chat keeps
+// maxRequestBytes; the ElevenLabs proxy raises it because a dub or a lip-sync
+// is a video. The cap still bounds a slow upload — it does not buffer it.
+func (s *Server) authWithLimit(limit int64, next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Cap the body before any handler reads it (bounds memory / slow-loris).
-		r.Body = http.MaxBytesReader(w, r.Body, maxRequestBytes)
+		if limit <= 0 {
+			limit = maxRequestBytes
+		}
+		r.Body = http.MaxBytesReader(w, r.Body, limit)
 		// Caller-supplied upstream credentials ride on every request, whether or
 		// not this deployment enforces its own keys.
 		keyCtx, _ := withCallerKeys(r.Context(), r)

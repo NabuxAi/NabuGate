@@ -130,6 +130,16 @@ func New(adapters map[string]provider.Adapter, models, images, audio, embeddings
 	}
 }
 
+// Adapter returns the live adapter for a provider, if one came up. The
+// ElevenLabs HTTP proxy uses it; routing itself does not.
+func (r *Router) Adapter(name string) (provider.Adapter, bool) {
+	if r == nil {
+		return nil, false
+	}
+	a, ok := r.adapters[name]
+	return a, ok
+}
+
 // resolvePassthrough resolves a public model name of the form
 // "<provider>/<upstream-model>" to a concrete target, when <provider> is a
 // passthrough-enabled provider with a live adapter. The split is on the FIRST

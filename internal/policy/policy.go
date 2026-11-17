@@ -89,7 +89,16 @@ func New(simpleKeys []string, richKeys []KeyConfig) *Enforcer {
 		if k.Key == "" {
 			continue
 		}
-		policies[k.Key] = Policy{Project: k.Project, Allow: k.Allow, RateLimit: k.RateLimit}
+		// Providers is copied so a config key's provider list is the same gate a
+		// console token already had. Leaving it off made `providers: ["openai"]`
+		// a comment: the ElevenLabs proxy (and every other provider check)
+		// treated the key as unrestricted.
+		policies[k.Key] = Policy{
+			Project:   k.Project,
+			Allow:     k.Allow,
+			RateLimit: k.RateLimit,
+			Providers: append([]string(nil), k.Providers...),
+		}
 	}
 	return &Enforcer{
 		policies: policies,
