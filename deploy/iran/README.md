@@ -70,6 +70,16 @@ The console and the docs copy the base URL from the page’s own origin, so a sa
 
 The service has to stay named `mirror`. `SERVICE_FQDN_MIRROR_80` is how Coolify knows to route the domain to port 80; renaming the service without renaming that variable leaves the container off the proxy.
 
+## Files served from the mirror's own disk
+
+A mirror can hold files itself and answer them from Iran, without the request crossing the border: a large download (the Nabusto till for Windows, on the `nabusto.ir` mirror) then arrives at local speed. Both templates try the request path on a local disk first and send everything else to the upstream exactly as before.
+
+1. In Coolify, add a **persistent volume** to the mirror's resource, mounted at `/srv/local`, and redeploy so the container mounts it. A mirror without that volume serves nothing from disk.
+2. Put each file at its request path under `/srv/local`. `/srv/local/download/windows/nabusto-pos-0.2.0-windows-x64.zip` answers `https://nabusto.ir/download/windows/nabusto-pos-0.2.0-windows-x64.zip`. The browser saves it under the URL's last segment, and nginx's `mime.types` gives it its type (`.zip` is `application/zip`).
+3. Copy a file into place in one step: download it beside its final name under a dot name, check its SHA-256, then `mv` it. A half-written file at the final name would be served as it stands.
+
+Only a regular file is answered from disk. A directory never is, so `/download/windows` still reaches the upstream even while `/srv/local/download/windows/` holds files. A path the disk has no file for goes to the upstream, so a newer file the mirror has not been given yet is still served, from abroad. Removing a file sends its path back to the upstream.
+
 ## Check
 
 ```bash

@@ -61,7 +61,20 @@ server {
         return 200 "ok\n";
     }
 
+    # A file this mirror keeps on its own disk is served from here, without
+    # crossing the border: a download a browser in Iran gets at local speed,
+    # and still gets while the link abroad is slow. The disk is a volume at
+    # /srv/local, mounted only on a mirror that has files to serve (see
+    # README, "Files served from the mirror's own disk"), laid out by request
+    # path: /srv/local/download/app.zip answers /download/app.zip. Only a
+    # regular file matches. A path the disk holds no file for, and every path
+    # on a mirror with no volume, goes to the upstream exactly as before.
     location / {
+        root /srv/local;
+        try_files $uri @upstream;
+    }
+
+    location @upstream {
         # Resolve on each request through Docker's DNS. A startup lookup would
         # pin one address for the life of the process.
         resolver 127.0.0.11 valid=30s ipv6=off;
