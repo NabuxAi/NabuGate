@@ -1971,6 +1971,13 @@ images:
         model: "gemini-2.5-flash-image"
       - provider: gemini2
         model: "gemini-2.5-flash-image"
+      # 2026-11-22: OpenAI answered 429 (no credits) and both Gemini keys 429
+      # (quota), so every nabu-image call landed on Pexels and NabuGen, which
+      # needs a generated scene, got stock photos (or none at all from the Iran
+      # region, where images.pexels.com is unreachable). Wan really generates
+      # and answered in ~9 s from both regions; Pexels stays the last resort.
+      - provider: dashscope-image
+        model: "wan2.6-t2i"
       - provider: pexels
         model: "search"
 
