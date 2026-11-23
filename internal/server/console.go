@@ -140,7 +140,11 @@ func (s *Server) consoleStatus(w http.ResponseWriter, r *http.Request) {
 	// Asked only of a signed-in visitor: the method list is for the buy
 	// screen, and an anonymous page load should not be a call to the bridge.
 	if authed && s.pay.Configured() {
-		list, healthy := s.paymentGateways(r.Context())
+		ctx := r.Context()
+		if strings.HasPrefix(s.publicURL(r), "https://gate.nabuxai.ir") {
+			ctx = context.WithValue(ctx, paymentCountryCtxKey{}, "IR")
+		}
+		list, healthy := s.paymentGateways(ctx)
 		if list == nil {
 			list = []nabupay.Gateway{}
 		}

@@ -200,6 +200,13 @@ type Gateway struct {
 // Zarinpal merchant id, say) happens in NabuDesk, and shows up here without a
 // release of this gateway.
 func (c *Client) Gateways(ctx context.Context) ([]Gateway, error) {
+	return c.GatewaysFor(ctx, "", "")
+}
+
+// GatewaysFor asks about the buyer's country and the calling service, so a
+// bank exclusively configured for Iran and NabuGate is actually offered on
+// the Iranian checkout instead of being hidden by a global default.
+func (c *Client) GatewaysFor(ctx context.Context, country, service string) ([]Gateway, error) {
 	if c == nil {
 		return nil, ErrNotConfigured
 	}
@@ -207,7 +214,18 @@ func (c *Client) Gateways(ctx context.Context) ([]Gateway, error) {
 		Success  bool      `json:"success"`
 		Gateways []Gateway `json:"gateways"`
 	}
-	if err := c.get(ctx, "/api/v1/pay/gateways", &out); err != nil {
+	query := url.Values{}
+	if country != "" {
+		query.Set("country", country)
+	}
+	if service != "" {
+		query.Set("service_name", service)
+	}
+	path := "/api/v1/pay/gateways"
+	if len(query) > 0 {
+		path += "?" + query.Encode()
+	}
+	if err := c.get(ctx, path, &out); err != nil {
 		return nil, err
 	}
 	if !out.Success {

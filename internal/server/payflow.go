@@ -75,9 +75,12 @@ func daysLeft(sub adminstore.Subscription, now time.Time) int {
 type gatewayCache struct {
 	mu      sync.Mutex
 	at      time.Time
+	country string
 	list    []nabupay.Gateway
 	healthy bool
 }
+
+type paymentCountryCtxKey struct{}
 
 const gatewayCacheTTL = 5 * time.Minute
 
@@ -89,15 +92,17 @@ func (s *Server) paymentGateways(ctx context.Context) ([]nabupay.Gateway, bool) 
 	if !s.pay.Configured() {
 		return nil, false
 	}
+	country, _ := ctx.Value(paymentCountryCtxKey{}).(string)
 	c := &s.gateways
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	if !c.at.IsZero() && time.Since(c.at) < gatewayCacheTTL {
+	if c.country == country && !c.at.IsZero() && time.Since(c.at) < gatewayCacheTTL {
 		return c.list, c.healthy
 	}
 	ctx, cancel := context.WithTimeout(ctx, 4*time.Second)
 	defer cancel()
-	list, err := s.pay.Gateways(ctx)
+	list, err := s.pay.GatewaysFor(ctx, country, "gate")
+	c.country = country
 	c.at = time.Now()
 	if err != nil {
 		s.log.Warn("payment bridge did not list its gateways", "error", err)
