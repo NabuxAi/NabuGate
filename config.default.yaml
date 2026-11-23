@@ -98,10 +98,11 @@ server:
       rate_limit: 240
 
     # NabuGen. Its chat goes through app/core/ai_gateway.py, which prefers
-    # NABUGATE_API_KEY over the legacy OPENAI_* variables.
+    # NABUGATE_API_KEY over the legacy OPENAI_* variables. Its voice studio
+    # calls the /elevenlabs/* proxy, which needs the "elevenlabs" alias.
     - key: "${NABUGEN_KEY}"
       project: "nabugen"
-      allow: ["nabu-*", "gen-*", "openrouter/*"]
+      allow: ["nabu-*", "gen-*", "openrouter/*", "elevenlabs"]
       rate_limit: 240
 
     # RASAD GCC. rasad-* covers rasad-embed, the single-rung multilingual alias
