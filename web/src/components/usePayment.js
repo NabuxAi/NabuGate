@@ -94,7 +94,19 @@ export function usePayment(onSettled) {
     }
     setBusy(true);
     try {
-      const res = await api.rechargeMe({ amount, gateway, plan });
+      // On the Iranian host, route unselected top-ups straight to the bank
+      // relay — but only when NabuPay advertises the bank method as available.
+      // Until it is enabled, the existing checkout path remains functional.
+      let selectedGateway = gateway;
+      if (!selectedGateway && typeof window !== 'undefined' && window.location.hostname === 'gate.nabuxai.ir') {
+        try {
+          const availability = await api.status();
+          if (availability?.payment_gateways?.some((entry) => entry.slug === 'bank_payment')) {
+            selectedGateway = 'bank_payment';
+          }
+        } catch { /* Gateway-list outages leave the normal checkout intact. */ }
+      }
+      const res = await api.rechargeMe({ amount, gateway: selectedGateway, plan });
       if (!res?.checkout_url) throw localError('no_checkout');
       // The gateway's own page. Leaving the panel here is the point: the card
       // details are entered at the bank, never in this app.
