@@ -528,6 +528,11 @@ func elevenRequestSeconds(body map[string]any) (float64, bool) {
 	if f, ok := elevenNumber(body["music_length_ms"]); ok && f > 0 {
 		return f / 1000, true
 	}
+	if plan, ok := body["composition_plan"].(map[string]any); ok {
+		if ms := elevenPlanMillis(plan); ms > 0 {
+			return ms / 1000, true
+		}
+	}
 	if end, ok := elevenNumber(body["end_time"]); ok && end > 0 {
 		start, _ := elevenNumber(body["start_time"])
 		if end > start {
@@ -535,6 +540,23 @@ func elevenRequestSeconds(body map[string]any) (float64, bool) {
 		}
 	}
 	return 0, false
+}
+
+// elevenPlanMillis is the length of a music composition plan, which has no
+// music_length_ms: music_v1 lists sections and music_v2 lists chunks, each
+// with its own duration_ms.
+func elevenPlanMillis(plan map[string]any) float64 {
+	total := 0.0
+	for _, key := range []string{"sections", "chunks"} {
+		items, _ := plan[key].([]any)
+		for _, item := range items {
+			part, _ := item.(map[string]any)
+			if ms, ok := elevenNumber(part["duration_ms"]); ok && ms > 0 {
+				total += ms
+			}
+		}
+	}
+	return total
 }
 
 func elevenNumber(v any) (float64, bool) {

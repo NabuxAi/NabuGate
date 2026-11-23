@@ -211,6 +211,14 @@ func TestMeasureElevenSoundAndMusicDefaultsAreEstimated(t *testing.T) {
 	if music.Seconds != 8 || music.Model != "music_v1" {
 		t.Fatalf("music = %+v", music)
 	}
+	sung := MeasureEleven(http.MethodPost, "/v1/music", "application/json", []byte(`{"model_id":"music_v1","composition_plan":{"positive_global_styles":["pop"],"negative_global_styles":[],"sections":[{"section_name":"Verse 1","duration_ms":40000,"lines":["a"]},{"section_name":"Chorus","duration_ms":20000,"lines":["b"]}]}}`), http.StatusOK, "audio/mpeg", nil)
+	if sung.Seconds != 60 || sung.Estimated || !sung.Charge {
+		t.Fatalf("composition plan = %+v", sung)
+	}
+	chunked := MeasureEleven(http.MethodPost, "/v1/music", "application/json", []byte(`{"model_id":"music_v2","composition_plan":{"chunks":[{"text":"[Intro]","duration_ms":15000,"positive_styles":["lofi"]},{"text":"[Verse]","duration_ms":30000,"positive_styles":[]}]}}`), http.StatusOK, "audio/mpeg", nil)
+	if chunked.Seconds != 45 || chunked.Estimated {
+		t.Fatalf("chunked plan = %+v", chunked)
+	}
 	plan := MeasureEleven(http.MethodPost, "/v1/music/plan", "application/json", []byte(`{"prompt":"piano"}`), http.StatusOK, "application/json", []byte(`{}`))
 	if plan.Charge {
 		t.Fatalf("plan was billed: %+v", plan)
