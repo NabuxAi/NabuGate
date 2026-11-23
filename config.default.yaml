@@ -2935,6 +2935,8 @@ pricing:
   eleven_flash_v2_5: { per_million_chars: 40.00 }
   # Voice-design previews are spoken characters.
   eleven_multilingual_ttv_v2: { per_million_chars: 80.00 }
+  # The v3 design model (it lists Persian, ttv_v2 does not). Same list rate.
+  eleven_ttv_v3: { per_million_chars: 80.00 }
   # Scribe v1 and v3 are $0.20/hour. Realtime is $0.22/hour.
   scribe_v1: { per_minute: 0.003333 }
   scribe_v3: { per_minute: 0.003333 }
