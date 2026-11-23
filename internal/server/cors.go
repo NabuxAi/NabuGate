@@ -34,7 +34,7 @@ import (
 // the configured providers rather than hard-coding it means adding a provider
 // never silently leaves its key header un-sendable from a browser.
 func (s *Server) allowedRequestHeaders() string {
-	names := []string{"Authorization", "Content-Type", callerKeyPrefix + "Mode"}
+	names := []string{"Authorization", "Content-Type", callerKeyPrefix + "Mode", networkHeader}
 	for name := range s.providers {
 		names = append(names, callerKeyPrefix+name)
 	}

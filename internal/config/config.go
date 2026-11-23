@@ -207,6 +207,9 @@ type AgentConfig struct {
 	// agents/README.md). MaxToolSteps bounds the tool-call loop.
 	Tools        []ToolConfig `yaml:"tools"`
 	MaxToolSteps int          `yaml:"max_tool_steps"`
+
+	// References are example images per social network (see agent.Agent).
+	References map[string][]string `yaml:"references"`
 }
 
 // ToolConfig is one agent tool as written in YAML. Parameters is kept as a
@@ -726,7 +729,22 @@ func (ac AgentConfig) toAgent(name string) agent.Agent {
 		MaxTokens:    ac.MaxTokens,
 		Tools:        toolsToAgent(ac.Tools),
 		MaxToolSteps: ac.MaxToolSteps,
+		References:   lowerKeys(ac.References),
 	}
+}
+
+// lowerKeys copies a network → images map with lower-case keys, so a YAML
+// "Instagram:" and a header "instagram" meet.
+func lowerKeys(in map[string][]string) map[string][]string {
+	if len(in) == 0 {
+		return nil
+	}
+	out := make(map[string][]string, len(in))
+	for k, v := range in {
+		k = strings.ToLower(strings.TrimSpace(k))
+		out[k] = append(out[k], v...)
+	}
+	return out
 }
 
 // toolsToAgent converts YAML tool declarations into runtime tools.

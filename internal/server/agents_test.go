@@ -233,3 +233,122 @@ func TestAgentStreamInjectsSystem(t *testing.T) {
 		t.Errorf("streamed system message = %q/%q", role, content)
 	}
 }
+
+// referenceAgent has per-network reference images: Instagram gets its own,
+// any other network falls back to "default".
+func referenceAgent(t *testing.T) *agent.Registry {
+	t.Helper()
+	reg := agent.NewRegistry()
+	if err := reg.Add(agent.Agent{
+		Name:   "story-director",
+		Model:  "nabu-fast",
+		System: "You plan stories.",
+		References: map[string][]string{
+			"instagram": {"https://img.example/ig-1.jpg", "https://img.example/ig-2.jpg"},
+			"default":   {"https://img.example/any.jpg"},
+		},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	return reg
+}
+
+// imageURLs returns the image_url parts of message i in a captured body.
+func imageURLs(t *testing.T, body map[string]json.RawMessage, i int) (string, []string) {
+	t.Helper()
+	var msgs []struct {
+		Role    string          `json:"role"`
+		Content json.RawMessage `json:"content"`
+	}
+	if err := json.Unmarshal(body["messages"], &msgs); err != nil {
+		t.Fatal(err)
+	}
+	var parts []struct {
+		Type     string `json:"type"`
+		ImageURL struct {
+			URL string `json:"url"`
+		} `json:"image_url"`
+	}
+	_ = json.Unmarshal(msgs[i].Content, &parts)
+	var urls []string
+	for _, p := range parts {
+		if p.Type == "image_url" {
+			urls = append(urls, p.ImageURL.URL)
+		}
+	}
+	return msgs[i].Role, urls
+}
+
+func postAgent(t *testing.T, url, network string) {
+	t.Helper()
+	req, _ := http.NewRequest(http.MethodPost, url+"/v1/chat/completions",
+		strings.NewReader(`{"model":"story-director","messages":[{"role":"user","content":"today's news"}]}`))
+	req.Header.Set("Content-Type", "application/json")
+	if network != "" {
+		req.Header.Set("X-Nabu-Network", network)
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("status = %d", resp.StatusCode)
+	}
+}
+
+// TestAgentReferencesFollowTheNetwork verifies the network's own reference
+// images reach the model between the system prompt and the caller's turn, and
+// that another network gets the default set.
+func TestAgentReferencesFollowTheNetwork(t *testing.T) {
+	cap, h := capturingUpstream(t)
+	up := newHTTPServer(t, h)
+	ts := newTestServer(t, up.URL, policy.New(nil, nil), referenceAgent(t))
+	defer ts.Close()
+
+	postAgent(t, ts.URL, "Instagram")
+	got := cap.get()
+	if role, _ := imageURLs(t, got, 0); role != "system" {
+		t.Fatalf("message[0] role = %q, want system", role)
+	}
+	role, urls := imageURLs(t, got, 1)
+	if role != "user" || strings.Join(urls, ",") != "https://img.example/ig-1.jpg,https://img.example/ig-2.jpg" {
+		t.Errorf("message[1] = %q %v, want the two Instagram references", role, urls)
+	}
+	var msgs []struct {
+		Role    string          `json:"role"`
+		Content json.RawMessage `json:"content"`
+	}
+	_ = json.Unmarshal(got["messages"], &msgs)
+	if len(msgs) != 3 || msgs[2].Role != "user" || string(msgs[2].Content) != `"today's news"` {
+		t.Errorf("message[2] = %+v, want the caller's turn last", msgs)
+	}
+
+	postAgent(t, ts.URL, "telegram")
+	if _, urls := imageURLs(t, cap.get(), 1); strings.Join(urls, ",") != "https://img.example/any.jpg" {
+		t.Errorf("telegram references = %v, want the default set", urls)
+	}
+}
+
+// TestAgentWithoutReferencesIsUntouched verifies an agent with no references
+// sends exactly the system prompt and the caller's turn, header or not.
+func TestAgentWithoutReferencesIsUntouched(t *testing.T) {
+	cap, h := capturingUpstream(t)
+	up := newHTTPServer(t, h)
+	ts := newTestServer(t, up.URL, policy.New(nil, nil), writerAgent(t))
+	defer ts.Close()
+
+	req, _ := http.NewRequest(http.MethodPost, ts.URL+"/v1/chat/completions",
+		strings.NewReader(`{"model":"cine-writer","messages":[{"role":"user","content":"hi"}]}`))
+	req.Header.Set("X-Nabu-Network", "instagram")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	var msgs []json.RawMessage
+	_ = json.Unmarshal(cap.get()["messages"], &msgs)
+	if len(msgs) != 2 {
+		t.Errorf("messages = %d, want 2 (system + user)", len(msgs))
+	}
+}

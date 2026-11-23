@@ -41,6 +41,40 @@ type Agent struct {
 	// MaxToolSteps bounds the tool-call loop (default DefaultMaxToolSteps,
 	// capped at MaxToolStepsCap).
 	MaxToolSteps int
+
+	// References are example images the agent's model is shown on every call,
+	// keyed by the social network the content is for ("instagram", "telegram",
+	// "linkedin", …), with "default" used for a network that has none. The
+	// caller names the network with the X-Nabu-Network header; see
+	// ReferencesFor.
+	References map[string][]string
+}
+
+// MaxReferenceImages bounds how many reference images one call carries, so a
+// long list in YAML cannot turn every request into a large vision bill.
+const MaxReferenceImages = 8
+
+// ReferencesFor returns the reference images for a network: that network's
+// own list when it has one, else the "default" list, else none. The network
+// name is matched case-insensitively.
+func (a Agent) ReferencesFor(network string) []string {
+	if len(a.References) == 0 {
+		return nil
+	}
+	refs, ok := a.References[strings.ToLower(strings.TrimSpace(network))]
+	if !ok || len(refs) == 0 {
+		refs = a.References["default"]
+	}
+	out := make([]string, 0, len(refs))
+	for _, u := range refs {
+		if u = strings.TrimSpace(u); u != "" {
+			out = append(out, u)
+		}
+		if len(out) == MaxReferenceImages {
+			break
+		}
+	}
+	return out
 }
 
 // Registry is a lookup of agents by name, populated once at startup.
