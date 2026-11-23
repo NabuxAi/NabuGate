@@ -228,3 +228,30 @@ keys:
 
 An entry whose key env is empty is skipped by the policy builder, so it stays
 inert until the variable is set.
+
+## Give an agent reference images (per social network)
+
+An agent can carry example images its model is shown on every call — the
+style, layout, person or product it should follow. Each social network gets
+its own set; the caller names the network with the `X-Nabu-Network` header,
+and a network with no set falls back to `default`. Keep private image links
+out of the repo with `${VAR}` references; an unset one is skipped.
+
+```yaml
+name: mrchatgpt-story
+model: nabu-vision          # a model that reads images
+references:
+  instagram: ["${STORY_REF_1}", "${STORY_REF_2}"]
+  telegram:  ["${STORY_REF_POST}"]
+  default:   ["${STORY_REF_1}"]
+```
+
+```bash
+curl $NABU/v1/chat/completions -H "Authorization: Bearer $NABU_KEY" \
+  -H "X-Nabu-Network: instagram" \
+  -d '{"model":"mrchatgpt-story","messages":[{"role":"user","content":"Today: …"}]}'
+```
+
+The images go in as one user message right after the system prompt (OpenAI
+`image_url` parts), at most 8 per call. An agent without `references`, or a
+request whose network has no set and no `default`, is unchanged.

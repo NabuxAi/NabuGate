@@ -951,6 +951,7 @@ func (s *Server) handleChat(w http.ResponseWriter, r *http.Request) {
 	if found, ok := s.agents.Lookup(alias); ok {
 		ag, isAgent = found, true
 		applyAgentToChat(ag, &chatReq)
+		applyAgentReferences(ag, &chatReq, r.Header.Get(networkHeader))
 		routeModel = ag.Model
 		w.Header().Set("X-Nabu-Agent", ag.Name)
 	}
@@ -1191,6 +1192,58 @@ func applyAgentToChat(ag agent.Agent, req *provider.ChatRequest) {
 	if ag.MaxTokens != nil && req.MaxTokens == nil {
 		req.MaxTokens = ag.MaxTokens
 		setRawParam(req.Raw, "max_tokens", *ag.MaxTokens)
+	}
+}
+
+// networkHeader names the social network a request's content is for. An agent
+// with references shows the model that network's reference images.
+const networkHeader = "X-Nabu-Network"
+
+// applyAgentReferences shows the model the agent's reference images for the
+// caller's network, as one user message placed right after the system prompt
+// and before the caller's own turns. The images travel as OpenAI image_url
+// parts in the raw body (which the OpenAI-wire, Gemini and Anthropic adapters
+// all read); the typed message carries the URLs as text for any adapter that
+// only sees typed content. An agent without references, or with none for the
+// network and no "default", leaves the request untouched.
+func applyAgentReferences(ag agent.Agent, req *provider.ChatRequest, network string) {
+	refs := ag.ReferencesFor(network)
+	if len(refs) == 0 {
+		return
+	}
+	label := strings.ToLower(strings.TrimSpace(network))
+	if label == "" {
+		label = "default"
+	}
+	intro := "Reference images (" + label + "): match their style, layout, colours and tone. " +
+		"They are examples, not content to copy."
+	parts := []map[string]any{{"type": "text", "text": intro}}
+	for _, u := range refs {
+		parts = append(parts, map[string]any{"type": "image_url", "image_url": map[string]any{"url": u}})
+	}
+	at := 0
+	if len(req.Messages) > 0 && req.Messages[0].Role == "system" {
+		at = 1
+	}
+	typed := provider.Message{Role: "user", Content: intro + "\n" + strings.Join(refs, "\n")}
+	req.Messages = append(req.Messages[:at], append([]provider.Message{typed}, req.Messages[at:]...)...)
+	if req.Raw != nil {
+		var msgs []json.RawMessage
+		_ = json.Unmarshal(req.Raw["messages"], &msgs)
+		rawAt := 0
+		if len(msgs) > 0 {
+			var first struct {
+				Role string `json:"role"`
+			}
+			if json.Unmarshal(msgs[0], &first) == nil && first.Role == "system" {
+				rawAt = 1
+			}
+		}
+		refMsg, _ := json.Marshal(map[string]any{"role": "user", "content": parts})
+		out := append([]json.RawMessage{}, msgs[:rawAt]...)
+		out = append(out, refMsg)
+		out = append(out, msgs[rawAt:]...)
+		req.Raw["messages"], _ = json.Marshal(out)
 	}
 }
 

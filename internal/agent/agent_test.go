@@ -72,3 +72,20 @@ func TestRegistryNamesSortedAndNilSafe(t *testing.T) {
 		t.Errorf("Len = %d, want 3", r.Len())
 	}
 }
+
+func TestReferencesForFallsBackAndCaps(t *testing.T) {
+	many := make([]string, 0, 12)
+	for i := 0; i < 12; i++ {
+		many = append(many, "https://img.example/"+string(rune('a'+i))+".jpg")
+	}
+	a := Agent{References: map[string][]string{"instagram": many, "default": {" https://img.example/d.jpg "}}}
+	if got := a.ReferencesFor(" INSTAGRAM "); len(got) != MaxReferenceImages {
+		t.Errorf("instagram refs = %d, want capped at %d", len(got), MaxReferenceImages)
+	}
+	if got := a.ReferencesFor("linkedin"); len(got) != 1 || got[0] != "https://img.example/d.jpg" {
+		t.Errorf("linkedin refs = %v, want the trimmed default", got)
+	}
+	if got := (Agent{}).ReferencesFor("instagram"); got != nil {
+		t.Errorf("no references = %v, want nil", got)
+	}
+}
