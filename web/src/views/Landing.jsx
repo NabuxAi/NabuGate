@@ -398,6 +398,7 @@ function Section({ id, eyebrow, title, sub, children, className = '' }) {
 export default function Landing({ signedIn = false }) {
   const t = useT(T);
   const { lang } = useI18n();
+  const isIranHost = typeof window !== 'undefined' && window.location.hostname.toLowerCase() === 'gate.nabuxai.ir';
   const intro = useIntro();
   const [models, setModels] = useState([]);
   const [menu, setMenu] = useState(false);
@@ -506,16 +507,15 @@ export default function Landing({ signedIn = false }) {
                 {t('eyebrow')}
               </span>
               <h1 className="lp-reveal">
-                {t('heroA')}<br />
-                <span className="lp-grad">{t('heroB')}</span>
+                {isIranHost ? (lang === 'fa' ? 'مشکل کلاود حل شد' : lang === 'ar' ? 'حل مشكلة الاتصال بـ Claude' : 'Connect Claude tools again') : <>{t('heroA')}<br /><span className="lp-grad">{t('heroB')}</span></>}
               </h1>
-              <p className="lp-lead lp-reveal">{t('heroSub')}</p>
+              <p className="lp-lead lp-reveal">{isIranHost ? (lang === 'fa' ? 'با NabuGate از طریق API مدل‌های پشتیبانی‌شده را به Claude Code و ابزارهای سازگار وصل کنید. راهنمای مرحله‌به‌مرحله، کلید API و شارژ ریالی در دسترس است؛ این سرویس اشتراک Claude.ai نیست.' : t('iranSub')) : t('heroSub')}</p>
               <div className="lp-hero-cta lp-reveal">
                 <a href={cta} className="lp-btn lp-btn-primary lp-btn-lg">
                   {ctaLabel}<Icon name="arrow" size={18} className="flip-rtl" />
                 </a>
                 <a href="/docs" className="lp-btn lp-btn-outline lp-btn-lg"><Icon name="book" size={18} />{t('readDocs')}</a>
-                <IntroButton onClick={intro.replay} />
+                {isIranHost ? <a href="/docs#claude-desktop" className="lp-btn lp-btn-outline lp-btn-lg"><Icon name="terminal" size={18} />{t('iranGuide')}</a> : <IntroButton onClick={intro.replay} />}
               </div>
               <div className="lp-tools lp-reveal">
                 <span>{t('worksWith')}</span>

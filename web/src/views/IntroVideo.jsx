@@ -40,11 +40,7 @@ function rememberDismissed() {
 export function useIntro() {
   const [open, setOpen] = useState(false);
 
-  useEffect(() => {
-    if (wasDismissed()) return undefined;
-    const id = window.setTimeout(() => setOpen(true), 700);
-    return () => window.clearTimeout(id);
-  }, []);
+  // The video is optional. Never block a first visit with an automatic modal.
 
   const close = () => {
     rememberDismissed();
