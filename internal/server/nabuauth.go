@@ -40,7 +40,12 @@ const (
 // nabuAuthConfig is the console's view of NabuAuth, read from the environment
 // so it needs no config-file change to enable.
 type nabuAuthConfig struct {
-	URL          string
+	URL string
+	// MirrorURL is NabuAuth's Iran mirror. A sign-in started on
+	// gate.nabuxai.ir sends the browser there instead of to URL, so the whole
+	// round trip stays on hosts reachable from Iran. The code is still
+	// exchanged server-side against URL: both names front one NabuAuth.
+	MirrorURL    string
 	ClientID     string
 	ClientSecret string
 	RedirectURI  string
@@ -63,6 +68,7 @@ func loadNabuAuthConfig() nabuAuthConfig {
 	}
 	return nabuAuthConfig{
 		URL:          strings.TrimRight(envOrDefault("NABUAUTH_URL", "https://auth.nabuxai.com"), "/"),
+		MirrorURL:    strings.TrimRight(envOrDefault("NABUAUTH_MIRROR_URL", "https://auth.nabuxai.ir"), "/"),
 		ClientID:     os.Getenv("NABUAUTH_CLIENT_ID"),
 		ClientSecret: os.Getenv("NABUAUTH_CLIENT_SECRET"),
 		RedirectURI:  os.Getenv("NABUAUTH_REDIRECT_URI"),
@@ -95,6 +101,15 @@ func (c nabuAuthConfig) redirectURI(r *http.Request) string {
 	// sends so the certificate matches. An explicit NABUAUTH_REDIRECT_URI
 	// still wins — and then only that one URI is registered.
 	return publicBase(r) + "/api/nabu/callback"
+}
+
+// browserURL is the NabuAuth origin the browser is sent to: the mirror when
+// the visitor came through gate.nabuxai.ir, otherwise URL.
+func (c nabuAuthConfig) browserURL(r *http.Request) string {
+	if c.MirrorURL != "" && publicBase(r) == "https://gate.nabuxai.ir" {
+		return c.MirrorURL
+	}
+	return c.URL
 }
 
 func b64u(raw []byte) string { return base64.RawURLEncoding.EncodeToString(raw) }
@@ -209,9 +224,10 @@ func (s *Server) consoleNabuStart(w http.ResponseWriter, r *http.Request) {
 		"code_challenge":        {b64u(sum[:])},
 		"code_challenge_method": {"S256"},
 	}
-	targetURL := cfg.URL + "/oauth/authorize?" + q.Encode()
+	authURL := cfg.browserURL(r)
+	targetURL := authURL + "/oauth/authorize?" + q.Encode()
 	if p := r.URL.Query().Get("provider"); p != "" {
-		targetURL = cfg.URL + "/login/" + url.PathEscape(p) + "?next=" + url.QueryEscape("/oauth/authorize?"+q.Encode())
+		targetURL = authURL + "/login/" + url.PathEscape(p) + "?next=" + url.QueryEscape("/oauth/authorize?"+q.Encode())
 	}
 	http.Redirect(w, r, targetURL, http.StatusFound)
 }

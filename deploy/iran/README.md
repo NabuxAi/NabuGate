@@ -30,15 +30,19 @@ The gateway trusts `X-Forwarded-Host` and `X-Forwarded-Proto` over the `Host` he
 | Header | Value |
 | --- | --- |
 | `Host` | `gate.nabuxai.com` |
-| `X-Forwarded-Host` | `gate.nabuxai.ir` |
+| `X-Forwarded-Host` | `gate.nabuxai.ir`, but replaced with `gate.nabuxai.com` by the upstream's Traefik (see below) |
+| `X-Nabu-Mirror-Host` | `gate.nabuxai.ir` |
 | `X-Forwarded-Proto` | `https` |
 | `X-Forwarded-For` | the browser, then Traefik |
 
 `X-Forwarded-Proto` is the literal `https`. Inside the container `$scheme` is `http`, because Traefik already terminated TLS. Using `$scheme` would build `http://` return URLs and omit `Secure` on cookies.
 
+Coolify's Traefik in front of `gate.nabuxai.com` does not trust `X-Forwarded-*` from this server: it drops them and writes its own, so `X-Forwarded-Host` reaches the gateway as `gate.nabuxai.com`. That is why every sign-in started on the mirror used to come back to `.com`. `X-Nabu-Mirror-Host` is not a header Traefik owns, so it arrives unchanged, and the gateway prefers it. It accepts only `gate.nabuxai.ir` or `gate.nabuxai.com` there, always as `https`.
+
 From those headers the gateway:
 
 - Builds payment return URLs and the NabuAuth `redirect_uri` as `https://gate.nabuxai.ir/...`, so the browser comes back to the mirror even when `NABU_PUBLIC_URL` is `https://gate.nabuxai.com`.
+- Sends the browser to NabuAuth's own mirror, `https://auth.nabuxai.ir` (`NABUAUTH_MIRROR_URL`), so the sign-in round trip never leaves `.ir`. The code is still exchanged server-side at `NABUAUTH_URL`.
 - Sets session cookies with an empty `Domain` and `Secure`, so the browser stores them for `gate.nabuxai.ir`.
 - Rate-limits the first `X-Forwarded-For` hop, which is the browser. Traefik wrote that hop; this nginx appends its own address after it.
 - Flushes streamed responses and sets `X-Accel-Buffering: no`. This nginx also turns `proxy_buffering` and `proxy_request_buffering` off.
@@ -55,7 +59,7 @@ The console and the docs copy the base URL from the page’s own origin, so a sa
    - `https://gate.nabuxai.ir/api/nabu/callback`
 
    If `NABUAUTH_REDIRECT_URI` is pinned to the `.com` URL, sign-in from the mirror returns to `.com`.
-4. A forwarded host of `gate.nabuxai.ir` or `gate.nabuxai.com` wins over `NABU_PUBLIC_URL`. Any other forwarded host does not.
+4. A mirror or forwarded host of `gate.nabuxai.ir` or `gate.nabuxai.com` wins over `NABU_PUBLIC_URL`. Any other host does not.
 
 ## Coolify
 

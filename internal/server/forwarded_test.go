@@ -102,6 +102,66 @@ func TestCoolifyHopKeepsTheMirrorOrigin(t *testing.T) {
 	}
 }
 
+// What production actually receives from the Iran mirror: Traefik in front of
+// gate.nabuxai.com has replaced X-Forwarded-Host with its own Host, and only
+// the mirror's own header still names the host the browser opened.
+func traefikRewrittenMirrorRequest() *http.Request {
+	r := httptest.NewRequest(http.MethodGet, "https://gate.nabuxai.com/api/nabu", nil)
+	r.Host = "gate.nabuxai.com"
+	r.Header.Set("X-Forwarded-Host", "gate.nabuxai.com")
+	r.Header.Set("X-Forwarded-Proto", "https")
+	r.Header.Set("X-Nabu-Mirror-Host", "gate.nabuxai.ir")
+	return r
+}
+
+func TestMirrorHeaderSurvivesTheEdgeRewrite(t *testing.T) {
+	t.Setenv("NABU_PUBLIC_URL", "https://gate.nabuxai.com")
+	r := traefikRewrittenMirrorRequest()
+	if got := publicBase(r); got != "https://gate.nabuxai.ir" {
+		t.Fatalf("public base = %q, want the mirror even after the edge rewrote X-Forwarded-Host", got)
+	}
+	if got := testNabuConfig().redirectURI(r); got != "https://gate.nabuxai.ir/api/nabu/callback" {
+		t.Fatalf("redirect uri = %q", got)
+	}
+}
+
+func TestMirrorHeaderAcceptsOnlyCanonicalHosts(t *testing.T) {
+	t.Setenv("NABU_PUBLIC_URL", "https://gate.nabuxai.com")
+	for _, v := range []string{"evil.example", "gate.nabuxai.ir.evil.example", "gate.nabuxai.ir/admin", "https://gate.nabuxai.ir", ""} {
+		r := httptest.NewRequest(http.MethodGet, "https://gate.nabuxai.com/api/nabu", nil)
+		r.Host = "gate.nabuxai.com"
+		r.Header.Set("X-Nabu-Mirror-Host", v)
+		if got := publicBase(r); got != "https://gate.nabuxai.com" {
+			t.Fatalf("mirror header %q gave public base %q, want the pin", v, got)
+		}
+	}
+	r := httptest.NewRequest(http.MethodGet, "https://gate.nabuxai.com/api/nabu", nil)
+	r.Header.Set("X-Nabu-Mirror-Host", "Gate.NabuXAI.ir")
+	if got := publicBase(r); got != "https://gate.nabuxai.ir" {
+		t.Fatalf("public base = %q, host names are case-insensitive", got)
+	}
+}
+
+func TestSignInFromTheMirrorStaysOnIranHosts(t *testing.T) {
+	t.Setenv("NABU_PUBLIC_URL", "https://gate.nabuxai.com")
+	cfg := testNabuConfig()
+	cfg.URL = "https://auth.nabuxai.com"
+	cfg.MirrorURL = "https://auth.nabuxai.ir"
+
+	if got := cfg.browserURL(traefikRewrittenMirrorRequest()); got != "https://auth.nabuxai.ir" {
+		t.Fatalf("browser auth url = %q, a visitor on .ir must be sent to the .ir NabuAuth", got)
+	}
+	direct := httptest.NewRequest(http.MethodGet, "https://gate.nabuxai.com/api/nabu", nil)
+	direct.Host = "gate.nabuxai.com"
+	if got := cfg.browserURL(direct); got != "https://auth.nabuxai.com" {
+		t.Fatalf("browser auth url = %q, a visitor on .com stays on .com", got)
+	}
+	cfg.MirrorURL = ""
+	if got := cfg.browserURL(traefikRewrittenMirrorRequest()); got != "https://auth.nabuxai.com" {
+		t.Fatalf("browser auth url = %q, with no mirror configured fall back to URL", got)
+	}
+}
+
 func TestBrowserCookieIsHostOnlyAndSecureBehindTheProxy(t *testing.T) {
 	r := httptest.NewRequest(http.MethodPost, "http://gate.nabuxai.com/api/login", nil)
 	r.Header.Set("X-Forwarded-Proto", "https")

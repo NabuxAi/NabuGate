@@ -18,6 +18,7 @@ gate.nabuxai.ir {
 	reverse_proxy https://gate.nabuxai.com {
 		header_up Host gate.nabuxai.com
 		header_up X-Forwarded-Host {host}
+		header_up X-Nabu-Mirror-Host {host}
 		header_up X-Forwarded-Proto {scheme}
 		header_up X-Forwarded-For {remote_host}
 		header_up X-Real-IP {remote_host}

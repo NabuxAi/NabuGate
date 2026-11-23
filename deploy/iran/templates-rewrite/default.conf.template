@@ -89,6 +89,9 @@ server {
         # What the browser actually opened. Hard-coded because this hop is
         # HTTP behind Traefik: $host may be rewritten and $scheme is http.
         proxy_set_header X-Forwarded-Host ${MIRROR_HOST};
+        # The edge proxy at the upstream replaces X-Forwarded-Host; this one it
+        # passes through. NabuGate builds sign-in and payment return URLs from it.
+        proxy_set_header X-Nabu-Mirror-Host ${MIRROR_HOST};
         proxy_set_header X-Forwarded-Proto https;
 
         # Traefik is the edge, so the browser address is already the first

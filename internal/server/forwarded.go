@@ -23,6 +23,26 @@ var canonicalPublicHosts = map[string]bool{
 	"gate.nabuxai.ir":  true,
 }
 
+// mirrorHostHeader carries the mirror's public name past the edge proxy in
+// front of gate.nabuxai.com. That proxy (Coolify's Traefik) does not trust
+// X-Forwarded-* from the Iran server, so it drops them and writes its own:
+// X-Forwarded-Host arrives as gate.nabuxai.com, and every sign-in started on
+// gate.nabuxai.ir was sent back to .com, where its flow cookie does not exist.
+// Traefik leaves a header it does not own untouched. Only a canonical public
+// host is accepted, so the worst a forged value can do is send a caller to the
+// other NabuGate hostname.
+const mirrorHostHeader = "X-Nabu-Mirror-Host"
+
+// mirrorHost returns the canonical public host named in mirrorHostHeader, or
+// "" when the header is absent or names anything else.
+func mirrorHost(r *http.Request) string {
+	h := strings.ToLower(firstHeaderValue(r.Header.Get(mirrorHostHeader)))
+	if canonicalPublicHosts[h] {
+		return h
+	}
+	return ""
+}
+
 // firstHeaderValue returns the left-most entry of a comma-separated
 // forwarding header. That entry is the client-facing one; later entries are
 // proxies that appended themselves.
@@ -121,6 +141,10 @@ func forwardedHostMayOverride(host, pinned string) bool {
 // path. OAuth redirect URIs and payment return URLs are built from it, so a
 // request that arrived through gate.nabuxai.ir goes back there.
 func publicBase(r *http.Request) string {
+	// Both canonical hosts are served over https only.
+	if h := mirrorHost(r); h != "" {
+		return "https://" + h
+	}
 	pinned := strings.TrimRight(os.Getenv("NABU_PUBLIC_URL"), "/")
 	if host := firstHeaderValue(r.Header.Get("X-Forwarded-Host")); validForwardedHost(host) && forwardedHostMayOverride(host, pinned) {
 		return requestScheme(r) + "://" + host
