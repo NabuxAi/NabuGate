@@ -87,6 +87,11 @@ html[lang="en"] .docs-body { line-height: 1.75; }
 .docs-body a:not(.btn) { color: var(--ng-accent-strong); text-decoration: underline; text-decoration-color: var(--ng-accent-border); text-underline-offset: 3px; }
 [data-theme="light"] .docs-body a:not(.btn) { color: var(--ng-accent); }
 .docs-h1 { font-size: clamp(28px, 3.2vw, 36px); line-height: 1.2; font-weight: 900; letter-spacing: -0.025em; color: var(--ng-heading); margin: 0 0 12px; }
+/* Tutorial video at the top of a guide. Fixed 16:9 so the page does not jump
+   while the poster loads. */
+.docs-video { margin: 0 0 28px; }
+.docs-video video { display: block; width: 100%; aspect-ratio: 16 / 9; border-radius: 14px; background: #070b16; border: 1px solid var(--ng-border); }
+.docs-video figcaption { margin-top: 8px; font-size: 13.5px; color: var(--ng-muted); text-align: start; }
 .docs-lead { font-size: 16.5px; line-height: 1.9; color: var(--ng-muted); margin: 0 0 28px !important; padding-bottom: 24px; border-bottom: 1px solid var(--ng-border); }
 html[lang="en"] .docs-lead { line-height: 1.7; }
 .docs-h2 {

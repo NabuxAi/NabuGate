@@ -1,5 +1,5 @@
 import CodeBlock from '../../components/CodeBlock.jsx';
-import { Callout, EnvTabs, Faq, H1, H2, Lead, Steps } from './parts.jsx';
+import { Callout, EnvTabs, Faq, GuideVideo, H1, H2, Lead, Steps } from './parts.jsx';
 
 /*
  * The English documentation. It mirrors content.fa.jsx section for section
@@ -16,14 +16,14 @@ export default function DocsEn({ active, go, BASE, ORIGIN, KEY }) {
           <Steps items={[
             <>Sign up in the <a href="/panel/">console</a>. Accounts are created with an email address; you can also sign in with Google or Nabu.</>,
             <>Top up your account from “Plans & top-up”. You pay for what you use, and your balance never expires. <button className="linklike" onClick={() => go('billing')}>Details</button></>,
-            <>Create a key in “API keys”. It starts with <code>ng_</code> and is shown in full only once.</>,
+            <>Create a key in “API keys”. It starts with <code>ng-</code> and is shown in full only once.</>,
             <>Set the base URL to <code dir="ltr">{BASE}</code> and the model to one of the names from <code dir="ltr">GET {BASE}/models</code> (for example <code>nabu-fast</code>).</>,
           ]} />
           <H2>The three values you need everywhere</H2>
           <div className="card card-flat" style={{ padding: 18 }}>
             <div className="kv">
               <div className="line"><span>Base URL</span><strong className="mono" dir="ltr">{BASE}</strong></div>
-              <div className="line"><span>API Key</span><strong className="mono" dir="ltr">ng_…</strong></div>
+              <div className="line"><span>API Key</span><strong className="mono" dir="ltr">ng-…</strong></div>
               <div className="line"><span>Model</span><strong className="mono" dir="ltr">nabu-fast · nabu-smart · openai/gpt-… · anthropic/claude-…</strong></div>
             </div>
           </div>
@@ -130,7 +130,7 @@ X-Nabu-Balance-Warning: low       # only when the balance is below $1`} label="r
           <Lead>Cursor lets you override the OpenAI base URL. Once you do, every model NabuGate offers can be selected in Cursor.</Lead>
           <Steps items={[
             <>Open Settings → Models.</>,
-            <>Under OpenAI API Key, enter your <code>ng_…</code> key.</>,
+            <>Under OpenAI API Key, enter your <code>ng-…</code> key.</>,
             <>Turn on <strong>Override OpenAI Base URL</strong> and enter <code dir="ltr">{BASE}</code>.</>,
             <>Add an alias name with “+ Add model” (for example <code>nabu-smart</code>) and click Verify.</>,
           ]} />
@@ -201,37 +201,44 @@ claude`} label="PowerShell" />
 
       {active === 'claude-desktop' && (
         <section>
-          <H1>Claude Desktop: connect a third-party inference Gateway</H1>
-          <Lead>Sign in to your NabuGate account to create a key, then use the <strong>Static API key</strong> option in Claude Desktop. This is API routing, not Claude.ai login, and does not transfer Projects or Cowork features.</Lead>
-          <Callout kind="warn" icon="⚠️">This configuration requires a NabuGate deployment that actually exposes Anthropic-compatible <code>POST /v1/messages</code>. Claude Desktop features and model IDs must be separately tested. For genuine Claude usage, verify per-user credentials and permitted licensing.</Callout>
-          <H2>Step 1: create a key</H2>
+          <H1>Claude Desktop on a NabuGate key</H1>
+          <Lead>Claude Desktop has a Gateway mode: instead of an Anthropic account, it sends requests to a gateway you choose. With this guide, chat, Cowork and Code in the desktop app are billed to your NabuGate wallet, and you do not sign in to Claude.ai.</Lead>
+          <GuideVideo name="claude-desktop" />
+          <H2>Steps</H2>
           <Steps items={[
-            <>Sign up or sign in to the <a href="/panel/login">NabuGate console</a> and create an API key.</>,
-            <>Check wallet balance and model permissions. Genuine Claude usage requires the user's own credential or a permitted commercial arrangement.</>,
-            <>In Claude Desktop, open <code>Help → Troubleshooting → Enable Developer Mode</code>. After restarting, open <code>Developer → Configure Third-Party Inference</code>.</>,
-            <>Choose <code>Connection → Gateway</code> and enter the settings below.</>,
+            <>In the <a href="/panel/">NabuGate panel</a>, open “API keys” and create a key. It starts with <code>ng-</code> and is shown in full only once.</>,
+            <>Open Claude Desktop but <strong>do not sign in</strong>. On Windows use the <code>☰</code> menu at the top left, on macOS the menu bar: <code>Help → Troubleshooting → Enable Developer Mode</code>.</>,
+            <>From the new Developer menu, open <code>Configure Third-Party Inference…</code>.</>,
+            <>Under <strong>Connection</strong>, enter the values below. From inside Iran, use <code>https://gate.nabuxai.ir</code>. The base URL has no <code>/v1</code>.</>,
+            <>Under <strong>Models</strong>, add <code>claude-sonnet-5-5</code>, <code>claude-opus-5-5</code> and <code>claude-haiku-5-5</code>, exactly as written.</>,
+            <>Click <code>Apply Changes</code>, then <code>Save &amp; Restart</code>. When the app reopens, choose to continue in third-party mode on the sign-in screen.</>,
           ]} />
           <CodeBlock code={`Inference provider : Gateway
-Credential kind    : Static API key
 Gateway base URL   : ${ORIGIN}
-Gateway API key    : ${KEY}
+Credential kind    : Static API key
 Gateway auth scheme: Bearer
-Model ID           : nabu-smart (add manually if supported)`} label="Claude Desktop · Connection" />
-          <p>Under <strong>Models</strong>, select or add a model that is actually available on the gateway. Use <strong>Test connection</strong> and <strong>Apply Changes / Save</strong>. If your Desktop version rejects a custom model ID, use a supported model/client; do not mislabel a non-Claude model as Claude.</p>
-          <H2>Verify the API separately</H2>
-          <CodeBlock code={`curl "${ORIGIN}/v1/messages" \
-  -H "Authorization: Bearer ${KEY}" \
-  -H "anthropic-version: 2023-06-01" \
-  -H "Content-Type: application/json" \
-  -d '{"model":"nabu-smart","max_tokens":128,"messages":[{"role":"user","content":"Hello!"}]}'`} label="bash · zsh" />
-          <H2>Protocol compatibility</H2>
-          <p><code dir="ltr">{ORIGIN}/v1/chat/completions</code> is OpenAI-compatible. Claude Desktop/Code gateways use <code>/v1/messages</code>. The former does not imply the latter: a compatibility layer must convert JSON, SSE streams, and tool calls.</p>
+API key            : ${KEY}
+Models             : claude-sonnet-5-5, claude-opus-5-5, claude-haiku-5-5`} label="Claude Desktop · Configure Third-Party Inference" />
+          <Callout icon="💡"><strong>Why a Claude ID and not <code>nabu-claude</code>?</strong> Claude Desktop only lists a model it recognises as Claude, and it sets the context window and features from the ID. NabuGate answers each of these IDs with that model first and falls back to another Claude model, never to another vendor’s model under a Claude name. <code>claude-fable-5-1</code> works too.</Callout>
+          <H2>Test the API directly</H2>
+          <p>If the app does not connect, test the gateway itself with the same key:</p>
+          <CodeBlock code={`curl "${ORIGIN}/v1/messages" \\
+  -H "Authorization: Bearer ${KEY}" \\
+  -H "anthropic-version: 2023-06-01" \\
+  -H "Content-Type: application/json" \\
+  -d '{"model":"claude-sonnet-5-5","max_tokens":128,"messages":[{"role":"user","content":"Hello!"}]}'`} label="bash · zsh" />
+          <H2>What is different in this mode</H2>
+          <ul style={{ paddingInlineStart: 20, display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <li>This is not a Claude.ai sign-in: Claude.ai projects, memory and history are not available.</li>
+            <li>Per Anthropic’s docs, Remote Control and Anthropic-hosted cloud environments are unavailable in Gateway mode.</li>
+            <li>Every message is logged in the NabuGate panel with its model and cost. Earlier turns’ thinking is not forwarded, because its signature is only valid for the model that produced it.</li>
+          </ul>
           <H2>Troubleshooting and security</H2>
-          <Faq q="401 or 402 error?">Check the NabuGate key, wallet balance and model permissions. Do not place keys in custom inference headers, screenshots or chats. Revoke any exposed key.</Faq>
-          <Faq q="The model is missing in Desktop">Some Desktop versions list only particular model ID patterns. Add the real ID in Models if supported and verify with an actual request.</Faq>
-          <Faq q="Does NabuGate login sign me into Claude.ai?">No. The console and API key are independent of Claude.ai OAuth. Interactive sign-in / OIDC needs its own identity-server integration and is not enabled here.</Faq>
-          <Faq q="Why are some features unavailable?">Streaming, tools, thinking, images, model capabilities and Projects vary by client and backend. Verify each feature rather than assuming parity.</Faq>
-          <p>References: <a href="https://developers.cloudflare.com/ai-gateway/integrations/coding-agents/claude-desktop/" target="_blank" rel="noreferrer">Desktop gateway instructions</a> and <a href="https://code.claude.com/docs/en/legal-and-compliance" target="_blank" rel="noreferrer">Claude Code terms</a>.</p>
+          <Faq q="401 or 402 error?">401 means the key is wrong or revoked. 402 means the NabuGate wallet balance is too low. Check both in the panel. These errors come from NabuGate, not from an Anthropic account.</Faq>
+          <Faq q="The model is missing in Claude Desktop">Type the ID exactly as above. Claude Desktop does not recognise or list names like <code>nabu-claude</code> or <code>nabu-smart</code>. If your key has an allow-list, these IDs must be on it.</Faq>
+          <Faq q="It does not connect from Iran">Set the base URL to <code>https://gate.nabuxai.ir</code>. The same key works on both addresses.</Faq>
+          <Faq q="My key leaked">Revoke it in the panel and create a new one. Do not put keys in screenshots, chats or the Custom headers field.</Faq>
+          <p>Official reference: <a href="https://claude.com/docs/third-party/claude-desktop/gateway" target="_blank" rel="noreferrer">Claude Desktop Gateway guide</a>.</p>
         </section>
       )}
 

@@ -1,5 +1,5 @@
 import CodeBlock from '../../components/CodeBlock.jsx';
-import { Callout, EnvTabs, Faq, H1, H2, Lead, Steps } from './parts.jsx';
+import { Callout, EnvTabs, Faq, GuideVideo, H1, H2, Lead, Steps } from './parts.jsx';
 
 /*
  * The Persian documentation. content.en.jsx mirrors it section for section;
@@ -16,14 +16,14 @@ export default function DocsFa({ active, go, BASE, ORIGIN, KEY }) {
           <Steps items={[
             <>در <a href="/panel/">پنل</a> ثبت‌نام کنید. حساب با ایمیل ساخته می‌شود؛ ورود با حساب گوگل و نابو هم هست.</>,
             <>از «خرید و شارژ» حساب را شارژ کنید. پرداخت به‌ازای مصرف است و موجودی منقضی نمی‌شود. <button className="linklike" onClick={() => go('billing')}>جزئیات</button></>,
-            <>در «کلیدهای API» یک کلید بسازید. با <code>ng_</code> شروع می‌شود و فقط یک‌بار کامل نمایش داده می‌شود.</>,
+            <>در «کلیدهای API» یک کلید بسازید. با <code>ng-</code> شروع می‌شود و فقط یک‌بار کامل نمایش داده می‌شود.</>,
             <>آدرس پایه را روی <code dir="ltr">{BASE}</code> و مدل را روی یکی از نام‌های <code dir="ltr">GET {BASE}/models</code> بگذارید (مثلاً <code>nabu-fast</code>).</>,
           ]} />
           <H2>سه مقداری که همه‌جا لازم است</H2>
           <div className="card card-flat" style={{ padding: 18 }}>
             <div className="kv">
               <div className="line"><span>Base URL</span><strong className="mono" dir="ltr">{BASE}</strong></div>
-              <div className="line"><span>API Key</span><strong className="mono" dir="ltr">ng_…</strong></div>
+              <div className="line"><span>API Key</span><strong className="mono" dir="ltr">ng-…</strong></div>
               <div className="line"><span>Model</span><strong className="mono" dir="ltr">nabu-fast · nabu-smart · openai/gpt-… · anthropic/claude-…</strong></div>
             </div>
           </div>
@@ -130,7 +130,7 @@ X-Nabu-Balance-Warning: low       # فقط وقتی موجودی زیر ۱ دل�
           <Lead>Cursor اجازه می‌دهد آدرس پایهٔ OpenAI را بازنویسی کنید. بعد از آن هر مدلی که NabuGate دارد در Cursor قابل انتخاب است.</Lead>
           <Steps items={[
             <>Settings → Models را باز کنید.</>,
-            <>در بخش OpenAI API Key کلید <code>ng_…</code> را وارد کنید.</>,
+            <>در بخش OpenAI API Key کلید <code>ng-…</code> را وارد کنید.</>,
             <>گزینهٔ <strong>Override OpenAI Base URL</strong> را فعال کنید و <code dir="ltr">{BASE}</code> را بنویسید.</>,
             <>با «+ Add model» نام alias را اضافه کنید (مثلاً <code>nabu-smart</code>) و Verify بزنید.</>,
           ]} />
@@ -201,37 +201,44 @@ claude`} label="PowerShell" />
 
       {active === 'claude-desktop' && (
         <section>
-          <H1>راهنمای Claude Desktop و اتصال Gateway</H1>
-          <Lead>می‌توانید پس از ورود به حساب NabuGate، یک کلید API بسازید و آن را در Claude Desktop به‌صورت <strong>Static API key</strong> وارد کنید. این یک روش اتصال به API است، نه ورود با حساب Claude.ai یا انتقال قابلیت‌های Projects و Cowork.</Lead>
-          <Callout kind="warn" icon="⚠️">این تنظیمات فقط روی نسخه‌ای از NabuGate کار می‌کنند که مسیر Anthropic-compatible <code>POST /v1/messages</code> را پیاده‌سازی و منتشر کرده باشد. پشتیبانی از تمام قابلیت‌های Claude Desktop، از جمله ابزارهای پیشرفته و مدل‌های خاص، باید جداگانه آزمایش شود. برای مدل‌های Anthropic، مجوز استفاده و کلید متعلق به کاربر را بررسی کنید.</Callout>
-          <H2>مرحلهٔ اول: کلید NabuGate</H2>
+          <H1>Claude Desktop با کلید NabuGate</H1>
+          <Lead>Claude Desktop حالتی به اسم Gateway دارد: به‌جای حساب Anthropic، درخواست‌ها را به درگاهی می‌فرستد که شما تعیین می‌کنید. با این راهنما گفت‌وگوها، Cowork و Code در اپ دسکتاپ از کیف‌پول NabuGate حساب می‌شوند و لازم نیست وارد حساب Claude.ai شوید.</Lead>
+          <GuideVideo name="claude-desktop" />
+          <H2>مراحل</H2>
           <Steps items={[
-            <>در <a href="/panel/login">پنل NabuGate</a> ثبت‌نام یا ورود کنید؛ سپس در «کلیدهای API» یک کلید جدید بسازید.</>,
-            <>موجودی و اجازهٔ دسترسی به مدل مدنظر را در پنل بررسی کنید. برای Claude واقعی از کلید شخصی ارائه‌دهنده یا قرارداد مجاز استفاده کنید.</>,
-            <>در Claude Desktop مسیر <code>Help → Troubleshooting → Enable Developer Mode</code> را باز کنید و پس از راه‌اندازی مجدد به <code>Developer → Configure Third-Party Inference</code> بروید.</>,
-            <>در بخش <code>Connection</code> گزینهٔ <code>Gateway</code> را انتخاب و اطلاعات زیر را وارد کنید.</>,
+            <>در <a href="/panel/">پنل NabuGate</a> به «کلیدهای API» بروید و یک کلید بسازید. با <code>ng-</code> شروع می‌شود و فقط یک‌بار کامل نمایش داده می‌شود.</>,
+            <>Claude Desktop را باز کنید ولی <strong>وارد حساب نشوید</strong>. در ویندوز از منوی <code>☰</code> بالا سمت چپ و در مک از نوار منو، <code dir="ltr">Help → Troubleshooting → Enable Developer Mode</code> را بزنید.</>,
+            <>از منوی تازهٔ Developer گزینهٔ <code dir="ltr">Configure Third-Party Inference…</code> را باز کنید.</>,
+            <>در بخش <strong>Connection</strong> مقادیر زیر را وارد کنید. از داخل ایران آدرس <code dir="ltr">https://gate.nabuxai.ir</code> را بگذارید. آدرس پایه <code>/v1</code> ندارد.</>,
+            <>در بخش <strong>Models</strong> شناسه‌های <code>claude-sonnet-5-5</code>، <code>claude-opus-5-5</code> و <code>claude-haiku-5-5</code> را دقیقاً همین‌طور اضافه کنید.</>,
+            <><code dir="ltr">Apply Changes</code> و بعد <code dir="ltr">Save &amp; Restart</code> را بزنید. وقتی اپ دوباره باز شد، در صفحهٔ ورود ادامه در حالت third-party را انتخاب کنید.</>,
           ]} />
           <CodeBlock code={`Inference provider : Gateway
-Credential kind    : Static API key
 Gateway base URL   : ${ORIGIN}
-Gateway API key    : ${KEY}
+Credential kind    : Static API key
 Gateway auth scheme: Bearer
-Model ID           : nabu-smart (add manually if supported)`} label="Claude Desktop · Connection" />
-          <p>در قسمت <strong>Models</strong> نام مدلِ واقعاً موجود در درگاه را انتخاب یا اضافه کنید. سپس <strong>Test connection</strong> و <strong>Apply Changes / Save</strong> را بزنید. اگر Model ID سفارشی در نسخهٔ فعلی Desktop پذیرفته نمی‌شود، از کلاینت سازگار یا مدلِ پشتیبانی‌شده استفاده کنید؛ نام مدل را به‌اشتباه به‌عنوان Claude معرفی نکنید.</p>
-          <H2>تست مستقل API</H2>
-          <CodeBlock code={`curl "${ORIGIN}/v1/messages" \
-  -H "Authorization: Bearer ${KEY}" \
-  -H "anthropic-version: 2023-06-01" \
-  -H "Content-Type: application/json" \
-  -d '{"model":"nabu-smart","max_tokens":128,"messages":[{"role":"user","content":"سلام!"}]}'`} label="bash · zsh" />
-          <H2>پروتکل‌ها چه فرقی دارند؟</H2>
-          <p><code dir="ltr">{ORIGIN}/v1/chat/completions</code> مسیر OpenAI-compatible است؛ Claude Desktop و Claude Code در حالت Gateway با <code>/v1/messages</code> کار می‌کنند. وجود مسیر اول، سازگاری با مسیر دوم را تضمین نمی‌کند. لایهٔ Anthropic باید JSON، استریم SSE و فراخوانی ابزار را تبدیل کند.</p>
+API key            : ${KEY}
+Models             : claude-sonnet-5-5, claude-opus-5-5, claude-haiku-5-5`} label="Claude Desktop · Configure Third-Party Inference" />
+          <Callout icon="💡"><strong>چرا شناسهٔ Claude و نه <code>nabu-claude</code>؟</strong> Claude Desktop فقط مدلی را در فهرست نشان می‌دهد که آن را Claude بشناسد، و پنجرهٔ زمینه و قابلیت‌ها را هم از روی شناسه تعیین می‌کند. NabuGate هر کدام از این شناسه‌ها را اول با همان مدل جواب می‌دهد و اگر در دسترس نبود به مدل Claude دیگری می‌رود، هرگز به مدل فروشندهٔ دیگری با نام Claude. <code>claude-fable-5-1</code> هم پشتیبانی می‌شود.</Callout>
+          <H2>آزمون مستقیم API</H2>
+          <p>اگر اپ وصل نشد، اول خود درگاه را با همان کلید امتحان کنید:</p>
+          <CodeBlock code={`curl "${ORIGIN}/v1/messages" \\
+  -H "Authorization: Bearer ${KEY}" \\
+  -H "anthropic-version: 2023-06-01" \\
+  -H "Content-Type: application/json" \\
+  -d '{"model":"claude-sonnet-5-5","max_tokens":128,"messages":[{"role":"user","content":"سلام!"}]}'`} label="bash · zsh" />
+          <H2>چه چیزهایی در این حالت فرق دارد</H2>
+          <ul style={{ paddingInlineStart: 20, display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <li>این ورود به Claude.ai نیست: پروژه‌ها، حافظه و تاریخچهٔ حساب Claude.ai در این حالت در دسترس نیستند.</li>
+            <li>طبق مستندات Anthropic، Remote Control و محیط‌های ابری Anthropic در حالت Gateway در دسترس نیستند.</li>
+            <li>هر پیام با مدل و هزینه‌اش در پنل NabuGate ثبت می‌شود. استدلال (thinking) نوبت‌های قبلی به مدل بعدی فرستاده نمی‌شود، چون امضای آن فقط برای همان مدل معتبر است.</li>
+          </ul>
           <H2>عیب‌یابی و امنیت</H2>
-          <Faq q="خطای 401 یا 402 چیست؟">کلید NabuGate، اعتبار حساب و سیاست‌های اجازهٔ مدل را بررسی کنید. کلید را در پیام، اسکرین‌شات یا بخش Custom inference headers قرار ندهید. در صورت افشای کلید آن را باطل کنید.</Faq>
-          <Faq q="چرا مدل در Claude Desktop دیده نمی‌شود؟">ممکن است نسخهٔ Desktop فقط شناسه‌های مدل خاصی را فهرست کند. در بخش Models شناسهٔ مدل موجود را اضافه کنید؛ پشتیبانی از شناسهٔ دلخواه را جداگانه تست کنید.</Faq>
-          <Faq q="آیا با ورود به NabuGate وارد Claude.ai می‌شوم؟">خیر. ورود به پنل و ساخت کلید API از ورود OAuth یا اشتراک Claude.ai مستقل است. گزینهٔ Interactive sign-in / OIDC به سرور هویت مجزا و پیاده‌سازی امن نیاز دارد و در این راهنما فعال نیست.</Faq>
-          <Faq q="چرا بعضی ابزارها یا قابلیت‌ها کار نمی‌کنند؟">استریم، ابزار، مدل، تصویر، thinking و ویژگی‌های پروژه‌ای در نرم‌افزارهای مختلف متفاوت است. از API پایه شروع کنید و سازگاری هر قابلیت را با تست واقعی تأیید کنید.</Faq>
-          <p>مستندات مرجع: <a href="https://developers.cloudflare.com/ai-gateway/integrations/coding-agents/claude-desktop/" target="_blank" rel="noreferrer">راهنمای Gateway در Claude Desktop</a> و <a href="https://code.claude.com/docs/en/legal-and-compliance" target="_blank" rel="noreferrer">شرایط رسمی Claude Code</a>.</p>
+          <Faq q="خطای 401 یا 402 چیست؟">401 یعنی کلید اشتباه یا باطل است. 402 یعنی موجودی کیف‌پول NabuGate کافی نیست. هر دو را در پنل ببینید. این خطاها از NabuGate است، نه از حساب Anthropic.</Faq>
+          <Faq q="مدل در فهرست Claude Desktop نیست">شناسه را دقیقاً مثل بالا بنویسید. نام‌هایی مثل <code>nabu-claude</code> یا <code>nabu-smart</code> را Claude Desktop نمی‌شناسد و نشان نمی‌دهد. اگر کلیدتان فهرست مجاز دارد، این شناسه‌ها باید در آن باشند.</Faq>
+          <Faq q="از ایران وصل نمی‌شود">آدرس پایه را <code dir="ltr">https://gate.nabuxai.ir</code> بگذارید. همان کلید روی هر دو آدرس کار می‌کند.</Faq>
+          <Faq q="کلیدم لو رفته">در پنل، همان کلید را باطل کنید و کلید تازه بسازید. کلید را در اسکرین‌شات، پیام یا فیلد Custom headers نگذارید.</Faq>
+          <p>مرجع رسمی: <a href="https://claude.com/docs/third-party/claude-desktop/gateway" target="_blank" rel="noreferrer">راهنمای Gateway در Claude Desktop</a>.</p>
         </section>
       )}
 

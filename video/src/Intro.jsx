@@ -10,7 +10,7 @@ import {
 } from 'remotion';
 import { COPY, SCENE_COUNT, SCENE_FRAMES } from './copy.js';
 
-const FONT_FACE = `
+export const FONT_FACE = `
 @font-face { font-family: 'Vazirmatn'; src: url('${staticFile('fonts/vazirmatn-arabic.woff2')}') format('woff2'); font-weight: 100 900; font-display: block; unicode-range: U+0600-06FF, U+0750-077F, U+200C-200E, U+FB50-FDFF, U+FE70-FEFC; }
 @font-face { font-family: 'Vazirmatn'; src: url('${staticFile('fonts/vazirmatn-latin.woff2')}') format('woff2'); font-weight: 100 900; font-display: block; unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+2000-206F; }
 @font-face { font-family: 'Inter'; src: url('${staticFile('fonts/inter-latin.woff2')}') format('woff2'); font-weight: 100 900; font-display: block; }
@@ -32,7 +32,7 @@ function rise(local, delay) {
   return { opacity: t, transform: `translateY(${(1 - t) * 18}px)` };
 }
 
-function Logo() {
+export function Logo() {
   return (
     <svg width="42" height="42" viewBox="0 0 40 40" fill="none" aria-hidden="true">
       <rect x="1" y="1" width="38" height="38" rx="11" fill="url(#g)" />

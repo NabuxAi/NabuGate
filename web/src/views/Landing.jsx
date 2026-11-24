@@ -93,14 +93,14 @@ const T = {
     fullDocs: 'مستندات کامل',
     iranEyebrow: "ایران بزرگ · راهنمای اتصال Claude",
     iranTitle: "راهی روشن برای اتصال به Claude",
-    iranSub: "ورود به Claude.ai با استفاده از API متفاوت است. برای اتصال Claude Desktop یا Claude Code به مدل‌های NabuGate، راهنمای Gateway تبدیل‌کننده، مراحل راه‌اندازی و عیب‌یابی را ببینید.",
+    iranSub: "ورود به Claude.ai با استفاده از API متفاوت است. Claude Desktop و Claude Code مستقیم با کلید NabuGate وصل می‌شوند و هزینه از کیف‌پول NabuGate کم می‌شود. ویدیوی آموزشی و مراحل را ببینید.",
     iranGuide: "راهنمای کامل اتصال Claude",
     iranStart: "ساخت کلید NabuGate",
     iranDisclaimer: "این راهکار جایگزین اشتراک Claude.ai نیست و تمام قابلیت‌های Claude Desktop یا دسترسی بدون محدودیت را تضمین نمی‌کند.",
     iranFlowA: "Claude Desktop / Code",
-    iranFlowB: "Anthropic-compatible Gateway",
-    iranFlowC: "NabuGate · OpenAI API",
-    iranFlowNote: "اتصال از طریق یک واسط تبدیل پروتکل",
+    iranFlowB: "NabuGate · /v1/messages",
+    iranFlowC: "Claude · fallback",
+    iranFlowNote: "NabuGate خودش مسیر Anthropic را دارد",
     ctaTitle: 'همین امروز با همهٔ مدل‌ها بسازید',
     ctaSub: 'حساب بسازید، کلید بگیرید و اولین درخواست را در کمتر از یک دقیقه بفرستید.',
     footTag: 'دروازهٔ یکپارچهٔ هوش مصنوعی: یک API سازگار با OpenAI برای همهٔ مدل‌ها.',
@@ -190,14 +190,14 @@ const T = {
     fullDocs: 'Full documentation',
     iranEyebrow: "Greater Iran · Claude connection guide",
     iranTitle: "A clearer path to Claude",
-    iranSub: "Signing in to Claude.ai is different from using an API. Learn how a protocol-converting gateway can connect Claude Desktop or Claude Code to models available through NabuGate.",
+    iranSub: "Signing in to Claude.ai is different from using an API. Claude Desktop and Claude Code connect directly with a NabuGate key and are billed to your NabuGate wallet. Watch the video and follow the steps.",
     iranGuide: "Read the full Claude guide",
     iranStart: "Create a NabuGate key",
     iranDisclaimer: "This is not a Claude.ai subscription and does not guarantee access to every Claude Desktop feature or unrestricted service availability.",
     iranFlowA: "Claude Desktop / Code",
-    iranFlowB: "Anthropic-compatible Gateway",
-    iranFlowC: "NabuGate · OpenAI API",
-    iranFlowNote: "A protocol adapter connects the two APIs",
+    iranFlowB: "NabuGate · /v1/messages",
+    iranFlowC: "Claude · fallback",
+    iranFlowNote: "NabuGate serves the Anthropic route itself",
     ctaTitle: 'Start building with every model today',
     ctaSub: 'Create an account, get a key and send your first request in under a minute.',
     footTag: 'The unified AI gateway: one OpenAI-compatible API for every model.',
@@ -287,14 +287,14 @@ const T = {
     fullDocs: 'التوثيق الكامل',
     iranEyebrow: "إيران الكبرى · دليل Claude",
     iranTitle: "طريقة واضحة للاتصال بـ Claude",
-    iranSub: "تسجيل الدخول إلى Claude.ai يختلف عن استخدام API. تعرف على طريقة ربط Claude Desktop أو Claude Code بنماذج NabuGate عبر بوابة تحوّل البروتوكول.",
+    iranSub: "تسجيل الدخول إلى Claude.ai يختلف عن استخدام API. يتصل Claude Desktop وClaude Code مباشرة بمفتاح NabuGate وتُحتسب التكلفة من محفظة NabuGate. شاهد الفيديو واتبع الخطوات.",
     iranGuide: "دليل Claude خطوة بخطوة",
     iranStart: "إنشاء مفتاح NabuGate",
     iranDisclaimer: "هذا لا يغني عن اشتراك Claude.ai ولا يضمن جميع ميزات Claude Desktop أو توفر الخدمة دون قيود.",
     iranFlowA: "Claude Desktop / Code",
-    iranFlowB: "Anthropic-compatible Gateway",
-    iranFlowC: "NabuGate · OpenAI API",
-    iranFlowNote: "بوابة تحول البروتوكول بين الواجهتين",
+    iranFlowB: "NabuGate · /v1/messages",
+    iranFlowC: "Claude · fallback",
+    iranFlowNote: "يقدّم NabuGate مسار Anthropic بنفسه",
     ctaTitle: 'ابدأ البناء بكل النماذج اليوم',
     ctaSub: 'أنشئ حسابًا، خذ مفتاحًا، وأرسل أول طلب.',
     footTag: 'بوابة الذكاء الاصطناعي الموحّدة: واجهة متوافقة مع OpenAI لكل النماذج.',
@@ -312,21 +312,21 @@ const T = {
 const FAQ = {
   fa: [
     ['NabuGate چیست؟', 'یک درگاه سازگار با OpenAI که پشت یک آدرس و یک کلید، مدل‌های OpenAI، Anthropic، Google و بقیه را با fallback خودکار ارائه می‌دهد.'],
-    ['با Cursor و Claude Code کار می‌کند؟', 'ابزارهای OpenAI-compatible مستقیم متصل می‌شوند. Claude Code به پروتکل Anthropic نیاز دارد و برای NabuGate در وضعیت فعلی باید از واسط تبدیل پروتکل استفاده کنید؛ راهنمای کامل در مستندات است.'],
+    ['با Cursor و Claude Code کار می‌کند؟', 'بله. ابزارهای OpenAI-compatible مثل Cursor با آدرس /v1 وصل می‌شوند. Claude Code و Claude Desktop از مسیر Anthropic یعنی /v1/messages استفاده می‌کنند که NabuGate خودش دارد؛ واسط جداگانه لازم نیست. راهنمای کامل در مستندات است.'],
     ['هزینه چطور حساب می‌شود؟', 'کیف پول دلاری. هر درخواست به قیمت واقعی مدل (به‌ازای میلیون توکن) کم می‌شود و هر پاسخ موجودی باقی‌مانده را در هدر برمی‌گرداند.'],
     ['اگر پرداختم مشکل داشت؟', 'فاکتور پیش از رفتن به بانک به نام حساب شما ثبت می‌شود و پنل هر بار از خودِ درگاه می‌پرسد. پول کم‌شده‌ای که تأیید نشود ظرف ۷۲ ساعت برمی‌گردد. بخش «مشکلات پرداخت» در مستندات همه را پوشش می‌دهد.'],
     ['کلید API چطور کار می‌کند؟', 'برای هر برنامه یک کلید می‌سازید، با محدودیت مدل، مبدأ و سقف درخواست. متن کامل کلید فقط یک‌بار نمایش داده می‌شود.'],
   ],
   en: [
     ['What is NabuGate?', 'An OpenAI-compatible gateway: one URL and one key for models from OpenAI, Anthropic, Google and more, with automatic fallback.'],
-    ['Does it work with Cursor and Claude Code?', 'OpenAI-compatible tools connect directly. Claude Code needs an Anthropic-compatible endpoint, so the current NabuGate API requires a protocol-converting bridge. See the complete setup guide.'],
+    ['Does it work with Cursor and Claude Code?', 'Yes. OpenAI-compatible tools such as Cursor connect through /v1. Claude Code and Claude Desktop use the Anthropic route, /v1/messages, which NabuGate serves itself; no bridge is needed. See the setup guide.'],
     ['How is it billed?', 'A USD wallet. Each request deducts the model’s real per-million-token price, and every response reports the remaining balance in a header.'],
     ['What if my payment fails?', 'The invoice is bound to your account before you leave for the bank, and the console re-asks the gateway on every visit. An unconfirmed charge is reversed within 72 hours. “Payment issues” in the docs covers every case.'],
     ['How do API keys work?', 'One key per app, limited by model, origin and rate. The full key is shown only once.'],
   ],
   ar: [
     ['ما هو نابوغيت؟', 'بوابة متوافقة مع OpenAI: عنوان واحد ومفتاح واحد لنماذج OpenAI وAnthropic وGoogle وغيرها، مع احتياط تلقائي.'],
-    ['هل يعمل مع Cursor وClaude Code؟', 'تتصل أدوات OpenAI-compatible مباشرة. يحتاج Claude Code إلى واجهة Anthropic، لذلك يلزم استخدام جسر لتحويل البروتوكول مع NabuGate حالياً. راجع دليل الإعداد.'],
+    ['هل يعمل مع Cursor وClaude Code؟', 'نعم. تتصل أدوات OpenAI-compatible مثل Cursor عبر /v1. ويستخدم Claude Code وClaude Desktop مسار Anthropic أي /v1/messages الذي يقدّمه NabuGate بنفسه؛ لا حاجة إلى جسر. راجع دليل الإعداد.'],
     ['كيف تُحسب التكلفة؟', 'محفظة بالدولار. كل طلب يُخصم بسعر النموذج الحقيقي لكل مليون رمز، وكل رد يعيد الرصيد المتبقي في ترويسة.'],
     ['ماذا لو فشلت عملية الدفع؟', 'تُسجَّل الفاتورة على حسابك قبل الذهاب إلى البنك، واللوحة تسأل البوابة في كل زيارة. المبلغ غير المؤكَّد يُعاد خلال ٧٢ ساعة. قسم «مشكلات الدفع» في التوثيق يغطي الحالات.'],
     ['كيف يعمل مفتاح API؟', 'مفتاح لكل تطبيق، بحدود النموذج والمصدر والمعدّل. النص الكامل للمفتاح يُعرض مرة واحدة.'],
@@ -435,7 +435,7 @@ export default function Landing({ signedIn = false }) {
 
   const ORIGIN = siteOrigin();
   const BASE = gatewayBase();
-  const KEY = 'ng_xxxxxxxxxxxxxxxx';
+  const KEY = 'ng-xxxxxxxxxxxxxxxx';
   const hello = lang === 'ar' ? 'مرحبا!' : lang === 'fa' ? 'سلام!' : 'Hello!';
   const snips = snippets(ORIGIN, BASE, KEY, hello);
   const snip = snips.find((s) => s.id === tab) || snips[0];
@@ -554,7 +554,7 @@ export default function Landing({ signedIn = false }) {
                 </div>
                 <div className="lp-window-foot" dir="ltr">
                   <span>X-Nabu-Balance-USD: <b>24.18</b></span>
-                  <span className="lp-bearer">Bearer ng_••••</span>
+                  <span className="lp-bearer">Bearer ng-••••</span>
                 </div>
               </div>
               <div className="lp-float lp-float-a"><Icon name="zap" size={15} />fallback</div>

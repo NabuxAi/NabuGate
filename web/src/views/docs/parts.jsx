@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import CodeBlock from '../../components/CodeBlock.jsx';
 import Icon from '../../components/Icon.jsx';
-import { fmtInt, useI18n } from '../../i18n/index.jsx';
+import { fmtInt, useI18n, useT } from '../../i18n/index.jsx';
 
 /* Building blocks shared by the Persian and English documentation. */
 
@@ -60,5 +60,31 @@ export function EnvTabs({ BASE, KEY }) {
       </div>
       <CodeBlock code={os === 'win' ? ps : bash} label={os === 'win' ? 'PowerShell' : 'bash · zsh'} />
     </div>
+  );
+}
+
+// Tutorial videos rendered from video/ (render-guide.mjs) into public/guide.
+// Paths are relative to the origin, so the Iran mirror serves its own copy.
+// A language without its own render falls back to Persian, like the docs.
+const GUIDE_T = {
+  fa: { caption: 'آموزش تصویری با صدای فارسی · حدود دو دقیقه', unsupported: 'مرورگر شما پخش ویدیو را پشتیبانی نمی‌کند.' },
+  en: { caption: 'Video walkthrough with narration · about two minutes', unsupported: 'Your browser cannot play this video.' },
+  ar: { caption: 'شرح مصوّر بصوت عربي · نحو دقيقتين', unsupported: 'متصفحك لا يدعم تشغيل الفيديو.' },
+};
+const GUIDE_LANGS = ['fa', 'en', 'ar'];
+
+export function GuideVideo({ name }) {
+  const { lang } = useI18n();
+  const t = useT(GUIDE_T);
+  const l = GUIDE_LANGS.includes(lang) ? lang : 'fa';
+  const base = `/guide/${name}-${l}`;
+  return (
+    <figure className="docs-video">
+      <video key={base} controls preload="none" playsInline poster={`${base}.jpg`}>
+        <source src={`${base}.mp4`} type="video/mp4" />
+        {t('unsupported')}
+      </video>
+      <figcaption>{t('caption')}</figcaption>
+    </figure>
   );
 }

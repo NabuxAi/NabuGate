@@ -36,7 +36,7 @@ function Mounted({ onMount, children }) {
 
 const ORIGIN = siteOrigin();
 const BASE = gatewayBase();
-const KEY = 'ng_xxxxxxxxxxxxxxxxxxxx';
+const KEY = 'ng-xxxxxxxxxxxxxxxxxxxx';
 
 const T = {
   fa: {

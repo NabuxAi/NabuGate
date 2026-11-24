@@ -1854,6 +1854,38 @@ models:
       - model: claude-opus-5-5
       - model: claude-sonnet-5
 
+  # The same four chains under Claude's own model IDs. Claude Desktop in
+  # third-party (Gateway) mode only lists a model it recognises as Claude, and
+  # Claude Code picks context window and features from the ID, so a gateway
+  # name like nabu-claude is hidden from the picker. Each ID is served by
+  # that model first; a fallback rung is a different Claude, never another
+  # vendor's model under a Claude name.
+  claude-opus-5-5:
+    primary:
+      model: claude-opus-5-5
+    fallback:
+      - model: claude-sonnet-5-5
+      - model: claude-sonnet-5
+
+  claude-sonnet-5-5:
+    primary:
+      model: claude-sonnet-5-5
+    fallback:
+      - model: claude-sonnet-5
+
+  claude-haiku-5-5:
+    primary:
+      model: claude-haiku-5-5
+    fallback:
+      - model: claude-sonnet-5
+
+  claude-fable-5-1:
+    primary:
+      model: claude-fable-5-1
+    fallback:
+      - model: claude-opus-5-5
+      - model: claude-sonnet-5
+
   # One vendor each, several models deep: per-model availability on these
   # routers comes and goes, so the next model on the same key is the useful
   # retry. Everything else in the catalogue is "openrouter/<id>" or

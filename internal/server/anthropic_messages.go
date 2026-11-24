@@ -83,6 +83,42 @@ func nabuAnthText(raw json.RawMessage) (string, error) {
 	return strings.Join(parts, "\n"), nil
 }
 
+// nabuAnthToolResult splits a tool_result's content into the text a tool
+// message can carry and the images that have to travel as user content.
+// Blocks that are neither (a tool_reference from tool search, say) carry no
+// text for the model and are left out instead of failing the whole turn.
+func nabuAnthToolResult(raw json.RawMessage) (string, []map[string]any, error) {
+	if len(raw) == 0 || string(raw) == "null" {
+		return "", nil, nil
+	}
+	var text string
+	if err := json.Unmarshal(raw, &text); err == nil {
+		return text, nil, nil
+	}
+	var blocks []nabuAnthBlock
+	if err := json.Unmarshal(raw, &blocks); err != nil {
+		return "", nil, fmt.Errorf("expected a string or content blocks")
+	}
+	var texts []string
+	var images []map[string]any
+	for _, b := range blocks {
+		switch b.Type {
+		case "text":
+			texts = append(texts, b.Text)
+		case "image":
+			if b.Source.Type == "base64" && strings.HasPrefix(b.Source.MediaType, "image/") && b.Source.Data != "" {
+				images = append(images, map[string]any{"type": "image_url", "image_url": map[string]any{
+					"url": "data:" + b.Source.MediaType + ";base64," + b.Source.Data}})
+			} else if b.Source.Type == "url" && strings.HasPrefix(b.Source.URL, "https://") {
+				images = append(images, map[string]any{"type": "image_url", "image_url": map[string]any{"url": b.Source.URL}})
+			} else {
+				return "", nil, fmt.Errorf("invalid image")
+			}
+		}
+	}
+	return strings.Join(texts, "\n"), images, nil
+}
+
 func nabuAnthConvert(in nabuAnthropicRequest) (provider.ChatRequest, error) {
 	msgs := make([]map[string]any, 0, len(in.Messages)+1)
 	raw := map[string]json.RawMessage{}
@@ -102,8 +138,20 @@ func nabuAnthConvert(in nabuAnthropicRequest) (provider.ChatRequest, error) {
 		addText("system", system)
 	}
 	for i, msg := range in.Messages {
+		if msg.Role == "system" {
+			// Claude Code (and so Claude Desktop in third-party mode) sends
+			// instructions that change mid-session as a system turn inside
+			// messages. OpenAI-wire accepts a system message at any position,
+			// so it keeps its place in the conversation.
+			text, err := nabuAnthText(msg.Content)
+			if err != nil {
+				return provider.ChatRequest{}, fmt.Errorf("messages[%d]: %w", i, err)
+			}
+			addText("system", text)
+			continue
+		}
 		if msg.Role != "user" && msg.Role != "assistant" {
-			return provider.ChatRequest{}, fmt.Errorf("messages[%d]: role must be user or assistant", i)
+			return provider.ChatRequest{}, fmt.Errorf("messages[%d]: role must be user, assistant or system", i)
 		}
 		var simple string
 		if err := json.Unmarshal(msg.Content, &simple); err == nil {
@@ -131,6 +179,10 @@ func nabuAnthConvert(in nabuAnthropicRequest) (provider.ChatRequest, error) {
 					}
 					calls = append(calls, map[string]any{"id": b.ID, "type": "function",
 						"function": map[string]any{"name": b.Name, "arguments": args}})
+				case "thinking", "redacted_thinking":
+					// A previous turn's reasoning. It is signed for one vendor's
+					// model and means nothing to whichever provider serves this
+					// turn, so it is dropped rather than failing the request.
 				default:
 					return provider.ChatRequest{}, fmt.Errorf("messages[%d]: unsupported assistant block %q", i, b.Type)
 				}
@@ -145,6 +197,7 @@ func nabuAnthConvert(in nabuAnthropicRequest) (provider.ChatRequest, error) {
 			continue
 		}
 		parts := []map[string]any{}
+		var toolImages []map[string]any
 		flushParts := func() {
 			if len(parts) > 0 {
 				msgs = append(msgs, map[string]any{"role": "user", "content": parts})
@@ -178,16 +231,22 @@ func nabuAnthConvert(in nabuAnthropicRequest) (provider.ChatRequest, error) {
 				if b.ToolUseID == "" {
 					return provider.ChatRequest{}, fmt.Errorf("messages[%d]: tool_result requires tool_use_id", i)
 				}
-				value, err := nabuAnthText(b.Content)
+				value, images, err := nabuAnthToolResult(b.Content)
 				if err != nil {
 					return provider.ChatRequest{}, fmt.Errorf("messages[%d] tool_result: %w", i, err)
 				}
 				msgs = append(msgs, map[string]any{"role": "tool", "tool_call_id": b.ToolUseID, "content": value})
 				typed = append(typed, provider.Message{Role: "user", Content: value})
+				// A tool message carries text only on OpenAI-wire; a screenshot
+				// or a read image follows the tool messages as user content.
+				// It cannot go between them: every tool reply has to follow
+				// the assistant's tool_calls without a turn in between.
+				toolImages = append(toolImages, images...)
 			default:
 				return provider.ChatRequest{}, fmt.Errorf("messages[%d]: unsupported user block %q", i, b.Type)
 			}
 		}
+		parts = append(toolImages, parts...)
 		flushParts()
 	}
 	if len(msgs) == 0 {

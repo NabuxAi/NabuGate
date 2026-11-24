@@ -144,3 +144,56 @@ func TestAnthropicMessagesRejectUnsupportedBlocks(t *testing.T) {
 		t.Fatalf("status=%d, body=%s", resp.StatusCode, raw)
 	}
 }
+
+// The turn shape Claude Code sends today, and so Claude Desktop in
+// third-party mode: a system turn inside messages, a signed thinking block on
+// an earlier assistant turn, and a screenshot inside a tool_result. Each of
+// these used to fail the whole request with a 400 before any provider saw it.
+func TestAnthropicMessagesAcceptClaudeCodeTurns(t *testing.T) {
+	var incoming nabuAnthropicRequest
+	raw := []byte(`{"model":"nabu-claude","max_tokens":128,"messages":[
+		{"role":"user","content":[{"type":"text","text":"look"}]},
+		{"role":"system","content":[{"type":"text","text":"Plan mode is off."}]},
+		{"role":"assistant","content":[
+			{"type":"thinking","thinking":"","signature":"sig"},
+			{"type":"tool_use","id":"call_1","name":"Screenshot","input":{}},
+			{"type":"tool_use","id":"call_2","name":"Read","input":{"path":"a"}}]},
+		{"role":"user","content":[
+			{"type":"tool_result","tool_use_id":"call_1","content":[
+				{"type":"text","text":"captured"},
+				{"type":"image","source":{"type":"base64","media_type":"image/png","data":"iVBORw0KGgo="}}]},
+			{"type":"tool_result","tool_use_id":"call_2","content":[{"type":"tool_reference","tool_name":"Read"},{"type":"text","text":"file body"}]},
+			{"type":"text","text":"what do you see?"}]}]}`)
+	if err := json.Unmarshal(raw, &incoming); err != nil {
+		t.Fatal(err)
+	}
+	converted, err := nabuAnthConvert(incoming)
+	if err != nil {
+		t.Fatalf("convert: %v", err)
+	}
+	var msgs []map[string]any
+	if err := json.Unmarshal(converted.Raw["messages"], &msgs); err != nil {
+		t.Fatal(err)
+	}
+	var roles []string
+	for _, m := range msgs {
+		roles = append(roles, m["role"].(string))
+	}
+	want := []string{"user", "system", "assistant", "tool", "tool", "user"}
+	if strings.Join(roles, ",") != strings.Join(want, ",") {
+		t.Fatalf("roles = %v, want %v (tool replies must follow the tool_calls with nothing between them)", roles, want)
+	}
+	if msgs[1]["content"] != "Plan mode is off." {
+		t.Errorf("system turn content = %v", msgs[1]["content"])
+	}
+	if msgs[3]["content"] != "captured" || msgs[4]["content"] != "file body" {
+		t.Errorf("tool contents = %v / %v", msgs[3]["content"], msgs[4]["content"])
+	}
+	last, _ := json.Marshal(msgs[5]["content"])
+	if !bytes.Contains(last, []byte("data:image/png;base64,iVBORw0KGgo=")) || !bytes.Contains(last, []byte("what do you see?")) {
+		t.Errorf("screenshot and the user's text should travel together after the tool replies: %s", last)
+	}
+	if bytes.Contains(converted.Raw["messages"], []byte("thinking")) {
+		t.Errorf("a vendor-signed thinking block must not be forwarded: %s", converted.Raw["messages"])
+	}
+}
