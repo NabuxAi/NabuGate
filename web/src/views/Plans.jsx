@@ -2,9 +2,9 @@ import { navigate } from '../nav.js';
 import { useEffect, useState } from 'react';
 import Layout from '../components/Layout.jsx';
 import * as api from '../api.js';
-import { usd, fmtInt, fmtNum, fmtDate, useT } from '../i18n/index.jsx';
+import { usd, toman, fmtInt, fmtNum, fmtDate, useT } from '../i18n/index.jsx';
 import { usePayment, MIN_USD, MAX_USD } from '../components/usePayment.js';
-import { PayError, SettleBanners, PaymentsDisabled, GatewayPicker, BankRateNote, newIdempotencyKey } from '../components/PaymentNotices.jsx';
+import { PayError, SettleBanners, PaymentsDisabled, GatewayPicker, BankRateNote, TomanOf, newIdempotencyKey } from '../components/PaymentNotices.jsx';
 import { Skeleton } from '../components/Skeleton.jsx';
 import Icon from '../components/Icon.jsx';
 
@@ -255,6 +255,11 @@ export default function Plans() {
   // one that waits a moment.
   const enabled = status?.payments_enabled === true;
   const gateways = status?.payment_gateways;
+  // Toman per dollar from the payment bridge; only present on a .ir host.
+  const rate = status?.usd_toman;
+  // What a pay button says it charges: toman on a .ir host (the bank charges
+  // toman there), dollars otherwise.
+  const charge = (u) => (Number(rate) > 0 ? toman(Number(u) * Number(rate)) : usd(u));
 
   const buy = (id, amount) => {
     setSelected(id);
@@ -284,6 +289,7 @@ export default function Plans() {
             {plan.popular && <div className="ribbon">{t('recommended')}</div>}
             <h3>{t(plan.name)}</h3>
             <div className="price" dir="ltr">{usd(plan.amount)}<small>{t('credit')}</small></div>
+            <TomanOf usd={plan.amount} rate={rate} />
             <p className="muted" style={{ fontSize: 13, lineHeight: 1.7, margin: 0 }}>{t(plan.blurb)}</p>
             <ul>{plan.perks.map((p) => <li key={p}>{t(p)}</li>)}</ul>
             <div className="spacer" />
@@ -292,9 +298,9 @@ export default function Plans() {
               onClick={() => buy(plan.id, plan.amount)}
               disabled={payment.busy || !enabled}
             >
-              {busyLabel(plan.id, t('payAmount', { amount: usd(plan.amount) }))}
+              {busyLabel(plan.id, t('payAmount', { amount: charge(plan.amount) }))}
             </button>
-            <BankRateNote />
+            <BankRateNote usd={plan.amount} rate={rate} />
           </div>
         ))}
       </div>
@@ -372,6 +378,7 @@ export default function Plans() {
                   {pl.popular && <div className="ribbon">{t('recommended')}</div>}
                   <h3>{pl.name}</h3>
                   <div className="price" dir="ltr">{usd(pl.price_usd)}<small>{t('perDays', { n: fmtInt(pl.days) })}</small></div>
+                  <TomanOf usd={pl.price_usd} rate={rate} />
                   {pl.description && (
                     <p className="muted" style={{ fontSize: 13, lineHeight: 1.7, margin: 0 }}>{pl.description}</p>
                   )}
@@ -396,12 +403,12 @@ export default function Plans() {
                         disabled={payment.busy || !enabled}
                         onClick={() => payDiff(pl.id)}
                       >
-                        {busyLabel('plan:' + pl.id, t('payDiffShort', { amount: usd(need) }))}
+                        {busyLabel('plan:' + pl.id, t('payDiffShort', { amount: charge(need) }))}
                       </button>
                       <p className="muted" style={{ fontSize: 11.5, lineHeight: 1.9, margin: 0 }}>
                         {t('shortNote', { balance: usd(balance), amount: usd(need) })}
                       </p>
-                      <BankRateNote />
+                      <BankRateNote usd={need} rate={rate} />
                     </>
                   ) : (
                     <>
@@ -450,7 +457,7 @@ export default function Plans() {
             {busyLabel('custom', t('pay'))}
           </button>
         </form>
-        <BankRateNote />
+        <BankRateNote usd={customOk ? Number(custom) : 0} rate={rate} />
       </div>
 
       <div className="card">

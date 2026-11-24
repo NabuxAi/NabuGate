@@ -30,6 +30,12 @@ func (s *Store) StartPayment(email string, amount float64, invoice string) error
 
 // StartPaymentFor is StartPayment carrying a plan to buy once the money lands.
 func (s *Store) StartPaymentFor(email string, amount float64, invoice, planID string) error {
+	return s.StartPaymentVia(email, amount, invoice, planID, "")
+}
+
+// StartPaymentVia is StartPaymentFor recording which bridge issued the
+// invoice ("" for the main one), so settling asks that bridge.
+func (s *Store) StartPaymentVia(email string, amount float64, invoice, planID, bridge string) error {
 	email = strings.TrimSpace(strings.ToLower(email))
 	if email == "" || invoice == "" {
 		return errors.New("a payment needs both an account and an invoice number")
@@ -66,6 +72,7 @@ func (s *Store) StartPaymentFor(email string, amount float64, invoice, planID st
 		CreatedAt: time.Now(),
 		Kind:      "topup",
 		PlanID:    planID,
+		Bridge:    strings.TrimSpace(bridge),
 	})
 	return s.save()
 }

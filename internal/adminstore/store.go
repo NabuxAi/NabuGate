@@ -62,7 +62,11 @@ type Admin struct {
 // Token is a project key minted from the console.
 
 type Payment struct {
-	ID        string    `json:"id"`
+	ID string `json:"id"`
+	// Bridge names the NabuPay instance that raised the invoice: "" for the
+	// main one (NABUPAY_URL), "ir" for the Iranian one (NABUPAY_IR_URL). Each
+	// keeps its own invoices, so settling must ask the one that issued it.
+	Bridge    string    `json:"bridge,omitempty"`
 	Amount    float64   `json:"amount"`
 	Status    string    `json:"status"`
 	CreatedAt time.Time `json:"created_at"`

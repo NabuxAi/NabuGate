@@ -143,10 +143,21 @@ func (s *Server) consoleStatus(w http.ResponseWriter, r *http.Request) {
 	// screen, and an anonymous page load should not be a call to the bridge.
 	if authed && s.pay.Configured() {
 		ctx := r.Context()
-		if strings.HasPrefix(s.publicURL(r), "https://gate.nabuxai.ir") {
+		bridge, cache := s.pay, &s.gateways
+		if isIranRequest(r) {
 			ctx = context.WithValue(ctx, paymentCountryCtxKey{}, "IR")
+			if b, name := s.bridgeFor(r); name == bridgeIran {
+				bridge, cache = b, &s.iranPay.gateways
+			}
+			// The payer on a .ir host is quoted in toman, at the rate of the
+			// bridge that will charge them; no rate, no toman figure.
+			body["payment_locale"] = "fa"
+			body["payment_currency"] = "IRT"
+			if rate, ok := s.tomanRate(ctx, bridge); ok {
+				body["usd_toman"] = rate
+			}
 		}
-		list, healthy := s.paymentGateways(ctx)
+		list, healthy := s.paymentGatewaysFrom(ctx, bridge, cache)
 		if list == nil {
 			list = []nabupay.Gateway{}
 		}
@@ -803,7 +814,8 @@ func (s *Server) rechargeMe(w http.ResponseWriter, r *http.Request) {
 	// own checkout, which shows the invoice and the gateways that are actually
 	// working. A caller that really does want one can still pass it.
 
-	checkout, err := s.pay.Start(r.Context(), nabupay.StartOptions{
+	bridge, bridgeName := s.bridgeFor(r)
+	opts := nabupay.StartOptions{
 		AmountUSD:   amount,
 		Gateway:     strings.TrimSpace(req.Gateway),
 		Description: description,
@@ -811,7 +823,10 @@ func (s *Server) rechargeMe(w http.ResponseWriter, r *http.Request) {
 		// query the gateway appends is not read: only the invoice number is,
 		// and only to ask the bridge what really happened.
 		CallbackURL: s.publicURL(r) + "/panel/account",
-	})
+	}
+	// From a .ir host: Persian checkout, priced in toman (payflow_iran.go).
+	s.iranCheckout(r, bridge, email, &opts)
+	checkout, err := bridge.Start(r.Context(), opts)
 	if err != nil {
 		s.log.Warn("payment bridge refused a checkout", "account", email, "amount", amount, "error", err)
 		code := "gateway_refused"
@@ -825,17 +840,21 @@ func (s *Server) rechargeMe(w http.ResponseWriter, r *http.Request) {
 	// Recorded before the payer leaves, which is what binds this invoice to
 	// this account. Settling later cannot then take the payer's word for whose
 	// invoice it is.
-	if err := s.admin.StartPaymentFor(email, amount, checkout.Invoice, planID); err != nil {
+	if err := s.admin.StartPaymentVia(email, amount, checkout.Invoice, planID, bridgeName); err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 	s.log.Info("checkout started", "account", email, "invoice", checkout.Invoice, "amount", amount, "plan", planID)
 
-	writeJSON(w, http.StatusOK, map[string]any{
+	res := map[string]any{
 		"invoice":      checkout.Invoice,
 		"checkout_url": checkout.URL,
 		"amount":       amount,
-	})
+	}
+	if opts.AmountToman > 0 {
+		res["amount_toman"] = opts.AmountToman
+	}
+	writeJSON(w, http.StatusOK, res)
 }
 
 // settleMyPayments finishes whatever this account left pending at the gateway.
@@ -880,7 +899,14 @@ func (s *Server) settleMyPayments(w http.ResponseWriter, r *http.Request) {
 	var subscribed map[string]any
 
 	for _, p := range pending {
-		v, err := s.pay.Verify(r.Context(), p.ID)
+		bridge := s.bridgeNamed(p.Bridge)
+		if bridge == nil {
+			// Raised on a bridge this deployment no longer has. No other
+			// bridge knows the invoice; it stays pending until it expires.
+			s.log.Warn("invoice's payment bridge is not configured", "invoice", p.ID, "bridge", p.Bridge)
+			continue
+		}
+		v, err := bridge.Verify(r.Context(), p.ID)
 		if err != nil {
 			// One unreachable invoice must not hide the others, and it is not
 			// a failed payment — the bridge simply did not answer.

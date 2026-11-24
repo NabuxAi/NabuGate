@@ -84,13 +84,29 @@ func (c *Client) Start(ctx context.Context, opts StartOptions) (Checkout, error)
 		return Checkout{}, errors.New("a payment must be for more than nothing")
 	}
 
-	body, err := json.Marshal(map[string]any{
+	payload := map[string]any{
 		"service_name": "gate",
 		"gateway":      opts.Gateway,
 		"amount_usd":   opts.AmountUSD,
 		"description":  opts.Description,
 		"callback_url": opts.CallbackURL,
-	})
+	}
+	// A toman figure beside the dollars makes the bridge record the invoice
+	// in toman (currency IRT) while keeping amount_usd as the dollars to
+	// credit, so its hosted page quotes the payer in toman instead of "USD".
+	if opts.AmountToman > 0 {
+		payload["amount_toman"] = opts.AmountToman
+	}
+	customer := map[string]string{}
+	for k, v := range map[string]string{"country": opts.Country, "locale": opts.Locale, "email": opts.Email} {
+		if v = strings.TrimSpace(v); v != "" {
+			customer[k] = v
+		}
+	}
+	if len(customer) > 0 {
+		payload["customer"] = customer
+	}
+	body, err := json.Marshal(payload)
 	if err != nil {
 		return Checkout{}, err
 	}
@@ -124,6 +140,37 @@ type StartOptions struct {
 	Gateway     string // bridge gateway slug, e.g. "zarinpal"
 	Description string
 	CallbackURL string // where the gateway returns the payer
+
+	// AmountToman, when positive, is the same price in toman, worked out at
+	// the bridge's own rate (see Rate). Zero leaves the conversion to the
+	// bridge and its page shows dollars.
+	AmountToman int64
+	// Country (ISO-2, e.g. "IR") and Locale ("fa") tell the hosted checkout
+	// which methods to offer and which language to open in. Email prefills
+	// the payer's details. All optional.
+	Country string
+	Locale  string
+	Email   string
+}
+
+// Rate is the bridge's toman-per-dollar figure: the one its bank pages charge
+// at right now. NabuGate keeps no rate of its own; a figure from anywhere else
+// would disagree with what the payer sees at the bank.
+func (c *Client) Rate(ctx context.Context) (int64, error) {
+	if c == nil {
+		return 0, ErrNotConfigured
+	}
+	var out struct {
+		Success  bool    `json:"success"`
+		USDToman float64 `json:"usd_toman"`
+	}
+	if err := c.get(ctx, "/api/v1/pay/rate", &out); err != nil {
+		return 0, err
+	}
+	if !out.Success || out.USDToman <= 0 {
+		return 0, errors.New("payment bridge has no exchange rate right now")
+	}
+	return int64(out.USDToman + 0.5), nil
 }
 
 // Verdict is the bridge's answer about one invoice.

@@ -203,6 +203,21 @@ func main() {
 		log.Info("payments disabled (NABUPAY_URL or NABUPAY_SECRET not set): the panel will say top-ups are unavailable")
 	}
 
+	// The Iranian NabuPay (pay.nabuxai.ir): optional. When set, a payer who
+	// opened a .ir host is invoiced there, so the hosted checkout and the
+	// bank methods it lists (the AccountCity bank relay among them) are the
+	// Iranian instance's. Signed with NABUPAY_IR_SECRET, or NABUPAY_SECRET
+	// when that is unset.
+	irPay := nabupay.New(
+		os.Getenv("NABUPAY_IR_URL"),
+		envOr("NABUPAY_APP_ID", "gate"),
+		envOr("NABUPAY_IR_SECRET", os.Getenv("NABUPAY_SECRET")),
+	)
+	srv = srv.WithIranPayments(irPay)
+	if irPay.Configured() {
+		log.Info("iranian payment bridge enabled", "bridge", os.Getenv("NABUPAY_IR_URL"))
+	}
+
 	// Console state: accounts, console-minted project tokens, and usage that
 	// survives a restart. Mount a volume at NABU_STATE_DIR to keep it — without
 	// one the file lives in the container and every redeploy loses the admin
