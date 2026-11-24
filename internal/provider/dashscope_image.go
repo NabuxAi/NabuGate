@@ -11,8 +11,9 @@ import (
 	"strings"
 )
 
-// DashScopeImageAdapter serves Alibaba's Wan text-to-image models (wan2.6-t2i
-// and later) from Model Studio's native multimodal-generation API. The chat
+// DashScopeImageAdapter serves Alibaba's Wan image models — text-to-image
+// (wan2.6-t2i) and image editing with references (wan2.6-image) — from Model
+// Studio's native multimodal-generation API. The chat
 // side of DashScope rides the openai adapter through its compatible-mode
 // endpoint, but images have no OpenAI-wire route there: the request is a
 // messages body under "input", and the answer is a signed OSS URL per image
@@ -61,22 +62,7 @@ func (a *DashScopeImageAdapter) Image(ctx context.Context, req ImageRequest) (Im
 	if n <= 0 {
 		n = 1
 	}
-	body := map[string]any{
-		"model": req.Model,
-		"input": map[string]any{"messages": []any{map[string]any{
-			"role":    "user",
-			"content": []any{map[string]any{"text": req.Prompt}},
-		}}},
-		"parameters": map[string]any{
-			"size":      dashScopeSize(req),
-			"n":         n,
-			"watermark": false,
-		},
-	}
-	if neg := strings.TrimSpace(req.NegativePrompt); neg != "" {
-		body["parameters"].(map[string]any)["negative_prompt"] = neg
-	}
-	payload, err := json.Marshal(body)
+	payload, err := json.Marshal(dashScopeImageBody(req, n))
 	if err != nil {
 		return ImageResponse{}, err
 	}
@@ -125,6 +111,48 @@ func (a *DashScopeImageAdapter) Image(ctx context.Context, req ImageRequest) (Im
 	return out, nil
 }
 
+// AcceptsInputImages implements ImageInputAdapter. Wan's image-in models
+// (wan2.6-image) read input pictures from the same messages body; the -t2i
+// models are text-to-image only, and an edit sent there would come back as a
+// fresh picture that ignores the input.
+func (a *DashScopeImageAdapter) AcceptsInputImages(model string) bool {
+	return !strings.Contains(strings.ToLower(model), "t2i")
+}
+
+// dashScopeImageBody is the multimodal-generation request. With input images
+// the user turn is one {"image": …} part per picture followed by the prompt as
+// {"text": …}, and size is sent only when the caller asked for a shape: left
+// out, the model keeps the input's own shape, which is what an edit wants.
+// Without input images the body is exactly the text-to-image one.
+func dashScopeImageBody(req ImageRequest, n int) map[string]any {
+	content := make([]any, 0, len(req.Images)+1)
+	for _, img := range req.Images {
+		content = append(content, map[string]any{"image": img})
+	}
+	content = append(content, map[string]any{"text": req.Prompt})
+
+	params := map[string]any{
+		"n":         n,
+		"watermark": false,
+	}
+	if len(req.Images) == 0 {
+		params["size"] = dashScopeSize(req)
+	} else if size, ok := dashScopeRequestedSize(req); ok {
+		params["size"] = size
+	}
+	if neg := strings.TrimSpace(req.NegativePrompt); neg != "" {
+		params["negative_prompt"] = neg
+	}
+	return map[string]any{
+		"model": req.Model,
+		"input": map[string]any{"messages": []any{map[string]any{
+			"role":    "user",
+			"content": content,
+		}}},
+		"parameters": params,
+	}
+}
+
 // dashScopeSizes are the canvases Wan is asked for per aspect ratio: each about
 // 1.6 MP, inside the model's accepted pixel range.
 var dashScopeSizes = map[string]string{
@@ -141,11 +169,20 @@ var dashScopeSizes = map[string]string{
 // dashScopeSize turns the request's aspect ratio, or else its OpenAI-style
 // "WxH" size, into Wan's "W*H". Unknown shapes get the square default.
 func dashScopeSize(req ImageRequest) string {
-	if s, ok := dashScopeSizes[strings.TrimSpace(req.AspectRatio)]; ok {
+	if s, ok := dashScopeRequestedSize(req); ok {
 		return s
 	}
-	if w, h, ok := splitDims(req.Size, "x"); ok {
-		return strconv.Itoa(w) + "*" + strconv.Itoa(h)
-	}
 	return dashScopeSizes["1:1"]
+}
+
+// dashScopeRequestedSize is the canvas the caller asked for, if they asked for
+// one Wan can draw: a known aspect ratio, else an OpenAI-style "WxH".
+func dashScopeRequestedSize(req ImageRequest) (string, bool) {
+	if s, ok := dashScopeSizes[strings.TrimSpace(req.AspectRatio)]; ok {
+		return s, true
+	}
+	if w, h, ok := splitDims(req.Size, "x"); ok {
+		return strconv.Itoa(w) + "*" + strconv.Itoa(h), true
+	}
+	return "", false
 }

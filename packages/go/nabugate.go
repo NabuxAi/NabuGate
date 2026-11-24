@@ -270,6 +270,11 @@ type ImageRequest struct {
 	Prompt string `json:"prompt"`
 	N      int    `json:"n,omitempty"`
 	Size   string `json:"size,omitempty"`
+	// Images are input pictures — the photo to edit, or up to four character
+	// and style references — each an https:// URL or a
+	// data:image/(png|jpeg|webp);base64 URI. Use an editing alias such as
+	// "nabu-image-edit"; text-to-image aliases answer 400.
+	Images []string `json:"images,omitempty"`
 }
 
 // ImageResponse holds the generated images, base64-encoded.

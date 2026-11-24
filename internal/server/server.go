@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"encoding/binary"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -220,7 +221,9 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /v1/messages", s.auth(s.handleAnthropicMessages))
 	mux.HandleFunc("POST /v1/messages/count_tokens", s.auth(s.handleAnthropicTokenCount))
 	mux.HandleFunc("POST /v1/responses", s.auth(s.handleResponses))
-	mux.HandleFunc("POST /v1/images/generations", s.auth(s.handleImages))
+	// Input pictures (edits, references) ride in the JSON as data URIs, so this
+	// endpoint takes a larger body than chat.
+	mux.HandleFunc("POST /v1/images/generations", s.authWithLimit(imageBodyLimit, s.handleImages))
 	mux.HandleFunc("POST /v1/audio/speech", s.auth(s.handleSpeech))
 	mux.HandleFunc("POST /v1/live/sessions", s.auth(s.handleLiveSession))
 	mux.HandleFunc("POST /v1/live/sessions/{id}/usage", s.auth(s.handleLiveUsage))
@@ -1309,16 +1312,32 @@ type imageRequestBody struct {
 	Quality     string `json:"quality"`
 	// Not OpenAI's; honoured by the vendors that take one (Wan).
 	NegativePrompt string `json:"negative_prompt"`
+	// Input pictures — the photo to edit, or character and style references:
+	// "images" is the list, "image" the single-picture spelling. Each is an
+	// https:// URL or a data:image/(png|jpeg|webp);base64 URI. Raw because
+	// either may arrive as a string or an array (see inputImages).
+	Image  json.RawMessage `json:"image"`
+	Images json.RawMessage `json:"images"`
 }
 
 func (s *Server) handleImages(w http.ResponseWriter, r *http.Request) {
 	var body imageRequestBody
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		var tooBig *http.MaxBytesError
+		if errors.As(err, &tooBig) {
+			writeError(w, http.StatusRequestEntityTooLarge, fmt.Sprintf("request body too large: at most %d bytes; input images may total at most 20 MB decoded", tooBig.Limit))
+			return
+		}
 		writeError(w, http.StatusBadRequest, "invalid JSON body")
 		return
 	}
 	if body.Model == "" || body.Prompt == "" {
 		writeError(w, http.StatusBadRequest, "fields 'model' (alias) and 'prompt' are required")
+		return
+	}
+	images, msg := inputImages(body.Image, body.Images)
+	if msg != "" {
+		writeError(w, http.StatusBadRequest, msg)
 		return
 	}
 	if !s.aliasAllowed(w, r, body.Model) {
@@ -1332,9 +1351,14 @@ func (s *Server) handleImages(w http.ResponseWriter, r *http.Request) {
 		AspectRatio:    body.AspectRatio,
 		Quality:        body.Quality,
 		NegativePrompt: body.NegativePrompt,
+		Images:         images,
 	})
 	if err != nil {
-		writeError(w, aliasErrStatus(err, "unknown image alias"), err.Error())
+		status := aliasErrStatus(err, "unknown image alias")
+		if errors.Is(err, router.ErrNoImageInput) {
+			status = http.StatusBadRequest
+		}
+		writeError(w, status, err.Error())
 		return
 	}
 

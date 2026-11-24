@@ -20,7 +20,7 @@ OpenAI-wire compatible, so any OpenAI client works by changing the base URL:
 | `POST /v1/chat/completions` | Chat, streaming or not |
 | `POST /v1/responses` | Responses API |
 | `POST /v1/embeddings` | Vectors, with `dimensions` |
-| `POST /v1/images/generations` | Images |
+| `POST /v1/images/generations` | Images; edits and references with `images` |
 | `POST /v1/audio/speech` | Text to speech |
 | `POST /v1/audio/transcriptions` | Speech to text |
 | `POST /v1/systemone` | System 1 structured decisions (Jev / TypeSafe) |
@@ -35,6 +35,29 @@ Request bodies pass through to the provider untouched — only `model` and the
 stream flags are rewritten. So `tools`, `tool_choice`, `response_format`,
 `seed`, `top_p`, `stop` and penalties all work, and `tool_calls` come back in
 the response, whether or not the gateway names them.
+
+### Editing and reference images
+
+`POST /v1/images/generations` also edits a picture or draws a new one from
+character and style references. Send the input pictures in `images` (or one in
+`image`) alongside the prompt, with an editing alias — `nabu-image-edit`
+(Alibaba Wan 2.6 Image):
+
+```json
+{
+  "model": "nabu-image-edit",
+  "prompt": "Make it look like a watercolor painting.",
+  "images": ["https://example.com/photo.png"]
+}
+```
+
+Each input is an `https://` URL or a `data:image/png|jpeg|webp;base64,...` URI;
+at most 4 per request and 20 MB decoded in total. Without `aspect_ratio` or
+`size` the result keeps the input's shape. The answer is the usual
+`data[].b64_json`, billed per output picture like a generation on the same
+model. An alias with no model that reads input pictures — `nabu-image`, whose
+chain ends in stock photos — answers `400` rather than return a picture
+unrelated to the one sent.
 
 ## Bringing your own key
 

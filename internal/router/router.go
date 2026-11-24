@@ -6,6 +6,7 @@ package router
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -495,6 +496,9 @@ func (r *Router) Image(ctx context.Context, alias string, req provider.ImageRequ
 	}
 	targets := r.rungs(alias, route)
 	var failures targetErrors
+	// With input images: how many rungs could read them, and how many were
+	// skipped because they cannot.
+	inputRungs, textOnly := 0, 0
 
 	for i, t := range r.attempts(ctx, targets) {
 		adapter, ok := t.adapter, t.adapter != nil
@@ -507,6 +511,19 @@ func (r *Router) Image(ctx context.Context, alias string, req provider.ImageRequ
 			failures.add(t.label, t.Model, fmt.Errorf("provider does not support images"))
 			r.log.Warn("skip image target", "alias", alias, "provider", t.Provider, "reason", "no image support")
 			continue
+		}
+		// An edit or a reference-guided picture only goes to a rung that reads
+		// input images. Any other rung — a text-to-image model, a stock-photo
+		// search — would answer with a picture unrelated to the input, which
+		// is worse than failing.
+		if len(req.Images) > 0 && !acceptsInputImages(adapter, t.Model) {
+			failures.add(t.label, t.Model, fmt.Errorf("does not accept input images"))
+			r.log.Warn("skip image target", "alias", alias, "provider", t.Provider, "model", t.Model, "reason", "no input image support")
+			textOnly++
+			continue
+		}
+		if len(req.Images) > 0 {
+			inputRungs++
 		}
 
 		if !providerAllowed(ctx, t.Provider) {
@@ -526,7 +543,24 @@ func (r *Router) Image(ctx context.Context, alias string, req provider.ImageRequ
 		r.log.Info("upstream ok", append(attrs, "images", len(resp.Images))...)
 		return ImageResult{Alias: alias, Provider: t.Provider, Model: t.Model, Images: resp.Images}, nil
 	}
+	if inputRungs == 0 && textOnly > 0 {
+		// Not an outage: nothing on this alias edits. Saying so is what lets a
+		// caller fix the request instead of retrying it.
+		return ImageResult{}, fmt.Errorf("%w: image alias %q has no model that accepts input images; use an editing alias such as nabu-image-edit (%v)",
+			ErrNoImageInput, alias, failures.err("image", alias))
+	}
 	return ImageResult{}, failures.err("image", alias)
+}
+
+// ErrNoImageInput is returned by Image when a request carries input images and
+// no rung of the alias can read them. It is the caller's request that is wrong
+// for the alias, not an upstream that failed.
+var ErrNoImageInput = errors.New("input images not supported")
+
+// acceptsInputImages reports whether an image rung reads input pictures.
+func acceptsInputImages(adapter provider.Adapter, model string) bool {
+	in, ok := adapter.(provider.ImageInputAdapter)
+	return ok && in.AcceptsInputImages(model)
 }
 
 // SpeechResult is the outcome of a successful speech synthesis.
