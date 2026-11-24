@@ -279,7 +279,7 @@ config.example.yaml        # نمونهٔ پیکربندی (alias‌ها، provi
   cleanup می‌گیرد و هنگامِ ترکِ صفحه کلِ کنسول می‌افتد.
 - بعد از هر تغییر در `web/src`، `cd web && npm run build` و `web/dist` + `web/src.sha256` را با هم
   کامیت کن (`web/freshness_test.go` چک می‌کند). روی ویندوز (`core.autocrlf=true`) قبل از build
-  ورودی‌ها را LF کن؛ stamp بایت‌های فایل را hash می‌کند و CRLF با CI نمی‌خواند.
+  ورودی‌ها را LF کن؛ stamp بایت‌های فایل را hash می‌کند و CRLF با CI نمی‌خواند. stamp فقط فایل‌هایی را می‌بیند که git track می‌کند، پس فایلِ تازه را **قبل از** build با `git add` اضافه کن.
 - **سئو:** `<head>`ِ صفحه‌های عمومی (`/`، `/docs` و نسخهٔ `/en`، `/ar`) را **سرور** می‌نویسد
   (`internal/server/seo.go`): title، description، canonical، hreflang، og/twitter و JSON-LD. canonicalِ
   فارسی روی `gate.nabuxai.ir` است و انگلیسی/عربی روی `gate.nabuxai.com`؛ هر میزبانِ دیگری خودش
