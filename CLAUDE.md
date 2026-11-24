@@ -278,7 +278,17 @@ config.example.yaml        # نمونهٔ پیکربندی (alias‌ها، provi
   `/api/status` نمی‌مانند. `useEffect(load, [])` ننویس اگر `load` promise برمی‌گرداند — React آن را
   cleanup می‌گیرد و هنگامِ ترکِ صفحه کلِ کنسول می‌افتد.
 - بعد از هر تغییر در `web/src`، `cd web && npm run build` و `web/dist` + `web/src.sha256` را با هم
-  کامیت کن (`web/freshness_test.go` چک می‌کند).
+  کامیت کن (`web/freshness_test.go` چک می‌کند). روی ویندوز (`core.autocrlf=true`) قبل از build
+  ورودی‌ها را LF کن؛ stamp بایت‌های فایل را hash می‌کند و CRLF با CI نمی‌خواند.
+- **سئو:** `<head>`ِ صفحه‌های عمومی (`/`، `/docs` و نسخهٔ `/en`، `/ar`) را **سرور** می‌نویسد
+  (`internal/server/seo.go`): title، description، canonical، hreflang، og/twitter و JSON-LD. canonicalِ
+  فارسی روی `gate.nabuxai.ir` است و انگلیسی/عربی روی `gate.nabuxai.com`؛ هر میزبانِ دیگری خودش
+  canonical است (self-hosted). `robots.txt` و `sitemap.xml` به‌ازای هر میزبان ساخته می‌شوند و sitemap
+  فقط URLهای همان میزبان را دارد. مسیرِ ناشناخته **۴۰۴ واقعی** است (بدنه همچنان app shell)، نه ۲۰۰ —
+  وگرنه هر غلطِ تایپی soft 404 است. `/admin/` و `/panel/` همچنان ۲۰۰ با `X-Robots-Tag: noindex`اند و
+  viewهای کنسول در ریشه (`consoleViews`) باید با `web/src/nav.js` یکی بمانند (تست دارد). titleها در
+  `App.jsx` همان `seoCopy`اند؛ یکی را عوض کنی دیگری را هم عوض کن. لینکِ صفحه‌های عمومی با
+  `langHref` ساخته شود تا انگلیسی به `/en/docs` برود نه به نسخهٔ فارسی.
 
 ## دستورات
 ```bash

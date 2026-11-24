@@ -62,6 +62,17 @@ export function detectLang() {
 
 let current = DEFAULT_LANG;
 export const getLang = () => current;
+
+// The address of a public page in a language. Persian is the default and
+// carries no prefix; the others live under /en and /ar. The server marks each
+// language's own URL as canonical (internal/server/seo.go), so links on the
+// public pages point there rather than at the Persian copy.
+export function langHref(href, lang = current) {
+  if (lang === DEFAULT_LANG || !href.startsWith('/') || href.startsWith('//')) return href;
+  const [path, hash] = href.split('#');
+  const base = path === '/' ? `/${lang}` : `/${lang}${path}`;
+  return hash === undefined ? base : `${base}#${hash}`;
+}
 export const getLocale = () => LANGS[current].locale;
 export const isRTL = () => LANGS[current].dir === 'rtl';
 
