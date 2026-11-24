@@ -89,11 +89,15 @@ const gatewayCacheTTL = 5 * time.Minute
 // is a deployment where pressing Pay cannot work, and the panel should say so
 // before the payer tries.
 func (s *Server) paymentGateways(ctx context.Context) ([]nabupay.Gateway, bool) {
-	if !s.pay.Configured() {
+	return s.paymentGatewaysFrom(ctx, s.pay, &s.gateways)
+}
+
+// paymentGatewaysFrom is paymentGateways for a given bridge and its cache.
+func (s *Server) paymentGatewaysFrom(ctx context.Context, bridge *nabupay.Client, c *gatewayCache) ([]nabupay.Gateway, bool) {
+	if !bridge.Configured() {
 		return nil, false
 	}
 	country, _ := ctx.Value(paymentCountryCtxKey{}).(string)
-	c := &s.gateways
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if c.country == country && !c.at.IsZero() && time.Since(c.at) < gatewayCacheTTL {
@@ -101,7 +105,7 @@ func (s *Server) paymentGateways(ctx context.Context) ([]nabupay.Gateway, bool) 
 	}
 	ctx, cancel := context.WithTimeout(ctx, 4*time.Second)
 	defer cancel()
-	list, err := s.pay.GatewaysFor(ctx, country, "gate")
+	list, err := bridge.GatewaysFor(ctx, country, "gate")
 	c.country = country
 	c.at = time.Now()
 	if err != nil {

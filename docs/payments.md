@@ -19,6 +19,8 @@ confirmed the payment.
 | `NABUPAY_APP_ID` | Identifies this caller to the bridge | `gate` |
 | `NABUPAY_GATEWAY` | Default gateway slug the bridge should use | `zarinpal` |
 | `NABU_PUBLIC_URL` | Fallback return host when the proxy sends no `X-Forwarded-Host` | derived from the request |
+| `NABUPAY_IR_URL` | The Iranian NabuPay, e.g. `https://pay.nabuxai.ir`, used for payers on a `.ir` host | unset = everyone uses `NABUPAY_URL` |
+| `NABUPAY_IR_SECRET` | Secret for `NABUPAY_IR_URL` (that instance's `NABUGATE_SECRET`) | `NABUPAY_SECRET` |
 
 With `NABUPAY_URL` or `NABUPAY_SECRET` unset the gateway still starts. The
 startup log says `payments disabled`, `/api/status` answers
@@ -34,6 +36,38 @@ forwarded host that is neither that pin nor `gate.nabuxai.com` /
 
 Set `NABU_PUBLIC_URL` when the proxy sends neither header. Otherwise the URL
 is built from `Host`, which behind some proxies is an internal name.
+
+## Paying from Iran (Persian, toman)
+
+A payer who opened a `.ir` host (`gate.nabuxai.ir`) sees the payment in
+Persian and in toman, end to end:
+
+- The panel opens in Persian on a `.ir` host unless the URL names another
+  language (`?lang=en`), whatever the browser prefers.
+- `/api/status` adds `usd_toman` (toman per dollar), `payment_locale: "fa"`
+  and `payment_currency: "IRT"`. The buy screens show every price and pay
+  button in toman beside the dollars credited.
+- The invoice is raised with `amount_toman` beside `amount_usd` and with
+  `customer: {country: "IR", locale: "fa", email}`. The bridge records it in
+  toman, and its hosted checkout opens in Persian and quotes toman. The wallet
+  is still credited `amount_usd`.
+- With `NABUPAY_IR_URL` set, that invoice goes to the Iranian NabuPay
+  (`pay.nabuxai.ir`) instead of `NABUPAY_URL`. The row remembers its bridge
+  (`bridge: "ir"`), and settling asks that bridge. Each NabuPay instance keeps
+  its own invoices, so removing `NABUPAY_IR_URL` leaves its pending invoices
+  unverifiable until they expire.
+
+NabuGate keeps **no exchange rate**. The toman figure is
+`amount_usd × usd_toman`, where `usd_toman` is what the bridge that will
+charge the payer answers on `GET /api/v1/pay/rate`, cached for five minutes.
+With no answer from the bridge, no toman figure is shown or sent, and the
+bridge converts at checkout as before.
+
+On a `.ir` host the panel goes straight to `bank_payment` (the AccountCity
+WooCommerce bank relay) when the bridge lists it for `country=IR`. Whether it
+is listed is NabuDesk's decision: a `billing_gateway_settings` row for the
+slug wins over `PAY_BANK_PAYMENT_ENABLED`. Check with
+`curl '<bridge>/api/v1/pay/gateways?country=IR&service_name=gate'`.
 
 ## The flow
 

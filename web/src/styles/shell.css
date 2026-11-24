@@ -564,6 +564,8 @@ html[lang="en"] .tbl thead th { text-transform: uppercase; letter-spacing: 0.05e
 .err-details span { display: block; margin-block-start: 4px; overflow-wrap: anywhere; }
 .pay-action { margin-block-start: 10px; }
 .pay-note { margin: 8px 0 0; font-size: 11.5px; line-height: 1.8; }
+.toman-of { display: block; margin-top: 2px; font-size: 12.5px; font-weight: 600; color: var(--ng-muted); }
+.toman-due strong { white-space: nowrap; }
 .gw-pick { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-block-end: 12px; font-size: 13px; }
 .gw-pick .input { inline-size: auto; min-inline-size: min(260px, 100%); max-inline-size: 100%; }
 .debit { color: var(--ng-danger-text, #c53030); }

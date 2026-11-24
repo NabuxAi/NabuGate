@@ -247,7 +247,7 @@ export default function Account() {
               {payment.busy ? t('redirecting') : t('pay')}
             </button>
           </form>
-          <BankRateNote />
+          <BankRateNote usd={amountOk ? Number(amount) : 0} rate={status?.usd_toman} />
           <p className="muted" style={{ marginTop: 14, fontSize: 12, lineHeight: 1.8 }}>
             {t('plansLink', { link: <button type="button" className="linklike" onClick={() => navigate('plans')}>{t('plansLinkText')}</button> })}
           </p>

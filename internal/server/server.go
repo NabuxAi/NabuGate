@@ -96,6 +96,9 @@ type Server struct {
 	pay *nabupay.Client
 	// gateways caches the bridge's method list for the status endpoint.
 	gateways gatewayCache
+	// iranPay is the Iranian payment state: an optional second bridge for
+	// payers on a .ir host, and the toman rate cache. See payflow_iran.go.
+	iranPay iranPayments
 	// reserved is the money held against owners' balances for their
 	// requests in flight; see reserve.go.
 	reserved reservations

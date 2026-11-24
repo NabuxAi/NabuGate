@@ -42,14 +42,24 @@ export function stripLangPrefix(pathname) {
   return pathname.replace(PREFIX_RE, '') || '/';
 }
 
-// Order: an explicit choice in the URL, then the one remembered from last
-// time, then the browser's own preference list, then Persian.
+// An Iranian host (gate.nabuxai.ir) is read in Persian: payment there is in
+// toman, at an Iranian bank, and must not open in English because a browser
+// happens to prefer it.
+export function isIranHost() {
+  if (typeof window === 'undefined') return false;
+  return /\.ir$/i.test(window.location.hostname || '');
+}
+
+// Order: an explicit choice in the URL, then — on a .ir host — Persian, then
+// the one remembered from last time, then the browser's own preference list,
+// then Persian.
 export function detectLang() {
   const explicit = supported(new URLSearchParams(window.location.search).get('lang')) || langFromPath();
   if (explicit) {
     writeStored(explicit);
     return explicit;
   }
+  if (isIranHost()) return 'fa';
   const stored = supported(readStored());
   if (stored) return stored;
   // The Iran mirror (gate.nabuxai.ir) is for visitors in Iran: Persian first,
@@ -110,6 +120,15 @@ export const usd = (n) => {
   const digits = abs > 0 && abs < 0.01 ? Math.min(8, Math.ceil(-Math.log10(abs)) + 1) : 2;
   return fmtDigits('$' + v.toFixed(digits));
 };
+
+/*
+ * A toman figure: whole toman, grouped, with the unit. Only ever fed a rate
+ * the payment bridge gave (usd_toman in /api/status) — never a constant.
+ */
+export function toman(n) {
+  const v = Math.round(Number(n || 0));
+  return current === 'en' ? `${fmtInt(v)} toman` : `${fmtInt(v)} تومان`;
+}
 
 /* Dates follow the language: the Solar Hijri calendar in Persian. */
 export function fmtDate(d, kind = 'date') {

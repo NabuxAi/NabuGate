@@ -212,3 +212,50 @@ func TestARefusedStartSurfacesTheBridgesReason(t *testing.T) {
 		t.Errorf("error %q hides the bridge's reason", err)
 	}
 }
+
+func TestRateAndTomanCheckout(t *testing.T) {
+	var body map[string]any
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/api/v1/pay/rate":
+			if r.Header.Get("X-NabuGate-Signature") == "" {
+				t.Error("rate request not signed")
+			}
+			w.Write([]byte(`{"success":true,"usd_toman":289698}`))
+		case "/api/v1/pay/checkout":
+			json.NewDecoder(r.Body).Decode(&body)
+			w.Write([]byte(`{"success":true,"invoice_number":"INV-1","checkout_url":"https://pay.example/1"}`))
+		}
+	}))
+	defer srv.Close()
+	c := New(srv.URL, "gate", "s")
+
+	rate, err := c.Rate(context.Background())
+	if err != nil || rate != 289698 {
+		t.Fatalf("Rate = %v, %v", rate, err)
+	}
+	if _, err := c.Start(context.Background(), StartOptions{AmountUSD: 5, AmountToman: 1448490, Country: "IR", Locale: "fa"}); err != nil {
+		t.Fatal(err)
+	}
+	if body["amount_toman"] != float64(1448490) || body["amount_usd"] != float64(5) {
+		t.Errorf("body = %v", body)
+	}
+	cust, _ := body["customer"].(map[string]any)
+	if cust["country"] != "IR" || cust["locale"] != "fa" {
+		t.Errorf("customer = %v", cust)
+	}
+	if _, ok := cust["email"]; ok {
+		t.Errorf("empty email was sent: %v", cust)
+	}
+}
+
+func TestRateWithoutAnswerIsAnError(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusServiceUnavailable)
+		w.Write([]byte(`{"success":false,"message":"No exchange rate available."}`))
+	}))
+	defer srv.Close()
+	if _, err := New(srv.URL, "gate", "s").Rate(context.Background()); err == nil {
+		t.Fatal("a 503 with no rate returned no error")
+	}
+}

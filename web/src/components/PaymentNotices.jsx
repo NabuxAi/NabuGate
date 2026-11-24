@@ -1,4 +1,4 @@
-import { usd, fmtInt, fmtDate, useT } from '../i18n/index.jsx';
+import { usd, toman, fmtInt, fmtDate, useT } from '../i18n/index.jsx';
 import Icon from './Icon.jsx';
 
 /*
@@ -37,6 +37,8 @@ const T = {
     gateway: 'درگاه پرداخت',
     chooseLater: 'در صفحهٔ پرداخت انتخاب می‌کنم',
     bankRate: 'بانک معادلِ تومانی این مبلغ را با نرخ روز کم می‌کند؛ همین مبلغِ دلاری به کیف‌پولتان اضافه می‌شود.',
+    tomanDue: (v) => <>مبلغ پرداختی: <strong>{v.toman}</strong> (نرخ امروز درگاه: هر دلار {v.rate}). همین {v.usd} به کیف‌پولتان اضافه می‌شود.</>,
+    tomanRate: 'مبلغ‌ها با نرخ امروز درگاه به تومان پرداخت می‌شوند: هر دلار {rate}.',
   },
   en: {
     payments_disabled: 'Online payment is not enabled on this deployment. Contact support for a manual top-up.',
@@ -64,6 +66,8 @@ const T = {
     gateway: 'Payment gateway',
     chooseLater: 'Let me choose at the payment page',
     bankRate: 'The bank charges the toman equivalent at the day’s rate; this dollar amount is what lands in your wallet.',
+    tomanDue: (v) => <>You pay <strong>{v.toman}</strong> (today’s gateway rate: {v.rate} per dollar). {v.usd} lands in your wallet.</>,
+    tomanRate: 'Amounts are paid in toman at today’s gateway rate: {rate} per dollar.',
   },
 };
 
@@ -224,7 +228,28 @@ export function GatewayPicker({ gateways, value, onChange }) {
   );
 }
 
-export function BankRateNote() {
+/*
+ * Under a pay button. With a rate from the bridge (usd_toman, only sent to a
+ * payer on a .ir host) it says the toman the payer will be charged; without
+ * one, that the bank converts at the day's rate.
+ */
+export function BankRateNote({ usd: amount, rate } = {}) {
   const t = useT(T);
+  const r = Number(rate);
+  if (r > 0) {
+    const n = Number(amount);
+    if (n > 0) {
+      return <p className="muted pay-note toman-due">{t('tomanDue', { toman: toman(n * r), rate: toman(r), usd: usd(n) })}</p>;
+    }
+    return <p className="muted pay-note">{t('tomanRate', { rate: toman(r) })}</p>;
+  }
   return <p className="muted pay-note">{t('bankRate')}</p>;
+}
+
+/* "≈ 1,448,490 toman" beside a dollar figure, when the bridge gave a rate. */
+export function TomanOf({ usd: amount, rate }) {
+  const r = Number(rate);
+  const n = Number(amount);
+  if (!(r > 0) || !(n > 0)) return null;
+  return <small className="toman-of" dir="rtl">≈ {toman(n * r)}</small>;
 }
