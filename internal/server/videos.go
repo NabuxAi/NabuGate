@@ -381,10 +381,12 @@ func (s *Server) handleVideoStatus(w http.ResponseWriter, r *http.Request) {
 }
 
 // videoBillingModel is the coordinate a finished video is priced under: the
-// model for 720P, and model@1080P for the dearer tier.
+// model for 720P (or a tier nobody reported), and model@480P or model@1080P
+// for the other tiers.
 func videoBillingModel(model, resolution string) string {
-	if strings.EqualFold(resolution, "1080P") {
-		return model + "@1080P"
+	switch tier := strings.ToUpper(strings.TrimSpace(resolution)); tier {
+	case "480P", "1080P":
+		return model + "@" + tier
 	}
 	return model
 }

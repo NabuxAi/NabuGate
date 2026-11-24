@@ -38,12 +38,41 @@ stream flags are rewritten. So `tools`, `tool_choice`, `response_format`,
 `seed`, `top_p`, `stop` and penalties all work, and `tool_calls` come back in
 the response, whether or not the gateway names them.
 
+### Image models
+
+`POST /v1/images/generations` takes an alias or an OpenRouter model id
+directly. The generating aliases are below; `/v1/models` lists the rest (FLUX,
+SDXL, GPT and Gemini image, stock photos, branded graphics). Of these, only
+`nabu-image` falls back to other models:
+
+| Alias | Model | Input pictures | Price |
+|---|---|---|---|
+| `nabu-image` | gpt-image-1, then Gemini, Wan 2.6, Pexels stock | no | per rung |
+| `nabu-wan` | Alibaba Wan 2.6 (`wan2.6-t2i`) | no | $0.031 a picture |
+| `nabu-image-edit` | Alibaba Wan 2.6 Image (`wan2.6-image`) | yes, up to 4 | $0.031 a picture |
+| `nabu-wan25` | Alibaba Wan 2.5 preview (`wan2.5-t2i-preview`) | no | $0.03 a picture |
+| `nabu-wan22` | Alibaba Wan 2.2 Plus (`wan2.2-t2i-plus`) | no | $0.05 a picture |
+| `nabu-wan-flash` | Alibaba Wan 2.2 Flash (`wan2.2-t2i-flash`) | no | $0.025 a picture |
+| `openrouter/<model>` | any OpenRouter image-output model, e.g. `openrouter/google/gemini-3.1-flash-image`, `openrouter/google/gemini-3-pro-image`, `openrouter/google/gemini-2.5-flash-image`, `openrouter/openai/gpt-5-image`, `openrouter/openai/gpt-5-image-mini` | yes | what OpenRouter reports for the call |
+
+`aspect_ratio` (or the shape of `size`) is mapped onto the nearest canvas
+each model draws. Wan 2.5 preview draws 1280×1280 to 1440×1440 pixels between
+1:4 and 4:1; Wan 2.2 draws sides of 512 to 1440 px (1024×1024 by default).
+Those three are on Alibaba's asynchronous API, so the request waits while the
+gateway polls the task (usually seconds, at most three minutes). An
+`openrouter/…` id is served through OpenRouter's chat completions with
+`modalities: ["image","text"]`; the picture comes back as `b64_json` like any
+other, and the call is billed at the `usage.cost` OpenRouter returns (or at the
+price table, and booked unpriced when the model has none, if it returns no
+cost). Prices are Alibaba Model Studio's international list prices.
+
 ### Editing and reference images
 
 `POST /v1/images/generations` also edits a picture or draws a new one from
 character and style references. Send the input pictures in `images` (or one in
 `image`) alongside the prompt, with an editing alias — `nabu-image-edit`
-(Alibaba Wan 2.6 Image):
+(Alibaba Wan 2.6 Image) or an `openrouter/…` image model (Gemini and GPT
+image models edit too):
 
 ```json
 {
@@ -65,7 +94,17 @@ unrelated to the one sent.
 
 Video is asynchronous: starting one returns a job id, and polling the id
 returns the video once it is rendered (about 30 s for 5 s of text-to-video,
-about a minute from a first frame). The alias is `nabu-video` (Alibaba Wan 2.6).
+about a minute from a first frame). Every alias is Alibaba Wan: one model makes
+video from the prompt, and another from a first frame when the request carries
+`image_url`. No alias falls back to another model.
+
+| Alias | From text | From a photo | Tiers | Lengths | Price a second |
+|---|---|---|---|---|---|
+| `nabu-video` | `wan2.6-t2v` | `wan2.6-i2v` | 720P, 1080P | 2–15 s | 720P $0.10, 1080P $0.15 |
+| `nabu-video-wan25` | `wan2.5-t2v-preview` | `wan2.5-i2v-preview` | 480P, 720P, 1080P | 5 or 10 s | 480P $0.05, 720P $0.10, 1080P $0.15 |
+| `nabu-video-wan22` | `wan2.2-t2v-plus` | `wan2.2-i2v-plus` | 480P, 1080P | 5 s | 480P $0.02, 1080P $0.10 |
+| `nabu-video-fast` | `wan2.1-t2v-turbo` | `wan2.2-i2v-flash` | 480P, 720P | 5 s | text $0.036; photo 480P $0.015, 720P $0.036 |
+| `nabu-video-wan21` | `wan2.1-t2v-plus` | `wan2.1-i2v-plus` | 720P | 5 s | $0.10 |
 
 ```http
 POST /v1/videos/generations
@@ -83,15 +122,21 @@ GET /v1/videos/generations/video_3f9c…
 
 `prompt` is required unless `image_url` is given; everything else is optional.
 `image_url` (an `https://` URL or a `data:image/png|jpeg|webp;base64,...` URI)
-makes it image-to-video, which follows the first frame's shape. Shapes are
-16:9, 9:16 and 1:1 at 720P or 1080P — `aspect_ratio` (or the shape of `size`)
-picks the nearest, a `size` longer than 1280 px or `"resolution": "1080P"`
-picks 1080P — and lengths are 5, 10 or 15 s, `seconds` rounded to the nearest.
-The default is 16:9, 720P, 5 s.
+makes it image-to-video, which follows the first frame's shape. Nothing is
+refused for asking what a model does not offer; it is mapped to the nearest
+thing it does. The tier is `resolution` (`480P`, `720P`, `1080P`), else a tier
+written as `size`, else the tier whose canvas is nearest a `WxH` `size`, else
+720P — then the nearest tier the model renders, ties going up (720P on
+`nabu-video-wan22` renders at 1080P). The text-to-video shape is the nearest of
+16:9, 9:16, 1:1, 4:3 and 3:4 to `aspect_ratio` (or the shape of `size`); 480P
+has no 4:3 or 3:4. `seconds` is rounded to the nearest length the model takes,
+5 s when not given; a model with one length is not sent one. The default is
+16:9, 720P, 5 s.
 
 A job id belongs to the key that started it; any other key gets `404`. The
-video is billed once, per second of output ($0.10/s at 720P, $0.15/s at 1080P),
-on the first poll that sees it finished; a failed job costs nothing. The URL is
+video is billed once, per second of output at the tier it came out at (the
+price list above: Alibaba Model Studio's international list prices), on the
+first poll that sees it finished; a failed job costs nothing. The URL is
 the vendor's signed link and expires after about 24 hours, and so does the job.
 Your own vendor key (`X-Nabu-Key-*`) cannot start a video job: finishing it
 takes that key on every poll, and the gateway does not keep keys.

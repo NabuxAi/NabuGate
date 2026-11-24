@@ -277,6 +277,13 @@ type ProviderConfig struct {
 	// without implementing verbose_json — Mistral's Voxtral does not.
 	TranscribeFormat string `yaml:"transcribe_format"`
 
+	// ImageAPI is how an OpenAI-wire provider makes pictures: "images" (the
+	// default) is POST /images/generations; "chat" is POST /chat/completions
+	// with modalities ["image","text"], which is OpenRouter's route to its
+	// image-output models (Gemini and GPT image). On "chat" those models also
+	// take input pictures, for edits and references.
+	ImageAPI string `yaml:"image_api"`
+
 	// Access decides whether a console user may spend *the gateway's* key on
 	// this provider without asking. "auto" (the default, and what every
 	// provider shipped here uses) grants it on request with no human in the
@@ -318,6 +325,13 @@ type Target struct {
 	// trace back. Absorbing that difference is the gateway's job; a caller
 	// should not have to know which dialect a model behind an alias speaks.
 	ParamStyle string `yaml:"param_style"`
+
+	// ImageModel is for video targets only: the image-to-video model this rung
+	// runs when the request carries a first frame (image_url), Model being the
+	// text-to-video one. Said outright because the pair is not always one
+	// model's two halves — a fast alias may pair one generation's text model
+	// with another's image model.
+	ImageModel string `yaml:"image_model"`
 }
 
 // ModelEntry describes one logical model and every provider that can serve it,
@@ -488,6 +502,9 @@ func newAdapter(name string, p ProviderConfig, apiKey string) (provider.Adapter,
 			return nil, fmt.Sprintf("provider %q disabled: %v", name, err)
 		}
 		oa.SetTranscribeFormat(strings.TrimSpace(p.TranscribeFormat))
+		if err := oa.SetImageAPI(p.ImageAPI); err != nil {
+			return nil, fmt.Sprintf("provider %q disabled: %v", name, err)
+		}
 		return oa, ""
 	case "anthropic":
 		return provider.NewAnthropicAdapter(name, p.BaseURL, apiKey), ""

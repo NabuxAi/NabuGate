@@ -414,6 +414,13 @@ func (s *Server) recordMetered(r *http.Request, prov, model string, m usage.Mete
 
 func (s *Server) recordMeteredFor(r *http.Request, project, prov, model string, m usage.Metered) float64 {
 	list, priced := s.usage.PriceOf(prov, model, m)
+	return s.recordListFor(r, project, prov, model, m, list, priced)
+}
+
+// recordListFor meters one call at a list cost already known — the price
+// table's (recordMeteredFor), or the vendor's own figure for the call — and
+// returns what the caller was charged.
+func (s *Server) recordListFor(r *http.Request, project, prov, model string, m usage.Metered, list float64, priced bool) float64 {
 	charged, providerCost := s.charge(r.Context(), false, list)
 	s.meter(r, project, prov, model, adminstore.UsageEntry{
 		Requests:         1,
@@ -1368,7 +1375,16 @@ func (s *Server) handleImages(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	cost := s.recordMetered(r, result.Provider, result.Model, usage.Metered{Images: len(result.Images)})
+	// A vendor that says what the call cost (OpenRouter's usage.cost) is
+	// metered at that; otherwise the price table prices it per picture, and a
+	// model it does not know is booked unpriced like any other.
+	metered := usage.Metered{Images: len(result.Images), Tokens: result.Usage}
+	var cost float64
+	if result.CostReported {
+		cost = s.recordListFor(r, s.project(r), result.Provider, result.Model, metered, result.CostUSD, true)
+	} else {
+		cost = s.recordMetered(r, result.Provider, result.Model, metered)
+	}
 
 	w.Header().Set("X-Nabu-Provider", result.Provider)
 	w.Header().Set("X-Nabu-Model", result.Model)

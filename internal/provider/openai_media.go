@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"math"
 	"net/http"
 	"strings"
 )
@@ -36,6 +37,9 @@ func (a *OpenAIAdapter) Image(ctx context.Context, req ImageRequest) (ImageRespo
 	if n <= 0 {
 		n = 1
 	}
+	if a.imageAPI == "chat" {
+		return a.chatImage(ctx, req, n)
+	}
 	body := openAIImageRequest{Model: req.Model, Prompt: req.Prompt, N: n, Size: req.Size, Quality: req.Quality}
 	// dall-e models default to URL output; force base64. gpt-image-1 returns
 	// base64 by default and rejects this field, so only set it for dall-e.
@@ -65,6 +69,146 @@ func (a *OpenAIAdapter) Image(ctx context.Context, req ImageRequest) (ImageRespo
 		return ImageResponse{}, fmt.Errorf("%s: no image returned", a.name)
 	}
 	return out, nil
+}
+
+// --- Image generation through chat completions (OpenRouter) ---
+
+// chatImageAspects are the aspect ratios OpenRouter's image_config takes.
+var chatImageAspects = []string{"1:1", "2:3", "3:2", "3:4", "4:3", "4:5", "5:4", "9:16", "16:9", "21:9"}
+
+// chatImageBody is the chat completion that asks an image-output model for a
+// picture: the prompt and any input pictures as one user turn, modalities
+// ["image","text"], and usage.include so the answer says what it cost. An
+// aspect ratio is sent only when the caller asked for a shape.
+func chatImageBody(req ImageRequest) map[string]any {
+	content := []any{map[string]any{"type": "text", "text": req.Prompt}}
+	for _, img := range req.Images {
+		content = append(content, map[string]any{"type": "image_url", "image_url": map[string]any{"url": img}})
+	}
+	body := map[string]any{
+		"model":      req.Model,
+		"messages":   []any{map[string]any{"role": "user", "content": content}},
+		"modalities": []string{"image", "text"},
+		"usage":      map[string]any{"include": true},
+	}
+	if aspect, ok := chatImageAspect(req); ok {
+		body["image_config"] = map[string]any{"aspect_ratio": aspect}
+	}
+	return body
+}
+
+// chatImageAspect is the offered aspect ratio nearest the caller's: its
+// aspect_ratio, else the shape of its WxH size.
+func chatImageAspect(req ImageRequest) (string, bool) {
+	w, h, ok := splitDims(strings.TrimSpace(req.AspectRatio), ":")
+	if !ok {
+		w, h, ok = splitDims(req.Size, "x")
+	}
+	if !ok {
+		return "", false
+	}
+	want := math.Log(float64(w) / float64(h))
+	best, bestDiff := "", math.Inf(1)
+	for _, a := range chatImageAspects {
+		aw, ah, _ := splitDims(a, ":")
+		if d := math.Abs(want - math.Log(float64(aw)/float64(ah))); d < bestDiff {
+			best, bestDiff = a, d
+		}
+	}
+	return best, true
+}
+
+type chatImageResponse struct {
+	Choices []struct {
+		Message struct {
+			Content json.RawMessage `json:"content"`
+			Images  []struct {
+				ImageURL struct {
+					URL string `json:"url"`
+				} `json:"image_url"`
+			} `json:"images"`
+		} `json:"message"`
+		FinishReason string `json:"finish_reason"`
+	} `json:"choices"`
+	Usage struct {
+		PromptTokens     int      `json:"prompt_tokens"`
+		CompletionTokens int      `json:"completion_tokens"`
+		TotalTokens      int      `json:"total_tokens"`
+		Cost             *float64 `json:"cost"`
+	} `json:"usage"`
+	Error *struct {
+		Message string `json:"message"`
+	} `json:"error"`
+}
+
+// chatImage generates through POST /chat/completions. Pictures come back as
+// data: URIs (or, from some routes, URLs) in choices[].message.images, and
+// usage.cost is what the vendor charged, in USD.
+func (a *OpenAIAdapter) chatImage(ctx context.Context, req ImageRequest, n int) (ImageResponse, error) {
+	raw, status, err := a.postJSON(ctx, "/chat/completions", chatImageBody(req))
+	if err != nil {
+		return ImageResponse{}, err
+	}
+	var parsed chatImageResponse
+	if err := json.Unmarshal(raw, &parsed); err != nil {
+		return ImageResponse{}, fmt.Errorf("%s: invalid image response (status %d): %s", a.name, status, truncate(raw))
+	}
+	if status >= 400 || parsed.Error != nil {
+		return ImageResponse{}, fmt.Errorf("%s: upstream error (status %d): %s", a.name, status, errMsg(parsed.Error, status))
+	}
+	out := ImageResponse{Usage: Usage{
+		PromptTokens:     parsed.Usage.PromptTokens,
+		CompletionTokens: parsed.Usage.CompletionTokens,
+		TotalTokens:      parsed.Usage.TotalTokens,
+	}}
+	if parsed.Usage.Cost != nil {
+		out.CostUSD, out.CostReported = *parsed.Usage.Cost, true
+	}
+	text := ""
+	for _, c := range parsed.Choices {
+		var s string
+		if json.Unmarshal(c.Message.Content, &s) == nil && strings.TrimSpace(s) != "" && text == "" {
+			text = strings.TrimSpace(s)
+		}
+		for _, img := range c.Message.Images {
+			if len(out.Images) >= n {
+				break
+			}
+			b64, err := imageDataBase64(ctx, a.name, img.ImageURL.URL)
+			if err != nil {
+				return ImageResponse{}, err
+			}
+			if b64 != "" {
+				out.Images = append(out.Images, b64)
+			}
+		}
+	}
+	if len(out.Images) == 0 {
+		// Still a call the vendor billed; the router does not meter a failed
+		// rung, so say what came back instead.
+		if text != "" {
+			return ImageResponse{}, fmt.Errorf("%s: %s answered with text and no image (is it an image-output model?): %s", a.name, req.Model, truncate([]byte(text)))
+		}
+		return ImageResponse{}, fmt.Errorf("%s: no image returned", a.name)
+	}
+	return out, nil
+}
+
+// imageDataBase64 is the base64 payload of a data: URI, or the downloaded
+// bytes of an http(s) URL.
+func imageDataBase64(ctx context.Context, name, u string) (string, error) {
+	u = strings.TrimSpace(u)
+	if rest, ok := strings.CutPrefix(u, "data:"); ok {
+		meta, payload, found := strings.Cut(rest, ",")
+		if !found || !strings.HasSuffix(strings.ToLower(meta), ";base64") {
+			return "", fmt.Errorf("%s: image data URI is not base64", name)
+		}
+		return payload, nil
+	}
+	if strings.HasPrefix(u, "https://") || strings.HasPrefix(u, "http://") {
+		return downloadBase64(ctx, name, u)
+	}
+	return "", nil
 }
 
 // --- Speech (OpenAI Audio Speech API) ---

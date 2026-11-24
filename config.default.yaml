@@ -199,6 +199,11 @@ providers:
     # discovered live from /v1/models — NabuGen's "openrouter/*" grant had
     # nothing to reach while this was off.
     passthrough: true
+    # Pictures go through /chat/completions with modalities ["image","text"]:
+    # POST /v1/images/generations with "openrouter/google/gemini-3.1-flash-image"
+    # (or any other image-output model) works, input pictures included, and is
+    # metered at the usage.cost OpenRouter reports for the call.
+    image_api: chat
 
   # Routerah (routerah.app) — OpenAI-compatible inference via a single key.
   # Its public pricing catalog lists ALL models (including free and media
@@ -395,6 +400,7 @@ providers:
     base_url: "https://openrouter.ai/api/v1"
     api_key_env: "OPENROUTER_API_KEY_2"
     passthrough: true
+    image_api: chat
 
   # Hugging Face Inference Providers (huggingface.co/docs/inference-providers)
   # — one OpenAI-wire router in front of Novita, DeepInfra, Together, Groq,
@@ -580,7 +586,10 @@ providers:
   # API, which answers with signed URLs, so this is its own adapter. Probed
   # 2026-10-29: wan2.6-t2i answers synchronously at any size from 1280*720 to
   # 1696*960; qwen-image and the flux-* names are mainland-only. Skipped while
-  # DASHSCOPE_API_KEY is unset.
+  # DASHSCOPE_API_KEY is unset. 2026-11-24: wan2.5-t2i-preview, wan2.2-t2i-plus
+  # and wan2.2-t2i-flash exist on the key but answer "url error" there; they
+  # are on the older asynchronous text2image API, which the adapter creates
+  # and polls within the one call.
   dashscope-image:
     enabled: true
     type: dashscope-image
@@ -2065,6 +2074,30 @@ images:
       provider: dashscope-image
       model: "wan2.6-t2i"
 
+  # Older Wan text-to-image models, each its own alias so a person can pick
+  # one. Text to image only — they read no input picture, so an edit sent here
+  # is refused rather than answered with an unrelated picture. Served on the
+  # asynchronous text2image API: a task is created and polled (up to 3
+  # minutes) inside the one request. No fallback: someone who picked a model
+  # would rather get an error than another model's picture.
+  # Wan 2.5 preview: canvases of 1280*1280 to 1440*1440 pixels, 1:4 to 4:1.
+  nabu-wan25:
+    primary:
+      provider: dashscope-image
+      model: "wan2.5-t2i-preview"
+
+  # Wan 2.2 Plus: sides of 512 to 1440 px, 1024*1024 by default.
+  nabu-wan22:
+    primary:
+      provider: dashscope-image
+      model: "wan2.2-t2i-plus"
+
+  # Wan 2.2 Flash: the same canvases as Plus, faster and cheaper.
+  nabu-wan-flash:
+    primary:
+      provider: dashscope-image
+      model: "wan2.2-t2i-flash"
+
   # Editing and references: send "images" (or "image") with the prompt — the
   # photo to change, or up to four character/style references. Wan 2.6 Image
   # took a photo URL and returned the edited picture in ~12 s (2026-11-24).
@@ -2116,14 +2149,52 @@ images:
 # Video generation (POST /v1/videos/generations, then GET …/{id} until done).
 # Asynchronous: the create answers a job id, the poll answers the video URL.
 videos:
-  # Wan 2.6: text-to-video, and image-to-video when the request carries an
-  # image_url (the adapter runs wan2.6-i2v then). 16:9, 9:16 or 1:1 at 720P or
-  # 1080P, 5/10/15 s; default 16:9, 720P, 5 s. No fallback: no other vendor
-  # here makes video.
+  # Every alias names a text-to-video model (model) and the image-to-video
+  # model that runs instead when the request carries an image_url
+  # (image_model). Each model takes its own tiers and lengths; the adapter maps
+  # resolution/size/aspect_ratio/seconds onto the nearest the model offers
+  # (ties going up) rather than refusing. No tier asked for means 720P, no
+  # length means 5 s. Text-to-video picks the canvas nearest aspect_ratio
+  # among 16:9, 9:16, 1:1, 4:3 and 3:4 (480P has no 4:3 or 3:4);
+  # image-to-video follows the first frame's shape. No fallback on any of them:
+  # no other vendor here makes video, and someone who picked a model would
+  # rather get an error than another model's video.
+  #
+  # Wan 2.6: 720P or 1080P, 2 to 15 s.
   nabu-video:
     primary:
       provider: dashscope-video
       model: "wan2.6-t2v"
+      image_model: "wan2.6-i2v"
+
+  # Wan 2.5 preview: 480P, 720P or 1080P, 5 or 10 s.
+  nabu-video-wan25:
+    primary:
+      provider: dashscope-video
+      model: "wan2.5-t2v-preview"
+      image_model: "wan2.5-i2v-preview"
+
+  # Wan 2.2 Plus: 480P or 1080P (720P asked renders at 1080P), always 5 s.
+  nabu-video-wan22:
+    primary:
+      provider: dashscope-video
+      model: "wan2.2-t2v-plus"
+      image_model: "wan2.2-i2v-plus"
+
+  # The fast, cheap pair: Wan 2.1 Turbo from text, Wan 2.2 Flash from a photo.
+  # Both 480P or 720P (1080P asked renders at 720P), always 5 s.
+  nabu-video-fast:
+    primary:
+      provider: dashscope-video
+      model: "wan2.1-t2v-turbo"
+      image_model: "wan2.2-i2v-flash"
+
+  # Wan 2.1 Plus: 720P only, always 5 s.
+  nabu-video-wan21:
+    primary:
+      provider: dashscope-video
+      model: "wan2.1-t2v-plus"
+      image_model: "wan2.1-i2v-plus"
 
 # Realtime full-duplex voice (GPT-Live). The browser speaks to the vendor over
 # WebRTC; the gateway only signals (POST /v1/live/sessions) and bills the
@@ -2896,6 +2967,38 @@ pricing:
   # Edits and reference-guided pictures, billed per output picture at the
   # wan2.6-t2i rate.
   "dashscope-image/wan2.6-image": { per_image: 0.031 }
+
+  # The older Wan models, Model Studio international (Singapore) list prices
+  # read 2026-11-24 from https://www.alibabacloud.com/help/en/model-studio/model-pricing
+  # — per picture made:
+  "dashscope-image/wan2.5-t2i-preview": { per_image: 0.03 }
+  "dashscope-image/wan2.2-t2i-plus": { per_image: 0.05 }
+  "dashscope-image/wan2.2-t2i-flash": { per_image: 0.025 }
+  # — and per second of video, written per minute. "<model>" is the 720P
+  # price, "<model>@480P" and "<model>@1080P" the other tiers; a model has rows
+  # for exactly the tiers it renders. wan2.1-i2v-turbo and wan2.1-i2v-plus are
+  # no longer on that page; their prices are from their own model pages
+  # (https://www.alibabacloud.com/help/en/model-studio/wan2-1-i2v-turbo and
+  # .../wan2-1-i2v-plus: $0.036 and $0.10 a second, Singapore, one price for
+  # every tier).
+  "dashscope-video/wan2.5-t2v-preview@480P": { per_minute: 3.00 }   # $0.05/s
+  "dashscope-video/wan2.5-t2v-preview": { per_minute: 6.00 }        # $0.10/s
+  "dashscope-video/wan2.5-t2v-preview@1080P": { per_minute: 9.00 }  # $0.15/s
+  "dashscope-video/wan2.5-i2v-preview@480P": { per_minute: 3.00 }   # $0.05/s
+  "dashscope-video/wan2.5-i2v-preview": { per_minute: 6.00 }        # $0.10/s
+  "dashscope-video/wan2.5-i2v-preview@1080P": { per_minute: 9.00 }  # $0.15/s
+  "dashscope-video/wan2.2-t2v-plus@480P": { per_minute: 1.20 }      # $0.02/s
+  "dashscope-video/wan2.2-t2v-plus@1080P": { per_minute: 6.00 }     # $0.10/s
+  "dashscope-video/wan2.2-i2v-plus@480P": { per_minute: 1.20 }      # $0.02/s
+  "dashscope-video/wan2.2-i2v-plus@1080P": { per_minute: 6.00 }     # $0.10/s
+  "dashscope-video/wan2.2-i2v-flash@480P": { per_minute: 0.90 }     # $0.015/s
+  "dashscope-video/wan2.2-i2v-flash": { per_minute: 2.16 }          # $0.036/s
+  "dashscope-video/wan2.1-t2v-turbo@480P": { per_minute: 2.16 }     # $0.036/s
+  "dashscope-video/wan2.1-t2v-turbo": { per_minute: 2.16 }          # $0.036/s
+  "dashscope-video/wan2.1-t2v-plus": { per_minute: 6.00 }           # $0.10/s
+  "dashscope-video/wan2.1-i2v-turbo@480P": { per_minute: 2.16 }     # $0.036/s
+  "dashscope-video/wan2.1-i2v-turbo": { per_minute: 2.16 }          # $0.036/s
+  "dashscope-video/wan2.1-i2v-plus": { per_minute: 6.00 }           # $0.10/s
 
   # ── Anthropic (OpenRouter, 2026-09-26) ───────────────────────────────────
   claude-sonnet-5: { input: 2.00, output: 10.00, input_cache_read: 0.20, input_cache_write: 2.50 }

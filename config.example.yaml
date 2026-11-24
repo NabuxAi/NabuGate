@@ -31,6 +31,9 @@ providers:
     type: openai
     base_url: "https://openrouter.ai/api/v1"
     api_key_env: "OPENROUTER_API_KEY"
+    # Pictures through /chat/completions (modalities ["image","text"]), the
+    # only way OpenRouter serves its image models (Gemini, GPT image).
+    image_api: chat
 
   # Routerah: 821 models in its public catalog (the count changes over time).
   # Model IDs are exposed as routerah/<upstream-id> when your key is set.

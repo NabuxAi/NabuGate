@@ -143,6 +143,15 @@ type ImageRequest struct {
 // ImageResponse carries one or more base64-encoded PNG images.
 type ImageResponse struct {
 	Images []string // base64 PNG data (no data: prefix)
+	// Usage is the tokens a token-billed image call spent (OpenRouter's chat
+	// route to Gemini and GPT image models). Zero for per-picture vendors.
+	Usage Usage
+	// CostUSD is what the vendor itself said the call cost, when it says
+	// (OpenRouter's usage.cost); CostReported tells that apart from a free
+	// call. A reported cost is the call's list price: it is what the gateway
+	// was charged, which no price table can know better.
+	CostUSD      float64
+	CostReported bool
 }
 
 // ImageAdapter is implemented by providers that can generate images.
@@ -169,7 +178,12 @@ type VideoRequest struct {
 	NegativePrompt string
 	// ImageURL is the first frame, an https:// URL or a data:image/...;base64
 	// URI. Set, the request is image-to-video.
-	ImageURL    string
+	ImageURL string
+	// ImageModel is the model that serves the request when it carries a first
+	// frame; Model is then the text-to-video one. Set by the router from the
+	// alias's image_model, because the two are not always siblings by name
+	// (nabu-video-fast pairs wan2.1-t2v-turbo with wan2.2-i2v-flash).
+	ImageModel  string
 	Size        string  // e.g. "1280x720" (OpenAI-style), or a tier such as "1080p"
 	AspectRatio string  // e.g. "16:9"
 	Resolution  string  // e.g. "720P" | "1080P"; empty lets Size decide
