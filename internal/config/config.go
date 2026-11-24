@@ -32,7 +32,11 @@ type Config struct {
 	Providers map[string]ProviderConfig `yaml:"providers"`
 	Models    map[string]ModelRoute     `yaml:"models"` // chat aliases
 	Images    map[string]ModelRoute     `yaml:"images"` // image-generation aliases
-	Audio     map[string]ModelRoute     `yaml:"audio"`  // text-to-speech aliases
+	// Videos are video-generation aliases (POST /v1/videos/generations). The
+	// vendor works asynchronously, so a call starts a job and a poll finishes
+	// it; billed per second of video when the job is first seen done.
+	Videos map[string]ModelRoute `yaml:"videos"`
+	Audio  map[string]ModelRoute `yaml:"audio"` // text-to-speech aliases
 	// Speech-to-text. Separate from Audio because they are opposite directions
 	// with different upstream models, and one alias cannot serve both.
 	Transcription map[string]ModelRoute `yaml:"transcription"`
@@ -528,6 +532,11 @@ func newAdapter(name string, p ProviderConfig, apiKey string) (provider.Adapter,
 		// adapter (compatible mode), but images only exist on the native
 		// multimodal-generation API, which answers with URLs. See the adapter.
 		return provider.NewDashScopeImageAdapter(name, p.BaseURL, apiKey), ""
+	case "dashscope-video":
+		// Alibaba's Wan video (text- and image-to-video), on the native
+		// asynchronous video-synthesis API: a task is started and polled. See
+		// the adapter.
+		return provider.NewDashScopeVideoAdapter(name, p.BaseURL, apiKey), ""
 	case "gamma":
 		// gamma.app: decks, documents and social posts. Asynchronous, and a chat
 		// adapter rather than an image one because what comes back is a hosted

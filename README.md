@@ -21,6 +21,8 @@ OpenAI-wire compatible, so any OpenAI client works by changing the base URL:
 | `POST /v1/responses` | Responses API |
 | `POST /v1/embeddings` | Vectors, with `dimensions` |
 | `POST /v1/images/generations` | Images; edits and references with `images` |
+| `POST /v1/videos/generations` | Start a video job (text- or image-to-video) |
+| `GET /v1/videos/generations/{id}` | Poll a video job |
 | `POST /v1/audio/speech` | Text to speech |
 | `POST /v1/audio/transcriptions` | Speech to text |
 | `POST /v1/systemone` | System 1 structured decisions (Jev / TypeSafe) |
@@ -58,6 +60,41 @@ at most 4 per request and 20 MB decoded in total. Without `aspect_ratio` or
 model. An alias with no model that reads input pictures — `nabu-image`, whose
 chain ends in stock photos — answers `400` rather than return a picture
 unrelated to the one sent.
+
+### Video generation
+
+Video is asynchronous: starting one returns a job id, and polling the id
+returns the video once it is rendered (about 30 s for 5 s of text-to-video,
+about a minute from a first frame). The alias is `nabu-video` (Alibaba Wan 2.6).
+
+```http
+POST /v1/videos/generations
+{"model": "nabu-video", "prompt": "A red fox trotting through fresh snow",
+ "aspect_ratio": "16:9", "size": "1280x720", "seconds": 5,
+ "image_url": "https://example.com/first-frame.png"}
+
+→ {"id": "video_3f9c…", "object": "video.generation", "status": "processing", "model": "nabu-video", …}
+
+GET /v1/videos/generations/video_3f9c…
+→ {"id": "video_3f9c…", "status": "processing", …}
+→ {"id": "video_3f9c…", "status": "completed", "data": [{"url": "https://…mp4"}], "seconds": 5, "resolution": "720P", …}
+→ {"id": "video_3f9c…", "status": "failed", "message": "…"}
+```
+
+`prompt` is required unless `image_url` is given; everything else is optional.
+`image_url` (an `https://` URL or a `data:image/png|jpeg|webp;base64,...` URI)
+makes it image-to-video, which follows the first frame's shape. Shapes are
+16:9, 9:16 and 1:1 at 720P or 1080P — `aspect_ratio` (or the shape of `size`)
+picks the nearest, a `size` longer than 1280 px or `"resolution": "1080P"`
+picks 1080P — and lengths are 5, 10 or 15 s, `seconds` rounded to the nearest.
+The default is 16:9, 720P, 5 s.
+
+A job id belongs to the key that started it; any other key gets `404`. The
+video is billed once, per second of output ($0.10/s at 720P, $0.15/s at 1080P),
+on the first poll that sees it finished; a failed job costs nothing. The URL is
+the vendor's signed link and expires after about 24 hours, and so does the job.
+Your own vendor key (`X-Nabu-Key-*`) cannot start a video job: finishing it
+takes that key on every poll, and the gateway does not keep keys.
 
 ## Bringing your own key
 

@@ -122,6 +122,7 @@ func main() {
 	r.SetRegistry(cfg.Registry)
 	r.SetLive(cfg.Live)
 	r.SetDecisions(cfg.Decisions)
+	r.SetVideos(cfg.Videos)
 	// Checked before the first call, because no call would ever report it: a
 	// live alias with no per-minute price connects fine and bills nothing. The
 	// alias is refused alone; everything else keeps serving.
@@ -216,6 +217,13 @@ func main() {
 	// turn the rest of its minutes into "unknown live session" — unbilled.
 	if err := srv.SetLiveStateFile(filepath.Join(stateDir, "live-sessions.json")); err != nil {
 		log.Warn("live session registry is memory-only", "error", err)
+	}
+
+	// Video jobs are started now and billed when a poll first sees them done.
+	// On the state volume, so a redeploy mid-render neither strands the job
+	// nor bills it a second time.
+	if err := srv.SetVideoStateFile(filepath.Join(stateDir, "video-jobs.json")); err != nil {
+		log.Warn("video job registry is memory-only", "error", err)
 	}
 
 	// Conversation memory: a project sends conversation_id and the gateway

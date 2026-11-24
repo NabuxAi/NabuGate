@@ -53,6 +53,7 @@ type Router struct {
 	adapters      map[string]provider.Adapter
 	models        map[string]config.ModelRoute
 	images        map[string]config.ModelRoute
+	videos        map[string]config.ModelRoute
 	audio         map[string]config.ModelRoute
 	transcription map[string]config.ModelRoute
 	embeddings    map[string]config.ModelRoute
@@ -744,6 +745,7 @@ func (r *Router) AliasInfos() []AliasInfo {
 	}
 	add(r.models)
 	add(r.images)
+	add(r.videos)
 	add(r.audio)
 	add(r.embeddings)
 	add(r.decisions)

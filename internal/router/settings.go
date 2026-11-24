@@ -149,7 +149,7 @@ func (r *Router) Routes() []RouteInfo {
 	}{
 		{"models", r.models}, {"images", r.images}, {"audio", r.audio},
 		{"transcription", r.transcription}, {"embeddings", r.embeddings},
-		{"decisions", r.decisions}, {"live", r.live},
+		{"decisions", r.decisions}, {"live", r.live}, {"videos", r.videos},
 	}
 	var out []RouteInfo
 	for _, sec := range sections {
@@ -184,7 +184,7 @@ func (r *Router) RouteKind(alias string) (string, config.ModelRoute) {
 	}{
 		{"models", r.models}, {"images", r.images}, {"audio", r.audio},
 		{"transcription", r.transcription}, {"embeddings", r.embeddings},
-		{"decisions", r.decisions}, {"live", r.live},
+		{"decisions", r.decisions}, {"live", r.live}, {"videos", r.videos},
 	} {
 		if route, ok := sec.routes[alias]; ok {
 			return sec.kind, route

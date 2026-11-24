@@ -87,7 +87,7 @@ func (c *Config) UnpricedRoutes() map[string][]string {
 	}{
 		{"models", c.Models}, {"images", c.Images}, {"audio", c.Audio},
 		{"transcription", c.Transcription}, {"embeddings", c.Embeddings},
-		{"decisions", c.Decisions}, {"live", c.Live},
+		{"decisions", c.Decisions}, {"live", c.Live}, {"videos", c.Videos},
 	}
 	out := map[string][]string{}
 	for _, sec := range sections {

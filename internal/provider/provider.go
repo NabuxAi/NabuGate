@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -158,6 +159,60 @@ type ImageAdapter interface {
 type ImageInputAdapter interface {
 	AcceptsInputImages(model string) bool
 }
+
+// VideoRequest is a provider-agnostic video generation request. Shape fields
+// are the caller's wishes; each adapter maps them onto the canvases, tiers and
+// durations its vendor actually offers.
+type VideoRequest struct {
+	Model          string
+	Prompt         string
+	NegativePrompt string
+	// ImageURL is the first frame, an https:// URL or a data:image/...;base64
+	// URI. Set, the request is image-to-video.
+	ImageURL    string
+	Size        string  // e.g. "1280x720" (OpenAI-style), or a tier such as "1080p"
+	AspectRatio string  // e.g. "16:9"
+	Resolution  string  // e.g. "720P" | "1080P"; empty lets Size decide
+	Seconds     float64 // requested length; 0 is the vendor's shortest
+}
+
+// VideoJob is a video task the vendor accepted. Video takes tens of seconds to
+// minutes, so creation only starts it; VideoStatus follows it.
+type VideoJob struct {
+	TaskID     string
+	Model      string // the upstream model the task runs on
+	Resolution string // the tier asked for, e.g. "720P"
+	Seconds    int    // the duration asked for
+}
+
+// Video task states, as VideoStatus.State reports them.
+const (
+	VideoProcessing = "processing"
+	VideoSucceeded  = "succeeded"
+	VideoFailed     = "failed"
+)
+
+// VideoStatus is where a video task stands. On success URL is the finished
+// file and Seconds/Resolution are what the vendor bills for.
+type VideoStatus struct {
+	State      string
+	URL        string
+	Message    string  // why it failed
+	Seconds    float64 // length of the video produced
+	Resolution string  // tier produced, e.g. "1080P"; empty if not reported
+}
+
+// VideoAdapter is implemented by providers that generate video. Both calls are
+// short: CreateVideo submits the task, VideoStatus asks about it once.
+type VideoAdapter interface {
+	CreateVideo(ctx context.Context, req VideoRequest) (VideoJob, error)
+	VideoStatus(ctx context.Context, taskID string) (VideoStatus, error)
+}
+
+// ErrInvalidVideoRequest marks a video request the vendor refused as malformed
+// (a 400), as opposed to an outage. It is the caller's to fix, so it is not
+// worth a fallback and is answered as a 400.
+var ErrInvalidVideoRequest = errors.New("invalid video request")
 
 // SpeechRequest is a provider-agnostic text-to-speech request.
 type SpeechRequest struct {
