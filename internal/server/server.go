@@ -350,13 +350,14 @@ func (s *Server) mountConsole(mux *http.ServeMux, site *staticSite) {
 	if site == nil {
 		return
 	}
-	mux.Handle("GET /admin/", http.StripPrefix("/admin/", site))
+	console := site.console()
+	mux.Handle("GET /admin/", http.StripPrefix("/admin/", console))
 	// Bare /admin → /admin/ so the SPA's relative asset URLs resolve correctly.
 	mux.HandleFunc("GET /admin", func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/admin/", http.StatusMovedPermanently)
 	})
 
-	mux.Handle("GET /panel/", http.StripPrefix("/panel/", site))
+	mux.Handle("GET /panel/", http.StripPrefix("/panel/", console))
 	mux.HandleFunc("GET /panel", func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/panel/", http.StatusMovedPermanently)
 	})
