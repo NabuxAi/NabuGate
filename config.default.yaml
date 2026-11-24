@@ -2023,6 +2023,17 @@ images:
       provider: dashscope-image
       model: "wan2.6-t2i"
 
+  # Editing and references: send "images" (or "image") with the prompt — the
+  # photo to change, or up to four character/style references. Wan 2.6 Image
+  # took a photo URL and returned the edited picture in ~12 s (2026-11-24).
+  # No fallback, and no other image alias takes input pictures: a text-only
+  # rung or Pexels would answer an edit with an unrelated picture.
+  # qwen-image-edit(-plus) answer 404 "Model not exist" on this key.
+  nabu-image-edit:
+    primary:
+      provider: dashscope-image
+      model: "wan2.6-image"
+
   # Stable Diffusion XL on Replicate. Not an official Replicate model, so it is
   # addressed by version. Serves once REPLICATE_API_TOKEN is set.
   nabu-sdxl:
@@ -2821,6 +2832,9 @@ pricing:
   gemini-3.1-flash-image: { per_image: 0.067 }
   # 0.22 CNY a picture on the Singapore endpoint (help.aliyun.com, 2026-10-29).
   "dashscope-image/wan2.6-t2i": { per_image: 0.031 }
+  # Edits and reference-guided pictures, billed per output picture at the
+  # wan2.6-t2i rate.
+  "dashscope-image/wan2.6-image": { per_image: 0.031 }
 
   # ── Anthropic (OpenRouter, 2026-09-26) ───────────────────────────────────
   claude-sonnet-5: { input: 2.00, output: 10.00, input_cache_read: 0.20, input_cache_write: 2.50 }

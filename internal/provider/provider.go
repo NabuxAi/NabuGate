@@ -131,6 +131,12 @@ type ImageRequest struct {
 	// What the picture must not contain. Wan takes it as a parameter; a model
 	// without one ignores it, so say it in the prompt too where it matters.
 	NegativePrompt string
+	// Images are input pictures: the one to edit, or character and style
+	// references. Each is an https:// URL or a data:image/(png|jpeg|webp);base64
+	// URI, already validated by the server. Empty means plain text-to-image.
+	// Only an ImageInputAdapter may be handed a request that carries any: a
+	// text-only model would ignore them and answer with an unrelated picture.
+	Images []string
 }
 
 // ImageResponse carries one or more base64-encoded PNG images.
@@ -141,6 +147,16 @@ type ImageResponse struct {
 // ImageAdapter is implemented by providers that can generate images.
 type ImageAdapter interface {
 	Image(ctx context.Context, req ImageRequest) (ImageResponse, error)
+}
+
+// ImageInputAdapter marks image adapters that can take input pictures
+// (ImageRequest.Images) for editing or as references. It is asked per model
+// because one vendor key serves text-only and image-in models side by side.
+// The router never hands an edit to a rung that does not say yes: falling
+// through to a text-to-image model or a stock photo would answer an edit with
+// an unrelated picture, which is worse than an error.
+type ImageInputAdapter interface {
+	AcceptsInputImages(model string) bool
 }
 
 // SpeechRequest is a provider-agnostic text-to-speech request.
