@@ -82,6 +82,8 @@ func (s *Server) mountConsoleAPI(mux *http.ServeMux) {
 	// Subscriptions: buying the right to spend the gateway's keys. See plans.go.
 	mux.Handle("GET /api/aliases", s.consoleAuth(s.listAliases))
 	mux.Handle("PUT /api/aliases/{alias}", s.consoleAuth(requireAdmin(s.saveAliasSetting)))
+	// How long visitors stay on the public pages, and the demo's spend today.
+	mux.Handle("GET /api/engagement", s.consoleAuth(requireAdmin(s.engagementReport)))
 
 	mux.Handle("GET /api/plans", s.consoleAuth(s.listPlans))
 	mux.Handle("POST /api/plans/{id}/subscribe", s.consoleAuth(s.subscribe))

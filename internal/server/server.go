@@ -71,6 +71,11 @@ type Server struct {
 	// as it did before.
 	admin *adminstore.Store
 
+	// demo fences the landing page's live demo (demo.go); beacons limits the
+	// time-on-page reports one address may send (engagement.go).
+	demo    *demoGate
+	beacons *beaconLimit
+
 	// requests is the recent-calls ring the console reads. In memory and
 	// bounded — see adminstore.RequestLog for why it is not persisted.
 	requests *adminstore.RequestLog
@@ -166,7 +171,7 @@ func (s *Server) loadManagedAgents() {
 // (dev mode) and a warning is logged by the caller. agents may be nil or empty
 // when no sub-agents are configured.
 func New(r *router.Router, enforcer *policy.Enforcer, tracker *usage.Tracker, agents *agent.Registry, log *slog.Logger) *Server {
-	return &Server{router: r, policy: enforcer, usage: tracker, agents: agents, log: log, logins: newThrottle(), probes: newProbeThrottle(), toolExec: agent.NewToolExecutor(), requests: adminstore.NewRequestLog(500), live: newLiveSessions(), tickets: newRelayTickets(), elevenBills: newElevenBills(), videos: newVideoJobs()}
+	return &Server{router: r, policy: enforcer, usage: tracker, agents: agents, log: log, logins: newThrottle(), probes: newProbeThrottle(), toolExec: agent.NewToolExecutor(), requests: adminstore.NewRequestLog(500), live: newLiveSessions(), tickets: newRelayTickets(), elevenBills: newElevenBills(), videos: newVideoJobs(), demo: newDemoGate(), beacons: newBeaconLimit()}
 }
 
 // WithToolExecutor overrides the agent-tool executor — tests use it to permit
@@ -266,6 +271,11 @@ func (s *Server) Handler() http.Handler {
 	if site != nil {
 		mux.Handle("GET /", site)
 	}
+
+	// The landing page's live demo and its time-on-page beacon. Both are
+	// public and fenced in their own files (demo.go, engagement.go).
+	mux.HandleFunc("POST /api/public/try", s.handleDemoTry)
+	mux.HandleFunc("POST /api/public/engagement", s.handleEngagement)
 
 	mux.HandleFunc("GET /api/public/models", func(w http.ResponseWriter, r *http.Request) {
 		infos := s.router.AliasInfos()
