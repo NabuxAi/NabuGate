@@ -7,6 +7,8 @@ import { fmtDigits, fmtInt, langHref, useI18n, useT } from '../i18n/index.jsx';
 import { gatewayBase, siteOrigin } from '../origin.js';
 import { IntroButton, IntroDialog, useIntro } from './IntroVideo.jsx';
 import ClaudeAdvisor from './ClaudeAdvisor.jsx';
+import TryLive from './landing/TryLive.jsx';
+import { useEngagement } from './landing/engagement.js';
 import '../styles/landing.css';
 
 /*
@@ -398,6 +400,7 @@ function Section({ id, eyebrow, title, sub, children, className = '' }) {
 export default function Landing({ signedIn = false }) {
   const t = useT(T);
   const { lang } = useI18n();
+  useEngagement('home', lang);
   const isIranHost = typeof window !== 'undefined' && window.location.hostname.toLowerCase() === 'gate.nabuxai.ir';
   const intro = useIntro();
   const [models, setModels] = useState([]);
@@ -583,6 +586,9 @@ export default function Landing({ signedIn = false }) {
             </div>
           </div>
         </section>
+
+        {/* ── Live demo: the one thing here a visitor can do, not just read ── */}
+        <TryLive lang={lang} signedIn={signedIn} />
 
         {/* ── Stats ─────────────────────────────────────────────────────────── */}
         <section className="lp-stats-band">
