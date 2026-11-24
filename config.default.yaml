@@ -586,6 +586,16 @@ providers:
     type: dashscope-image
     api_key_env: "DASHSCOPE_API_KEY"
 
+  # The same Alibaba key for Wan video, on the native asynchronous
+  # video-synthesis API (start a task, poll /tasks/{id}). Probed 2026-11-24:
+  # wan2.6-t2v finished a 5 s 1280*720 clip in ~32 s, wan2.6-i2v a 5 s 720P
+  # clip from an https first frame in ~64 s. Skipped while DASHSCOPE_API_KEY
+  # is unset.
+  dashscope-video:
+    enabled: true
+    type: dashscope-video
+    api_key_env: "DASHSCOPE_API_KEY"
+
   # Pexels stock photos as an image source. An image alias pointed here searches
   # Pexels for the prompt and returns real photos. Skipped when PEXELS_API_KEY
   # is unset, like any other keyed provider.
@@ -2071,6 +2081,18 @@ images:
       provider: imagegen
       model: "story"
 
+# Video generation (POST /v1/videos/generations, then GET …/{id} until done).
+# Asynchronous: the create answers a job id, the poll answers the video URL.
+videos:
+  # Wan 2.6: text-to-video, and image-to-video when the request carries an
+  # image_url (the adapter runs wan2.6-i2v then). 16:9, 9:16 or 1:1 at 720P or
+  # 1080P, 5/10/15 s; default 16:9, 720P, 5 s. No fallback: no other vendor
+  # here makes video.
+  nabu-video:
+    primary:
+      provider: dashscope-video
+      model: "wan2.6-t2v"
+
 # Realtime full-duplex voice (GPT-Live). The browser speaks to the vendor over
 # WebRTC; the gateway only signals (POST /v1/live/sessions) and bills the
 # minutes the caller reports back (POST /v1/live/sessions/{id}/usage).
@@ -2832,6 +2854,13 @@ pricing:
   gemini-3.1-flash-image: { per_image: 0.067 }
   # 0.22 CNY a picture on the Singapore endpoint (help.aliyun.com, 2026-10-29).
   "dashscope-image/wan2.6-t2i": { per_image: 0.031 }
+  # Wan 2.6 video per second of output (Model Studio international list price):
+  # 720P $0.10/s, 1080P $0.15/s, written per minute. A finished video is billed
+  # under "<model>" at 720P and "<model>@1080P" at 1080P.
+  "dashscope-video/wan2.6-t2v": { per_minute: 6.00 }
+  "dashscope-video/wan2.6-t2v@1080P": { per_minute: 9.00 }
+  "dashscope-video/wan2.6-i2v": { per_minute: 6.00 }
+  "dashscope-video/wan2.6-i2v@1080P": { per_minute: 9.00 }
   # Edits and reference-guided pictures, billed per output picture at the
   # wan2.6-t2i rate.
   "dashscope-image/wan2.6-image": { per_image: 0.031 }

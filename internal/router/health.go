@@ -73,6 +73,7 @@ func (r *Router) AliasHealthAll() []AliasHealth {
 	}{
 		{"chat", r.models},
 		{"image", r.images},
+		{"video", r.videos},
 		{"audio", r.audio},
 		{"embedding", r.embeddings},
 		{"transcription", r.transcription},
