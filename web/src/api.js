@@ -78,6 +78,17 @@ export const login = (username, password) =>
 export const continueAuth = (username, password, create = false) =>
   req('/auth/continue', { method: 'POST', body: JSON.stringify({ username, password, create }) });
 
+// Email-first sign-in: step one asks what an address can do ("none",
+// "password" or "sso"); a new address then registers with its details.
+export const checkEmail = (email) =>
+  req('/auth/check', { method: 'POST', body: JSON.stringify({ email }) });
+
+export const register = ({ email, firstName, lastName, mobile, password }) =>
+  req('/auth/register', {
+    method: 'POST',
+    body: JSON.stringify({ email, first_name: firstName, last_name: lastName, mobile, password }),
+  });
+
 export const logout = () => req('/logout', { method: 'POST' });
 
 // ---- tokens -----------------------------------------------------------------

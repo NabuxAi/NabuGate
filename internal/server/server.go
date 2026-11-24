@@ -115,6 +115,11 @@ type Server struct {
 	// logins rate-limits console sign-in attempts. See throttle.go.
 	logins *throttle
 
+	// probes rate-limits the email-first sign-up endpoints per source
+	// address: the address check would otherwise enumerate accounts, and
+	// registration would mint them in bulk. See signup.go.
+	probes *throttle
+
 	// mcp is the Model Context Protocol endpoint. nil, or configured without a
 	// token, means the route is never mounted — this service holds every
 	// provider key in the estate and mints the tokens projects call it with,
@@ -158,7 +163,7 @@ func (s *Server) loadManagedAgents() {
 // (dev mode) and a warning is logged by the caller. agents may be nil or empty
 // when no sub-agents are configured.
 func New(r *router.Router, enforcer *policy.Enforcer, tracker *usage.Tracker, agents *agent.Registry, log *slog.Logger) *Server {
-	return &Server{router: r, policy: enforcer, usage: tracker, agents: agents, log: log, logins: newThrottle(), toolExec: agent.NewToolExecutor(), requests: adminstore.NewRequestLog(500), live: newLiveSessions(), tickets: newRelayTickets(), elevenBills: newElevenBills(), videos: newVideoJobs()}
+	return &Server{router: r, policy: enforcer, usage: tracker, agents: agents, log: log, logins: newThrottle(), probes: newProbeThrottle(), toolExec: agent.NewToolExecutor(), requests: adminstore.NewRequestLog(500), live: newLiveSessions(), tickets: newRelayTickets(), elevenBills: newElevenBills(), videos: newVideoJobs()}
 }
 
 // WithToolExecutor overrides the agent-tool executor — tests use it to permit

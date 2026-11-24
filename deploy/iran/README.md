@@ -42,7 +42,7 @@ Coolify's Traefik in front of `gate.nabuxai.com` does not trust `X-Forwarded-*` 
 From those headers the gateway:
 
 - Builds payment return URLs and the NabuAuth `redirect_uri` as `https://gate.nabuxai.ir/...`, so the browser comes back to the mirror even when `NABU_PUBLIC_URL` is `https://gate.nabuxai.com`.
-- Sends the browser to NabuAuth's own mirror, `https://auth.nabuxai.ir` (`NABUAUTH_MIRROR_URL`), so the sign-in round trip never leaves `.ir`. The code is still exchanged server-side at `NABUAUTH_URL`.
+- Sends the browser to NabuAuth's own mirror, `https://auth.nabuxai.ir` (`NABUAUTH_MIRROR_URL`), so the sign-in round trip never leaves `.ir`. `auth.nabuxai.ir` is its own NabuAuth deployment with its own database, so the code it issues is exchanged server-side at that same mirror (the flow cookie records which instance started the sign-in), not at `NABUAUTH_URL`. The `nabugate` client on the mirror NabuAuth therefore needs its secret (`NABUAUTH_SECRET_NABUGATE` there) set to the gateway's `NABUAUTH_CLIENT_SECRET`, or the gateway's `NABUAUTH_MIRROR_CLIENT_SECRET` set to whatever the mirror holds.
 - Sets session cookies with an empty `Domain` and `Secure`, so the browser stores them for `gate.nabuxai.ir`.
 - Rate-limits the first `X-Forwarded-For` hop, which is the browser. Traefik wrote that hop; this nginx appends its own address after it.
 - Flushes streamed responses and sets `X-Accel-Buffering: no`. This nginx also turns `proxy_buffering` and `proxy_request_buffering` off.

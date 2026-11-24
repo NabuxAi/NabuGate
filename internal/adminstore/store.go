@@ -85,9 +85,15 @@ type User struct {
 	Salt  string `json:"salt"`
 	Hash  string `json:"hash"`
 
-	Balance  float64   `json:"balance"`
-	Name     string    `json:"name"`
-	Payments []Payment `json:"payments,omitempty"`
+	Balance float64 `json:"balance"`
+	Name    string  `json:"name"`
+	// FirstName, LastName and Mobile are what the email-first sign-up form
+	// asks for. Name stays the display name (first and last together) so
+	// everything that already reads it keeps working.
+	FirstName string    `json:"first_name,omitempty"`
+	LastName  string    `json:"last_name,omitempty"`
+	Mobile    string    `json:"mobile,omitempty"`
+	Payments  []Payment `json:"payments,omitempty"`
 
 	// ProviderKeys are the user's own upstream credentials, sealed. Never
 	// serialize a User straight to an API response: build a projection that
@@ -1114,6 +1120,7 @@ func (s *Store) AddPayment(email string, amount float64, status string, id strin
 	}
 	return u.Balance
 }
+
 // Account rules the sign-in form states, enforced here because the form is
 // not the only client: a password the hint calls too short was accepted.
 var (
@@ -1131,41 +1138,7 @@ func ValidEmail(email string) bool {
 }
 
 func (s *Store) SignupUser(email, password string) error {
-	email = strings.TrimSpace(strings.ToLower(email))
-	if !ValidEmail(email) {
-		return ErrInvalidEmail
-	}
-	if len([]rune(password)) < 10 {
-		return ErrShortPassword
-	}
-
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	if s.st.Users == nil {
-		s.st.Users = make(map[string]*User)
-	}
-	if _, exists := s.st.Users[email]; exists {
-		return errors.New("an account with this email already exists")
-	}
-
-	salt := make([]byte, saltLen)
-	if _, err := rand.Read(salt); err != nil {
-		return err
-	}
-
-	hash, err := pbkdf2.Key(sha256.New, password, salt, pbkdfIterations, pbkdfKeyLen)
-	if err != nil {
-		return err
-	}
-
-	s.st.Users[email] = &User{
-		Email: email,
-		Salt:  base64.RawStdEncoding.EncodeToString(salt),
-		Hash:  base64.RawStdEncoding.EncodeToString(hash),
-	}
-	s.save()
-	return nil
+	return s.RegisterUser(Registration{Email: email, Password: password})
 }
 
 // ChangeUserPassword replaces a user's password, proving the current one first.

@@ -41,15 +41,25 @@ const (
 // so it needs no config-file change to enable.
 type nabuAuthConfig struct {
 	URL string
-	// MirrorURL is NabuAuth's Iran mirror. A sign-in started on
+	// MirrorURL is NabuAuth's Iran instance. A sign-in started on
 	// gate.nabuxai.ir sends the browser there instead of to URL, so the whole
-	// round trip stays on hosts reachable from Iran. The code is still
-	// exchanged server-side against URL: both names front one NabuAuth.
+	// round trip stays on hosts reachable from Iran.
+	//
+	// auth.nabuxai.ir is its own NabuAuth deployment with its own database,
+	// not a proxy in front of auth.nabuxai.com: a code it issues is unknown to
+	// auth.nabuxai.com. So the code is exchanged against the instance that
+	// issued it — the flow cookie records which one that was — with that
+	// instance's credentials for this client.
 	MirrorURL    string
 	ClientID     string
 	ClientSecret string
-	RedirectURI  string
-	Scopes       string
+	// MirrorClientID and MirrorClientSecret are this client's credentials on
+	// the mirror instance. Empty means the same as ClientID and ClientSecret,
+	// which is the expected setup: one secret, registered on both instances.
+	MirrorClientID     string
+	MirrorClientSecret string
+	RedirectURI        string
+	Scopes             string
 	// Admins is the set of NabuAuth account emails allowed into the console.
 	Admins map[string]bool
 	// Primary means the console presents a Nabu account as the way in rather
@@ -67,14 +77,16 @@ func loadNabuAuthConfig() nabuAuthConfig {
 		}
 	}
 	return nabuAuthConfig{
-		URL:          strings.TrimRight(envOrDefault("NABUAUTH_URL", "https://auth.nabuxai.com"), "/"),
-		MirrorURL:    strings.TrimRight(envOrDefault("NABUAUTH_MIRROR_URL", "https://auth.nabuxai.ir"), "/"),
-		ClientID:     os.Getenv("NABUAUTH_CLIENT_ID"),
-		ClientSecret: os.Getenv("NABUAUTH_CLIENT_SECRET"),
-		RedirectURI:  os.Getenv("NABUAUTH_REDIRECT_URI"),
-		Scopes:       envOrDefault("NABUAUTH_SCOPES", "openid profile email"),
-		Admins:       admins,
-		Primary:      os.Getenv("NABUAUTH_PRIMARY") != "0",
+		URL:                strings.TrimRight(envOrDefault("NABUAUTH_URL", "https://auth.nabuxai.com"), "/"),
+		MirrorURL:          strings.TrimRight(envOrDefault("NABUAUTH_MIRROR_URL", "https://auth.nabuxai.ir"), "/"),
+		ClientID:           os.Getenv("NABUAUTH_CLIENT_ID"),
+		ClientSecret:       os.Getenv("NABUAUTH_CLIENT_SECRET"),
+		MirrorClientID:     os.Getenv("NABUAUTH_MIRROR_CLIENT_ID"),
+		MirrorClientSecret: os.Getenv("NABUAUTH_MIRROR_CLIENT_SECRET"),
+		RedirectURI:        os.Getenv("NABUAUTH_REDIRECT_URI"),
+		Scopes:             envOrDefault("NABUAUTH_SCOPES", "openid profile email"),
+		Admins:             admins,
+		Primary:            os.Getenv("NABUAUTH_PRIMARY") != "0",
 	}
 }
 
@@ -106,10 +118,37 @@ func (c nabuAuthConfig) redirectURI(r *http.Request) string {
 // browserURL is the NabuAuth origin the browser is sent to: the mirror when
 // the visitor came through gate.nabuxai.ir, otherwise URL.
 func (c nabuAuthConfig) browserURL(r *http.Request) string {
-	if c.MirrorURL != "" && publicBase(r) == "https://gate.nabuxai.ir" {
+	if c.useMirror(r) {
 		return c.MirrorURL
 	}
 	return c.URL
+}
+
+func (c nabuAuthConfig) useMirror(r *http.Request) bool {
+	return c.MirrorURL != "" && publicBase(r) == "https://gate.nabuxai.ir"
+}
+
+// nabuAuthInstance is one NabuAuth deployment and this client's credentials
+// on it: where a code is redeemed and the profile read.
+type nabuAuthInstance struct {
+	URL          string
+	ClientID     string
+	ClientSecret string
+}
+
+// instance returns the NabuAuth that issued a flow's code.
+func (c nabuAuthConfig) instance(mirror bool) nabuAuthInstance {
+	if !mirror || c.MirrorURL == "" {
+		return nabuAuthInstance{URL: c.URL, ClientID: c.ClientID, ClientSecret: c.ClientSecret}
+	}
+	in := nabuAuthInstance{URL: c.MirrorURL, ClientID: c.MirrorClientID, ClientSecret: c.MirrorClientSecret}
+	if in.ClientID == "" {
+		in.ClientID = c.ClientID
+	}
+	if in.ClientSecret == "" {
+		in.ClientSecret = c.ClientSecret
+	}
+	return in
 }
 
 func b64u(raw []byte) string { return base64.RawURLEncoding.EncodeToString(raw) }
@@ -120,6 +159,9 @@ type consoleNabuFlow struct {
 	Verifier string `json:"v"`
 	Expires  int64  `json:"e"`
 	ReturnTo string `json:"r"`
+	// Mirror records that the browser was sent to the Iran NabuAuth, so the
+	// code is redeemed there and not at the instance that never issued it.
+	Mirror bool `json:"m,omitempty"`
 }
 
 // signFlow authenticates the flow cookie. Without a signature a visitor could
@@ -195,8 +237,10 @@ func (s *Server) consoleNabuStart(w http.ResponseWriter, r *http.Request) {
 		returnTo = "/admin/"
 	}
 
+	mirror := cfg.useMirror(r)
 	cookieValue, err := cfg.packFlow(consoleNabuFlow{
 		State: state, Verifier: verifier, Expires: time.Now().Add(consoleNabuFlowTTL).Unix(), ReturnTo: returnTo,
+		Mirror: mirror,
 	})
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "could not start sign-in")
@@ -216,7 +260,7 @@ func (s *Server) consoleNabuStart(w http.ResponseWriter, r *http.Request) {
 	}))
 
 	q := url.Values{
-		"client_id":             {cfg.ClientID},
+		"client_id":             {cfg.instance(mirror).ClientID},
 		"redirect_uri":          {cfg.redirectURI(r)},
 		"response_type":         {"code"},
 		"scope":                 {cfg.Scopes},
@@ -284,9 +328,10 @@ func (s *Server) consoleNabuCallback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	profile, err := cfg.signIn(r.Context(), r.URL.Query().Get("code"), flow.Verifier, cfg.redirectURI(r))
+	issuer := cfg.instance(flow.Mirror)
+	profile, err := issuer.signIn(r.Context(), r.URL.Query().Get("code"), flow.Verifier, cfg.redirectURI(r))
 	if err != nil {
-		s.log.Warn("console nabuauth sign-in failed", "error", err)
+		s.log.Warn("console nabuauth sign-in failed", "nabuauth", issuer.URL, "error", err)
 		fail("failed", dest)
 		return
 	}
@@ -338,7 +383,7 @@ type nabuAuthProfile struct {
 }
 
 // signIn exchanges the code and reads the profile behind it.
-func (c nabuAuthConfig) signIn(ctx context.Context, code, verifier, redirectURI string) (nabuAuthProfile, error) {
+func (c nabuAuthInstance) signIn(ctx context.Context, code, verifier, redirectURI string) (nabuAuthProfile, error) {
 	form := url.Values{
 		"grant_type":    {"authorization_code"},
 		"client_id":     {c.ClientID},
