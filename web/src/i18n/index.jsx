@@ -52,6 +52,9 @@ export function detectLang() {
   }
   const stored = supported(readStored());
   if (stored) return stored;
+  // The Iran mirror (gate.nabuxai.ir) is for visitors in Iran: Persian first,
+  // whatever the browser's own list says. A choice made on the switch still wins.
+  if (/\.ir$/i.test(window.location.hostname || '')) return 'fa';
   const prefs = navigator.languages && navigator.languages.length ? navigator.languages : [navigator.language];
   for (const p of prefs) {
     const base = supported(String(p || '').toLowerCase().split('-')[0]);

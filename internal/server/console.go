@@ -39,6 +39,8 @@ func (s *Server) mountConsoleAPI(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/login", s.consoleLogin)
 	mux.HandleFunc("POST /api/signup", s.consoleSignup)
 	mux.HandleFunc("POST /api/auth/continue", s.consoleContinue)
+	mux.HandleFunc("POST /api/auth/check", s.consoleCheckEmail)
+	mux.HandleFunc("POST /api/auth/register", s.consoleRegister)
 
 	mux.HandleFunc("POST /api/logout", s.consoleLogout)
 

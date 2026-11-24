@@ -39,13 +39,31 @@ type loginAttempt struct {
 type throttle struct {
 	mu       sync.Mutex
 	attempts map[string]*loginAttempt
+	// max is how many counted attempts lock the key; zero means
+	// maxLoginAttempts.
+	max int
 }
 
 func newThrottle() *throttle { return &throttle{attempts: map[string]*loginAttempt{}} }
 
+// newThrottleMax is a throttle that locks after max counted attempts.
+func newThrottleMax(max int) *throttle {
+	return &throttle{attempts: map[string]*loginAttempt{}, max: max}
+}
+
+func (t *throttle) limit() int {
+	if t.max > 0 {
+		return t.max
+	}
+	return maxLoginAttempts
+}
+
 // blocked reports whether the key is currently locked out, and clears the entry
 // once its window has passed.
 func (t *throttle) blocked(key string) bool {
+	if t == nil {
+		return false
+	}
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	a := t.attempts[key]
@@ -56,11 +74,14 @@ func (t *throttle) blocked(key string) bool {
 		delete(t.attempts, key)
 		return false
 	}
-	return a.count >= maxLoginAttempts
+	return a.count >= t.limit()
 }
 
 // fail records a failed attempt and extends the window.
 func (t *throttle) fail(key string) {
+	if t == nil {
+		return
+	}
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	a := t.attempts[key]

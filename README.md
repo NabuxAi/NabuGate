@@ -326,7 +326,8 @@ explicit allow-list:
 | Variable | Meaning |
 |---|---|
 | `NABUAUTH_URL` | NabuAuth base URL |
-| `NABUAUTH_MIRROR_URL` | NabuAuth origin the browser is sent to when it came through `gate.nabuxai.ir`; defaults to `https://auth.nabuxai.ir` |
+| `NABUAUTH_MIRROR_URL` | NabuAuth origin the browser is sent to when it came through `gate.nabuxai.ir`; defaults to `https://auth.nabuxai.ir`. That is a separate NabuAuth with its own database, so a code it issues is also redeemed there |
+| `NABUAUTH_MIRROR_CLIENT_ID` / `NABUAUTH_MIRROR_CLIENT_SECRET` | This client's credentials on the mirror NabuAuth; empty means the same as `NABUAUTH_CLIENT_ID` / `NABUAUTH_CLIENT_SECRET` |
 | `NABUAUTH_CLIENT_ID` | This gateway's client id |
 | `NABUAUTH_CLIENT_SECRET` | Its secret; also signs the sign-in flow cookie |
 | `NABUAUTH_REDIRECT_URI` | Defaults to `<host>/admin/api/nabu/callback` |

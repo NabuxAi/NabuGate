@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import * as api from '../api.js';
-import { useT } from '../i18n/index.jsx';
+import { useT, fmtDigits } from '../i18n/index.jsx';
 import Icon from '../components/Icon.jsx';
 import { LangSwitch, Logo, ThemeToggle } from '../components/Brand.jsx';
 
@@ -43,6 +43,29 @@ const T = {
     throttled: 'تلاش‌های ناموفق زیاد بود؛ چند دقیقه بعد دوباره امتحان کنید.',
     nabu: 'ادامه با حساب نابو',
     google: 'ادامه با حساب گوگل',
+    emailTitle: 'ورود یا ثبت‌نام',
+    emailLead: 'ایمیل‌تان را وارد کنید. اگر حساب دارید رمز را می‌پرسیم، و اگر نه، در قدم بعد حساب تازه می‌سازیم.',
+    emailPlaceholder: 'you@example.com',
+    next: 'ادامه',
+    passwordTitle: 'خوش برگشتید',
+    passwordLead: 'رمز عبور حساب‌تان را وارد کنید.',
+    submitSignIn: 'ورود',
+    registerTitle: 'ساخت حساب تازه',
+    registerLead: 'با این ایمیل هنوز حسابی نیست. چند مشخصه بدهید تا حساب‌تان ساخته شود.',
+    firstName: 'نام',
+    lastName: 'نام خانوادگی',
+    mobile: 'شماره موبایل',
+    mobilePlaceholder: '۰۹۱۲ ۱۲۳ ۴۵۶۷',
+    mobileHint: 'موبایل ایران را با ۰۹ بزنید؛ شمارهٔ خارج از ایران را با کد کشور.',
+    submitRegister: 'ساخت حساب و ورود',
+    ssoTitle: 'ورود با حساب نابو یا گوگل',
+    ssoLead: 'این ایمیل با حساب نابو یا گوگل ساخته شده و رمز جداگانه ندارد. با یکی از دکمه‌های زیر وارد شوید.',
+    change: 'تغییر',
+    step: 'مرحلهٔ {n} از ۲',
+    invalidName: 'نام و نام خانوادگی را وارد کنید.',
+    invalidMobile: 'شمارهٔ موبایل درست نیست؛ مثلاً ۰۹۱۲۱۲۳۴۵۶۷.',
+    accountExists: 'با این ایمیل از قبل حساب هست؛ رمز را بزنید و وارد شوید.',
+    ssoFailedLong: 'ورود با حساب نابو یا گوگل کامل نشد. دوباره امتحان کنید، یا با ایمیل و رمز وارد شوید.',
   },
   en: {
     tagline: 'The central AI gateway',
@@ -82,6 +105,29 @@ const T = {
     throttled: 'Too many failed attempts; try again in a few minutes.',
     nabu: 'Continue with Nabu',
     google: 'Continue with Google',
+    emailTitle: 'Sign in or sign up',
+    emailLead: 'Enter your email. If you have an account we ask for its password; if not, we create one in the next step.',
+    emailPlaceholder: 'you@example.com',
+    next: 'Continue',
+    passwordTitle: 'Welcome back',
+    passwordLead: 'Enter the password for your account.',
+    submitSignIn: 'Sign in',
+    registerTitle: 'Create your account',
+    registerLead: 'There is no account with this email yet. A few details and it is ready.',
+    firstName: 'First name',
+    lastName: 'Last name',
+    mobile: 'Mobile number',
+    mobilePlaceholder: '+1 415 555 0100',
+    mobileHint: 'An Iranian mobile starts with 09; any other number needs its country code (like +44).',
+    submitRegister: 'Create account and sign in',
+    ssoTitle: 'Sign in with Nabu or Google',
+    ssoLead: 'This email was set up with a Nabu or Google account and has no separate password. Use one of the buttons below.',
+    change: 'Change',
+    step: 'Step {n} of 2',
+    invalidName: 'Enter your first and last name.',
+    invalidMobile: 'That mobile number does not look right.',
+    accountExists: 'This email already has an account; enter its password to sign in.',
+    ssoFailedLong: 'Signing in with Nabu or Google did not finish. Try again, or sign in with email and password.',
   },
 };
 
@@ -91,17 +137,26 @@ const GOOGLE = (
 
 /*
  * The console's gate.
+ *
+ * The user panel signs in email-first: step one asks only for the address and
+ * the server says what it can do — sign in with a password, register (first
+ * and last name, mobile, password), or use the Nabu/Google button. The admin
+ * area and first-time setup keep the username-and-password form.
  */
 export default function SignIn({ needsSetup, onAuthenticated }) {
   const t = useT(T);
+  const isPanel = window.location.pathname.startsWith('/panel');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
+  const [mobile, setMobile] = useState('');
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
-  // 'setup' creates the first administrator; 'continue' is sign-in and
-  // sign-up in one, and 'create' is its second step for a new address.
-  const [mode, setMode] = useState(needsSetup ? 'setup' : 'continue');
+  // 'setup' creates the first administrator and 'continue' is the admin
+  // area's sign-in. The panel walks 'email' → 'password' | 'register' | 'sso'.
+  const [mode, setMode] = useState(needsSetup ? 'setup' : isPanel ? 'email' : 'continue');
   const [nabu, setNabu] = useState(null);
 
   useEffect(() => {
@@ -111,8 +166,12 @@ export default function SignIn({ needsSetup, onAuthenticated }) {
       // Stored as a key rather than a sentence so a language switch
       // re-renders it in the new language.
       if (errParam === 'expired') setError({ key: 'expired' });
-      else if (errParam === 'failed') setError({ key: 'ssoFailed' });
+      else if (errParam === 'failed') setError({ key: 'ssoFailedLong' });
       else setError({ key: 'ssoError', vars: { code: errParam } });
+      // Drop the flag from the address bar so a reload does not show it again.
+      params.delete('nabu_error');
+      const q = params.toString();
+      window.history.replaceState(null, '', window.location.pathname + (q ? `?${q}` : '') + window.location.hash);
     }
 
     if (!needsSetup) {
@@ -120,9 +179,10 @@ export default function SignIn({ needsSetup, onAuthenticated }) {
     }
   }, [needsSetup]);
 
-  const creating = mode === 'setup' || mode === 'create';
-  const isPanel = window.location.pathname.startsWith('/panel');
+  const creating = mode === 'setup' || mode === 'register';
   const isAdmin = !isPanel && mode !== 'setup';
+  const emailStep = mode === 'email';
+  const panelStep2 = mode === 'password' || mode === 'register' || mode === 'sso';
 
   // The server's answers, by status and code, as sentences in the page's
   // language; a raw English message never reaches the form.
@@ -133,6 +193,9 @@ export default function SignIn({ needsSetup, onAuthenticated }) {
       case 'use_sso': return { key: 'useSso' };
       case 'short_password': return { key: 'shortPassword' };
       case 'invalid_email': return { key: 'invalidEmail' };
+      case 'invalid_name': return { key: 'invalidName' };
+      case 'invalid_mobile': return { key: 'invalidMobile' };
+      case 'account_exists': return { key: 'accountExists' };
       default: return { key: 'failed' };
     }
   }
@@ -149,31 +212,63 @@ export default function SignIn({ needsSetup, onAuthenticated }) {
       setError({ key: 'shortPassword' });
       return;
     }
+    if (mode === 'register' && (!firstName.trim() || !lastName.trim())) {
+      setError({ key: 'invalidName' });
+      return;
+    }
     setBusy(true);
     try {
       if (mode === 'setup') {
         await api.setup(username, password);
+      } else if (mode === 'email') {
+        const res = await api.checkEmail(username.trim());
+        setPassword('');
+        setConfirm('');
+        setMode(res.state === 'none' ? 'register' : res.state === 'sso' ? 'sso' : 'password');
+        return;
+      } else if (mode === 'register') {
+        await api.register({ email: username.trim(), firstName, lastName, mobile, password });
+      } else if (mode === 'password') {
+        await api.login(username.trim(), password);
       } else {
-        const res = await api.continueAuth(username, password, mode === 'create');
+        const res = await api.continueAuth(username, password, false);
         if (res && res.new_account) {
-          setConfirm('');
-          setMode('create');
+          setError({ key: 'wrongPassword' });
           return;
         }
       }
       onAuthenticated();
     } catch (err) {
-      setError(errorFor(err));
+      const mapped = errorFor(err);
+      // Someone registered this address meanwhile: offer the password step.
+      if (mode === 'register' && err.code === 'account_exists') setMode('password');
+      if (err.code === 'use_sso') setMode(isPanel ? 'sso' : mode);
+      setError(mapped);
     } finally {
       setBusy(false);
     }
   }
 
-  const backToEmail = () => { setMode('continue'); setConfirm(''); setError(null); };
+  const backToEmail = () => { setMode('email'); setPassword(''); setConfirm(''); setError(null); };
 
-  const title = mode === 'setup' ? t('setupTitle') : isAdmin ? t('adminTitle') : t('continueTitle');
-  const lead = isAdmin ? t('adminLead') : t('continueLead');
+  const title = mode === 'setup' ? t('setupTitle')
+    : isAdmin ? t('adminTitle')
+    : mode === 'password' ? t('passwordTitle')
+    : mode === 'register' ? t('registerTitle')
+    : mode === 'sso' ? t('ssoTitle')
+    : t('emailTitle');
+  const lead = isAdmin ? t('adminLead')
+    : mode === 'password' ? t('passwordLead')
+    : mode === 'register' ? t('registerLead')
+    : mode === 'sso' ? t('ssoLead')
+    : t('emailLead');
   const errorText = error && (error.text || t(error.key, error.vars));
+  const submitLabel = mode === 'setup' ? t('submitSetup')
+    : mode === 'email' ? t('next')
+    : mode === 'password' ? t('submitSignIn')
+    : mode === 'register' ? t('submitRegister')
+    : t('submitContinue');
+  const showSso = nabu && nabu.enabled && mode !== 'setup' && mode !== 'password' && mode !== 'register';
 
   return (
     <div className="auth">
@@ -205,43 +300,87 @@ export default function SignIn({ needsSetup, onAuthenticated }) {
           </div>
         </div>
 
-        <form className="auth-card fade-in" onSubmit={submit}>
+        <form className="auth-card fade-in" onSubmit={submit} key={mode}>
+          {(emailStep || panelStep2) && (
+            <p className="auth-step">{t('step', { n: fmtDigits(emailStep ? '1' : '2') })}</p>
+          )}
           <h2>{title}</h2>
           {mode !== 'setup' && <p className="auth-lead">{lead}</p>}
 
           {mode === 'setup' && <p className="auth-note">{t('setupNote')}</p>}
 
-          {mode === 'create' && <p className="auth-note">{t('newAccount')}</p>}
+          {panelStep2 ? (
+            <div className="auth-email-chip">
+              <Icon name="user" size={15} />
+              <bdi dir="ltr">{username.trim()}</bdi>
+              <button type="button" className="auth-link" onClick={backToEmail}>{t('change')}</button>
+            </div>
+          ) : (
+            <label className="field">
+              <span>{mode === 'setup' ? t('username') : isPanel ? t('email') : t('emailOrUser')}</span>
+              <input
+                className="input"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                // An administrator signs in with a username; only the user
+                // panel is email-only.
+                type={isPanel && mode !== 'setup' ? 'email' : 'text'}
+                inputMode="email"
+                autoComplete={isPanel ? 'email' : 'username'}
+                placeholder={isPanel ? t('emailPlaceholder') : undefined}
+                dir="ltr"
+                autoFocus
+                required
+              />
+            </label>
+          )}
 
-          <label className="field">
-            <span>{mode === 'setup' ? t('username') : isPanel ? t('email') : t('emailOrUser')}</span>
-            <input
-              className="input"
-              value={username}
-              onChange={(e) => { setUsername(e.target.value); if (mode === 'create') backToEmail(); }}
-              // An administrator signs in with a username; only the user
-              // panel is email-only.
-              type={isPanel && mode !== 'setup' ? 'email' : 'text'}
-              inputMode="email"
-              autoComplete="username"
-              dir="ltr"
-              required
-            />
-          </label>
+          {mode === 'register' && (
+            <>
+              <div className="field-row">
+                <label className="field">
+                  <span>{t('firstName')}</span>
+                  <input className="input" value={firstName} onChange={(e) => setFirstName(e.target.value)} autoComplete="given-name" maxLength={60} autoFocus required />
+                </label>
+                <label className="field">
+                  <span>{t('lastName')}</span>
+                  <input className="input" value={lastName} onChange={(e) => setLastName(e.target.value)} autoComplete="family-name" maxLength={60} required />
+                </label>
+              </div>
+              <label className="field">
+                <span>{t('mobile')}</span>
+                <input
+                  className="input"
+                  type="tel"
+                  inputMode="tel"
+                  value={mobile}
+                  onChange={(e) => setMobile(e.target.value)}
+                  autoComplete="tel"
+                  placeholder={t('mobilePlaceholder')}
+                  dir="ltr"
+                  required
+                />
+                <span className="hint">{t('mobileHint')}</span>
+              </label>
+            </>
+          )}
 
-          <label className="field">
-            <span>{t('password')}</span>
-            <input
-              className="input"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              autoComplete={creating ? 'new-password' : 'current-password'}
-              dir="ltr"
-              required
-            />
-            {creating && <span className="hint">{t('pwHint')}</span>}
-          </label>
+          {!emailStep && mode !== 'sso' && (
+            <label className="field">
+              <span>{t('password')}</span>
+              <input
+                className="input"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                autoComplete={creating ? 'new-password' : 'current-password'}
+                autoFocus={mode === 'password'}
+                dir="ltr"
+                required
+              />
+              {creating && <span className="hint">{t('pwHint')}</span>}
+            </label>
+          )}
 
           {creating && (
             <label className="field">
@@ -260,18 +399,16 @@ export default function SignIn({ needsSetup, onAuthenticated }) {
 
           {errorText && <p className="auth-error" role="alert"><Icon name="alert" size={16} />{errorText}</p>}
 
-          <button className="btn btn-primary auth-submit" disabled={busy}>
-            {busy ? '…' : mode === 'setup' ? t('submitSetup') : mode === 'create' ? t('submitCreate') : t('submitContinue')}
-            {!busy && <Icon name="arrow" size={16} className="flip-rtl" />}
-          </button>
-
-          {mode === 'create' && (
-            <button type="button" className="btn btn-outline auth-submit" onClick={backToEmail}>{t('otherEmail')}</button>
+          {mode !== 'sso' && (
+            <button className="btn btn-primary auth-submit" disabled={busy}>
+              {busy ? '…' : submitLabel}
+              {!busy && <Icon name="arrow" size={16} className="flip-rtl" />}
+            </button>
           )}
 
-          {nabu && nabu.enabled && mode !== 'setup' && (
+          {showSso && (
             <>
-              <div className="auth-or">{t('or')}</div>
+              {mode !== 'sso' && <div className="auth-or">{t('or')}</div>}
               <div className="auth-sso">
                 <a href="/api/nabu" className="btn btn-outline"><Logo size={18} />{t('nabu')}</a>
                 <a href="/api/nabu?provider=google" className="btn btn-outline">{GOOGLE}{t('google')}</a>
