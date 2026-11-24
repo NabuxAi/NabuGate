@@ -304,3 +304,76 @@ func TestModelsListsTheVideoAlias(t *testing.T) {
 	}
 	t.Fatalf("/v1/models = %v; nabu-video missing", a.body)
 }
+
+func TestVideoBillingModelPerTier(t *testing.T) {
+	for res, want := range map[string]string{
+		"": "m", "720P": "m", "480P": "m@480P", "480p": "m@480P", "1080P": "m@1080P", "1080p": "m@1080P",
+	} {
+		if got := videoBillingModel("m", res); got != want {
+			t.Errorf("videoBillingModel(m, %q) = %q, want %q", res, got, want)
+		}
+	}
+}
+
+// The real DashScope adapter behind an alias that pairs two models: text runs
+// the alias's text model, a photo its image model, and the finished video is
+// billed under the model that made it at the tier it came out at — here a
+// Wan 2.2 Flash clip at 480P, reported the Wan 2.1/2.2 way (video_duration,
+// video_ratio).
+func TestVideoAliasPairRunsTheRightModelAndBillsItsTier(t *testing.T) {
+	var mu sync.Mutex
+	var created []map[string]any
+	vendor := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		defer mu.Unlock()
+		switch {
+		case r.Method == http.MethodPost && r.URL.Path == "/services/aigc/video-generation/video-synthesis":
+			var body map[string]any
+			_ = json.NewDecoder(r.Body).Decode(&body)
+			created = append(created, body)
+			_, _ = w.Write([]byte(`{"output":{"task_id":"t-` + strconv.Itoa(len(created)) + `","task_status":"PENDING"}}`))
+		case r.URL.Path == "/tasks/t-2":
+			_, _ = w.Write([]byte(`{"output":{"task_id":"t-2","task_status":"SUCCEEDED","video_url":"https://oss/fast.mp4"},"usage":{"video_duration":5,"video_ratio":"832*480","video_count":1}}`))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer vendor.Close()
+
+	r := router.New(map[string]provider.Adapter{"dashscope-video": provider.NewDashScopeVideoAdapter("dashscope-video", vendor.URL, "k")},
+		nil, nil, nil, nil, nil, nil, discardLogger())
+	r.SetVideos(map[string]config.ModelRoute{"nabu-video-fast": {Primary: config.Target{
+		Provider: "dashscope-video", Model: "wan2.1-t2v-turbo", ImageModel: "wan2.2-i2v-flash"}}})
+	keys := policy.New(nil, []policy.KeyConfig{{Key: "gen-key", Project: "nabugen", Allow: []string{"nabu-*"}, RateLimit: 10000}})
+	tracker := usage.New(map[string]usage.Price{
+		"dashscope-video/wan2.1-t2v-turbo":      {PerMinute: 2.16},
+		"dashscope-video/wan2.2-i2v-flash":      {PerMinute: 2.16},
+		"dashscope-video/wan2.2-i2v-flash@480P": {PerMinute: 0.90},
+	})
+	ts := httptest.NewServer(New(r, keys, tracker, agent.NewRegistry(), discardLogger()).Handler())
+	defer ts.Close()
+
+	text := videoCall(t, ts, http.MethodPost, "/v1/videos/generations", "gen-key", `{"model":"nabu-video-fast","prompt":"a fox","seconds":10}`)
+	photo := videoCall(t, ts, http.MethodPost, "/v1/videos/generations", "gen-key",
+		`{"model":"nabu-video-fast","prompt":"wave","image_url":"https://example.com/f.png","resolution":"480P"}`)
+	if text.status != http.StatusOK || photo.status != http.StatusOK || len(created) != 2 {
+		t.Fatalf("creates: %+v / %+v", text, photo)
+	}
+	if created[0]["model"] != "wan2.1-t2v-turbo" || created[1]["model"] != "wan2.2-i2v-flash" {
+		t.Fatalf("models sent: %v / %v", created[0]["model"], created[1]["model"])
+	}
+	if photo.body["resolution"] != "480P" || photo.body["seconds"] != float64(5) {
+		t.Fatalf("photo job: %+v", photo.body)
+	}
+
+	done := videoCall(t, ts, http.MethodGet, "/v1/videos/generations/"+photo.body["id"].(string), "gen-key", "")
+	if done.body["status"] != "completed" || done.body["resolution"] != "480P" {
+		t.Fatalf("done: %+v", done)
+	}
+	if cost, _ := strconv.ParseFloat(done.cost, 64); math.Abs(cost-0.075) > 1e-9 {
+		t.Fatalf("5 s of wan2.2-i2v-flash at 480P charged %q, want 0.075", done.cost)
+	}
+	if stat := byModel(tracker)["dashscope-video/wan2.2-i2v-flash@480P"]; stat.Requests != 1 || stat.AudioSeconds != 5 {
+		t.Fatalf("metered %+v", byModel(tracker))
+	}
+}

@@ -26,6 +26,32 @@ type OpenAIAdapter struct {
 	// implementing that shape (Mistral's Voxtral offers text, SRT and json)
 	// needs a different value or every call 422s.
 	transcribeFormat string
+
+	// imageAPI is how Image reaches the vendor: "" or "images" is OpenAI's
+	// POST /images/generations; "chat" is POST /chat/completions with
+	// modalities ["image","text"], which is how OpenRouter serves Gemini and
+	// GPT image models (it has no /images/generations for them).
+	imageAPI string
+}
+
+// SetImageAPI chooses how Image reaches the vendor ("images" or "chat"; empty
+// is "images"). Called from the config when a provider declares image_api.
+func (a *OpenAIAdapter) SetImageAPI(api string) error {
+	switch api = strings.ToLower(strings.TrimSpace(api)); api {
+	case "", "images", "chat":
+		a.imageAPI = api
+		return nil
+	default:
+		return fmt.Errorf("image_api must be \"images\" or \"chat\", not %q", api)
+	}
+}
+
+// AcceptsInputImages implements ImageInputAdapter. On the chat route input
+// pictures go in as image_url parts beside the prompt, which the image models
+// there (Gemini's, GPT's) read for edits and references. OpenAI's
+// /images/generations takes no input picture.
+func (a *OpenAIAdapter) AcceptsInputImages(model string) bool {
+	return a.imageAPI == "chat"
 }
 
 // SetTranscribeFormat overrides the transcription response_format. Called from

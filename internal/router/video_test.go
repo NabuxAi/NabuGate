@@ -113,3 +113,32 @@ func TestVideoAliasesAreListed(t *testing.T) {
 	}
 	t.Fatalf("nabu-video not in %+v", r.AliasInfos())
 }
+
+// pairRung records the request a video rung was handed.
+type pairRung struct {
+	fakeAdapter
+	got *provider.VideoRequest
+}
+
+func (p pairRung) CreateVideo(_ context.Context, req provider.VideoRequest) (provider.VideoJob, error) {
+	*p.got = req
+	return provider.VideoJob{TaskID: "t", Model: req.Model}, nil
+}
+
+func (p pairRung) VideoStatus(context.Context, string) (provider.VideoStatus, error) {
+	return provider.VideoStatus{State: provider.VideoProcessing}, nil
+}
+
+// A rung's image_model travels with the request, so the adapter can run it
+// when the request carries a first frame.
+func TestVideoHandsTheRungsImageModelToTheAdapter(t *testing.T) {
+	var got provider.VideoRequest
+	r := videoRouter(map[string]provider.Adapter{"a": pairRung{fakeAdapter: fakeAdapter{name: "a"}, got: &got}},
+		config.ModelRoute{Primary: config.Target{Provider: "a", Model: "wan2.1-t2v-turbo", ImageModel: "wan2.2-i2v-flash"}})
+	if _, err := r.Video(context.Background(), "nabu-video", provider.VideoRequest{Prompt: "x", ImageURL: "https://e.com/f.png"}); err != nil {
+		t.Fatal(err)
+	}
+	if got.Model != "wan2.1-t2v-turbo" || got.ImageModel != "wan2.2-i2v-flash" {
+		t.Fatalf("adapter got model %q, image model %q", got.Model, got.ImageModel)
+	}
+}

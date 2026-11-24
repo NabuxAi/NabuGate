@@ -71,6 +71,28 @@ func (c *Config) coordinates(t Target) ([]string, bool) {
 	return out, true
 }
 
+// videoTiers are the tier suffixes a finished video is billed under besides
+// the bare model, which is its 720P price (server.videoBillingModel).
+var videoTiers = []string{"@480P", "@1080P"}
+
+// priced reports whether a coordinate has a price. A video model is priced per
+// tier, and one that renders no 720P (wan2.2-t2v-plus: 480P and 1080P) has
+// only tier rows, so for video any of its tier rows counts; the shipped-config
+// tests check every tier each model actually renders.
+func priced(prices map[string]usage.Price, prov, model string, video bool) bool {
+	if _, ok := usage.Lookup(prices, prov, model); ok {
+		return true
+	}
+	if video {
+		for _, tier := range videoTiers {
+			if _, ok := usage.Lookup(prices, prov, model+tier); ok {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 // UnpricedRoutes is every "provider/model" an alias can be served by that has
 // no price, with the aliases that reach it ("models:nabu-fast").
 //
@@ -91,15 +113,19 @@ func (c *Config) UnpricedRoutes() map[string][]string {
 	}
 	out := map[string][]string{}
 	for _, sec := range sections {
+		video := sec.name == "videos"
 		for alias, route := range sec.routes {
 			for _, t := range append([]Target{route.Primary}, route.Fallback...) {
 				coords, ok := c.coordinates(t)
 				if !ok {
 					continue
 				}
+				if video && t.ImageModel != "" && t.Provider != "" {
+					coords = append(coords, t.Provider+"/"+t.ImageModel)
+				}
 				for _, coord := range coords {
 					prov, model, _ := strings.Cut(coord, "/")
-					if _, priced := usage.Lookup(c.Pricing, prov, model); priced {
+					if priced(c.Pricing, prov, model, video) {
 						continue
 					}
 					out[coord] = append(out[coord], sec.name+":"+alias)

@@ -487,6 +487,11 @@ type ImageResult struct {
 	Provider string
 	Model    string
 	Images   []string // base64 PNG
+	// Usage, CostUSD and CostReported are the vendor's own account of the
+	// call, when it gives one (see provider.ImageResponse).
+	Usage        provider.Usage
+	CostUSD      float64
+	CostReported bool
 }
 
 // Image resolves an image alias and tries primary then fallbacks.
@@ -542,7 +547,8 @@ func (r *Router) Image(ctx context.Context, alias string, req provider.ImageRequ
 		}
 		r.served(ctx, t)
 		r.log.Info("upstream ok", append(attrs, "images", len(resp.Images))...)
-		return ImageResult{Alias: alias, Provider: t.Provider, Model: t.Model, Images: resp.Images}, nil
+		return ImageResult{Alias: alias, Provider: t.Provider, Model: t.Model, Images: resp.Images,
+			Usage: resp.Usage, CostUSD: resp.CostUSD, CostReported: resp.CostReported}, nil
 	}
 	if inputRungs == 0 && textOnly > 0 {
 		// Not an outage: nothing on this alias edits. Saying so is what lets a

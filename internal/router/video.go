@@ -62,6 +62,7 @@ func (r *Router) Video(ctx context.Context, alias string, req provider.VideoRequ
 			continue
 		}
 		req.Model = t.Model
+		req.ImageModel = t.ImageModel
 		start := time.Now()
 		job, err := vid.CreateVideo(ctx, req)
 		attrs := []any{"capability", "video", "alias", alias, "provider", t.Provider, "model", t.Model, "attempt", i + 1, "latency_ms", time.Since(start).Milliseconds()}
