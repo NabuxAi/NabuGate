@@ -17,6 +17,8 @@ prompt: |
   ۲. سه تا پنج خط متن کوتاه.
   ۳. یک دعوت به اقدام مشخص.
   ۴. هشت تا دوازده هشتگ فارسی و انگلیسی مرتبط، نه عمومی.
+
+  تخفیف، قیمت، آمار یا وعده‌ای که در موضوع نیامده ننویس.
 variables:
   - { name: topic, required: true, multiline: true, label: { fa: "موضوع پست", en: "Post topic" } }
   - { name: brand, default: "", label: { fa: "نام برند یا صفحه", en: "Brand/page" } }
