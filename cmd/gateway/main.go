@@ -22,6 +22,7 @@ import (
 	"nabugate/internal/nabupay"
 	"nabugate/internal/photos"
 	"nabugate/internal/policy"
+	"nabugate/internal/preset"
 	"nabugate/internal/router"
 	"nabugate/internal/server"
 	"nabugate/internal/usage"
@@ -167,7 +168,11 @@ func main() {
 	for _, w := range flowWarnings {
 		log.Warn(w)
 	}
-	srv := server.New(r, enforcer, tracker, agents, log).WithFlows(flows)
+	presets, presetWarnings := preset.Load(cfg.SkillsDir, cfg.TemplatesDir)
+	for _, w := range presetWarnings {
+		log.Warn(w)
+	}
+	srv := server.New(r, enforcer, tracker, agents, log).WithFlows(flows).WithPresets(presets)
 	// What the config knows about providers the router never sees: the ones
 	// with no key set, and whether spending the gateway's key on them needs
 	// approval. The console catalogue is built from this.

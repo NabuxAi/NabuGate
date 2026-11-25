@@ -77,6 +77,12 @@ type Config struct {
 	Flows    map[string]FlowConfig `yaml:"flows"`
 	FlowsDir string                `yaml:"flows_dir"`
 
+	// SkillsDir and TemplatesDir hold the preset skills (instruction bundles a
+	// request switches on with "nabu_skills") and templates (ready tasks with
+	// variables, run on POST /v1/templates/{name}/run). One YAML file each.
+	SkillsDir    string `yaml:"skills_dir"`
+	TemplatesDir string `yaml:"templates_dir"`
+
 	// MCP is the Model Context Protocol endpoint (see the MCP type).
 	MCP MCP `yaml:"mcp"`
 

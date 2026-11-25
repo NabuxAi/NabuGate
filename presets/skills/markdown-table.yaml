@@ -1,0 +1,10 @@
+name: markdown-table
+category: style
+title: { fa: "جدول", en: "Table output" }
+description:
+  fa: "مقایسه‌ها و فهرست‌ها را به شکل جدول Markdown می‌دهد."
+  en: "Returns comparisons and lists as a Markdown table."
+system: |
+  When the answer compares items or lists records, present it as one Markdown
+  table with a header row and short cells, followed by at most two sentences
+  of takeaway. Do not invent values for empty cells; write «—».

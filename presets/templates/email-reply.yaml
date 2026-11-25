@@ -1,0 +1,22 @@
+name: email-reply
+category: business
+title: { fa: "پاسخ ایمیل", en: "Email reply" }
+description:
+  fa: "پیش‌نویس پاسخ به یک ایمیل، با هدفی که شما تعیین می‌کنید."
+  en: "Drafts a reply to an email with the outcome you choose."
+model: nabu-smart
+temperature: 0.5
+prompt: |
+  Email received:
+  {{email}}
+
+  What I want the reply to say or achieve: {{goal}}
+  Tone: {{tone}}
+
+  Write the reply in the language of the email received: a subject line, then
+  the body. Keep it short. Do not invent dates, prices or commitments I did not
+  give.
+variables:
+  - { name: email, required: true, multiline: true, label: { fa: "ایمیل دریافتی", en: "Email received" } }
+  - { name: goal, required: true, multiline: true, label: { fa: "هدف پاسخ", en: "What the reply should do" } }
+  - { name: tone, default: "formal", options: ["formal", "friendly", "firm"], label: { fa: "لحن", en: "Tone" } }

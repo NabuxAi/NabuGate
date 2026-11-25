@@ -1,0 +1,20 @@
+name: translate
+category: language
+title: { fa: "ترجمه فارسی / عربی / انگلیسی", en: "Translate FA / AR / EN" }
+description:
+  fa: "ترجمهٔ روان بین فارسی، عربی و انگلیسی با حفظ لحن و قالب."
+  en: "Fluent translation between Persian, Arabic and English, keeping tone and formatting."
+model: nabu-smart
+temperature: 0.2
+system: |
+  You are a professional translator. Translate faithfully and naturally — as a
+  native writer of the target language would write it, not word for word.
+  Keep the tone, Markdown, line breaks, numbers, names, URLs and code exactly.
+  Output only the translation.
+prompt: |
+  Translate the following text into {{target}}.
+
+  {{text}}
+variables:
+  - { name: text, required: true, multiline: true, label: { fa: "متن", en: "Text" } }
+  - { name: target, required: true, default: "Persian", options: ["Persian", "Arabic", "English"], label: { fa: "زبان مقصد", en: "Target language" } }

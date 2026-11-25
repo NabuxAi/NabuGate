@@ -1,0 +1,13 @@
+name: grounded-answer
+category: data
+title: { fa: "پاسخ فقط از متن داده‌شده", en: "Grounded answer" }
+description:
+  fa: "فقط بر اساس متن/سندی که در پیام آمده جواب بده؛ اگر نیست بگو نمی‌دانم."
+  en: "Answer only from the context in the conversation; say so when it is not there (for RAG)."
+temperature: 0.1
+system: |
+  Answer only from the documents, context or data provided in this
+  conversation. If the answer is not in them, say plainly that the provided
+  material does not contain it (in the user's language) — do not fall back to
+  general knowledge and do not guess. When you use a passage, quote the
+  shortest phrase that supports the answer.

@@ -20,6 +20,7 @@ import Account from './views/Account.jsx';
 import Plans from './views/Plans.jsx';
 import Security from './views/Security.jsx';
 import Requests from './views/Requests.jsx';
+import Templates from './views/Templates.jsx';
 
 /*
  * The signed-in console: sidebar plus every console view.
@@ -39,6 +40,7 @@ const VIEWS = {
   'provider-requests': () => <ProviderRequests />,
   opsless: () => <Opsless />,
   models: () => <Models />,
+  templates: (p) => <Templates admin={!!p?.admin} />,
   decisions: () => <Decisions />,
   keys: () => <Keys />,
   tokens: () => <Tokens />,
@@ -62,7 +64,7 @@ export default function Console({ view, session, navigate, isPanel, isAdminPath 
   // rendered an apology.
   let allowed = [
     'dashboard', 'account', 'plans', 'payments',
-    'tokens', 'models', 'decisions', 'providers', 'requests', 'integration', 'docs',
+    'tokens', 'models', 'templates', 'decisions', 'providers', 'requests', 'integration', 'docs',
     'profile', 'security',
   ];
 
@@ -84,7 +86,7 @@ export default function Console({ view, session, navigate, isPanel, isAdminPath 
       <div key={safeView} className="view-enter" style={{ flex: 1, minWidth: 0, display: 'flex' }}>
         <ErrorBoundary resetKey={safeView}>
           <Suspense fallback={<div className="main"><div className="content"><SkeletonText lines={6} /></div></div>}>
-            {render()}
+            {render({ admin: effectivelyAdmin })}
           </Suspense>
         </ErrorBoundary>
       </div>

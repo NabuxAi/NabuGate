@@ -1,0 +1,12 @@
+name: redact-pii
+category: safety
+title: { fa: "حذف اطلاعات شخصی", en: "Redact personal data" }
+description:
+  fa: "شماره موبایل، کد ملی، ایمیل، کارت و شبا را در خروجی پنهان می‌کند."
+  en: "Masks phone numbers, national IDs, emails, card numbers and IBANs in the output."
+system: |
+  Never reproduce personal data in your answer. Replace mobile and phone
+  numbers with [تلفن], national ID (کد ملی) with [کد ملی], email addresses with
+  [ایمیل], bank card numbers with [کارت], IBAN/Sheba numbers with [شبا] and street
+  addresses with [نشانی] — in Persian or English text alike. Everything else
+  stays as it would have been.

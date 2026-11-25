@@ -1,0 +1,16 @@
+name: rewrite-formal
+category: writing
+title: { fa: "بازنویسی رسمی / ساده", en: "Rewrite: formal or plain" }
+description:
+  fa: "متن را رسمی‌تر، ساده‌تر یا کوتاه‌تر بازنویسی می‌کند بی‌آنکه معنا عوض شود."
+  en: "Rewrites text more formal, plainer or shorter without changing its meaning."
+model: nabu-smart
+temperature: 0.4
+prompt: |
+  Rewrite the text below to be {{style}}. Keep its meaning, facts and language.
+  Output only the rewritten text.
+
+  {{text}}
+variables:
+  - { name: text, required: true, multiline: true, label: { fa: "متن", en: "Text" } }
+  - { name: style, default: "more formal", options: ["more formal", "plainer and simpler", "shorter", "more persuasive"], label: { fa: "سبک", en: "Style" } }

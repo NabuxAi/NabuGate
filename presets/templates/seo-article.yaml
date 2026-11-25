@@ -1,0 +1,23 @@
+name: seo-article
+category: marketing
+title: { fa: "مقالهٔ سئو شده", en: "SEO article" }
+description:
+  fa: "مقالهٔ ساختاریافته با تیترهای H2/H3 برای یک کلمهٔ کلیدی."
+  en: "A structured article with H2/H3 headings for one keyword."
+model: nabu-smart
+temperature: 0.6
+skills: [persian-native]
+prompt: |
+  کلمهٔ کلیدی: {{keyword}}
+  مخاطب: {{audience}}
+  طول تقریبی: {{length}} کلمه
+  نکته‌هایی که باید بیاید (اختیاری): {{points}}
+
+  یک مقالهٔ Markdown بنویس با یک H1، مقدمهٔ کوتاه، چند بخش H2 و در صورت نیاز
+  H3، و یک جمع‌بندی. کلمهٔ کلیدی طبیعی در متن بیاید، نه تکراری. آمار یا منبعی که
+  نداری از خودت نساز.
+variables:
+  - { name: keyword, required: true, label: { fa: "کلمهٔ کلیدی", en: "Keyword" } }
+  - { name: audience, default: "عموم کاربران", label: { fa: "مخاطب", en: "Audience" } }
+  - { name: length, default: "800", options: ["500", "800", "1200", "2000"], label: { fa: "طول (کلمه)", en: "Length (words)" } }
+  - { name: points, default: "-", multiline: true, label: { fa: "نکته‌های لازم", en: "Points to cover" } }
