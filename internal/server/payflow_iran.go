@@ -5,6 +5,7 @@ import (
 	"math"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -147,4 +148,43 @@ func (s *Server) iranCheckout(r *http.Request, c *nabupay.Client, email string, 
 	if rate, ok := s.tomanRate(r.Context(), c); ok {
 		opts.AmountToman = tomanFor(opts.AmountUSD, rate)
 	}
+	// No method named: go straight to the AccountCity bank relay when the
+	// bridge offers it to Iran. The payer is redirected to the bank with no
+	// chooser page in between; NabuPay's hosted page stays the fallback for
+	// a bridge that does not list it.
+	if opts.Gateway == "" {
+		if gw := iranDefaultGateway(); gw != "" && s.bridgeOffers(r.Context(), c, gw) {
+			opts.Gateway = gw
+		}
+	}
+}
+
+// iranDefaultGateway is the method a .ir payer is sent to when none is named:
+// NABUPAY_IR_GATEWAY, "bank_payment" (AccountCity's bank relay) by default.
+// "auto" or "none" keeps NabuPay's own chooser page.
+func iranDefaultGateway() string {
+	v := strings.TrimSpace(os.Getenv("NABUPAY_IR_GATEWAY"))
+	switch strings.ToLower(v) {
+	case "":
+		return "bank_payment"
+	case "auto", "none":
+		return ""
+	}
+	return v
+}
+
+// bridgeOffers reports whether c lists slug for Iranian payers right now.
+func (s *Server) bridgeOffers(ctx context.Context, c *nabupay.Client, slug string) bool {
+	cache := &s.gateways
+	if c == s.iranPay.bridge && c != nil {
+		cache = &s.iranPay.gateways
+	}
+	ctx = context.WithValue(ctx, paymentCountryCtxKey{}, "IR")
+	list, _ := s.paymentGatewaysFrom(ctx, c, cache)
+	for _, g := range list {
+		if strings.EqualFold(g.Slug, slug) {
+			return true
+		}
+	}
+	return false
 }
