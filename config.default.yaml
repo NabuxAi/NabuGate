@@ -901,6 +901,101 @@ model_registry:
     serves:
       - provider: dashscope
         model: "qwen-turbo"
+  # Newest DashScope (Alibaba Model Studio, international endpoint) chat models.
+  # Every id below is in this key's GET /compatible-mode/v1/models and answered
+  # a one-line chat with 200 on 2026-11-25. Kimi and GLM are Moonshot's and
+  # Zhipu's models, sold on the same Alibaba key, so they need no new account.
+  qwen4-max:
+    serves:
+      - provider: dashscope
+        model: "qwen4-max"
+  qwen3.8-max:
+    serves:
+      - provider: dashscope
+        model: "qwen3.8-max"
+  qwen3.8-flash:
+    serves:
+      - provider: dashscope
+        model: "qwen3.8-flash"
+  qwen3.8-omni-flash:
+    serves:
+      - provider: dashscope
+        model: "qwen3.8-omni-flash"
+  qwen3.7-plus:
+    serves:
+      - provider: dashscope
+        model: "qwen3.7-plus"
+  qwen3.7-flash:
+    serves:
+      - provider: dashscope
+        model: "qwen3.7-flash"
+  kimi-k3.1-pro:
+    serves:
+      - provider: dashscope
+        model: "kimi-k3.1-pro"
+  kimi-k3:
+    serves:
+      - provider: dashscope
+        model: "kimi-k3"
+  glm-5.3:
+    serves:
+      - provider: dashscope
+        model: "glm-5.3"
+  # Machine translation. It refuses any system message (400 "Role must be
+  # user or assistant"), so it is a plain alias, never an agent's or a
+  # template's model.
+  qwen-mt-plus:
+    serves:
+      - provider: dashscope
+        model: "qwen-mt-plus"
+
+  # Newest Google AI Studio chat models, from both keys' GET /v1beta/models on
+  # 2026-11-25. gemini-4-hydrogen and gemini-3.5-flash-lite answered 200 on
+  # GEMINI_API_KEY; argon, carbon, neon and 3.7/3.8-flash are listed for the
+  # key but were at the free-tier quota (429) or busy (503) when probed, so
+  # they sit behind answered models in every alias below.
+  gemini-4-hydrogen:
+    serves:
+      - provider: gemini-openai
+        model: "gemini-4-hydrogen"
+      - provider: gemini-openai2
+        model: "gemini-4-hydrogen"
+  gemini-4-argon:
+    serves:
+      - provider: gemini-openai
+        model: "gemini-4-argon"
+      - provider: gemini-openai2
+        model: "gemini-4-argon"
+  gemini-4-carbon:
+    serves:
+      - provider: gemini-openai
+        model: "gemini-4-carbon"
+      - provider: gemini-openai2
+        model: "gemini-4-carbon"
+  gemini-4-neon:
+    serves:
+      - provider: gemini-openai
+        model: "gemini-4-neon"
+      - provider: gemini-openai2
+        model: "gemini-4-neon"
+  gemini-3.8-flash:
+    serves:
+      - provider: gemini-openai
+        model: "gemini-3.8-flash"
+      - provider: gemini-openai2
+        model: "gemini-3.8-flash"
+  gemini-3.7-flash:
+    serves:
+      - provider: gemini-openai
+        model: "gemini-3.7-flash"
+      - provider: gemini-openai2
+        model: "gemini-3.7-flash"
+  gemini-3.5-flash-lite:
+    serves:
+      - provider: gemini-openai
+        model: "gemini-3.5-flash-lite"
+      - provider: gemini-openai2
+        model: "gemini-3.5-flash-lite"
   # Qwen3-Coder: purpose-built for code tasks — agentic coding, repo-level
   # understanding, multi-turn tool interactions. Served by DashScope on the
   # international endpoint (same key as qwen-max/plus/turbo). qwen3-coder-plus
@@ -1233,6 +1328,24 @@ model_registry:
         model: "gpt-6-astra"
       - provider: parspack
         model: "openai/gpt-6-astra"
+  # Listed by OpenAI's GET /v1/models for this key on 2026-11-25. Not yet
+  # answered: the OpenAI account had no credit that day (429
+  # insufficient_quota), so no alias puts them first.
+  gpt-6.2-sol:
+    param_style: reasoning
+    serves:
+      - provider: openai
+        model: "gpt-6.2-sol"
+  gpt-6.2-astra:
+    param_style: reasoning
+    serves:
+      - provider: openai
+        model: "gpt-6.2-astra"
+  gpt-6.1-terra:
+    param_style: reasoning
+    serves:
+      - provider: openai
+        model: "gpt-6.1-terra"
 
   # Cheap open models sold by both OpenRouter and Hugging Face — two vendors
   # per model, so either account running dry costs a round trip, not the
@@ -1753,6 +1866,76 @@ models:
       # rung: a Qwen outage degrades the answer instead of failing the request,
       # and the usage log names what actually carried it.
       - model: gemini-2.5-flash
+
+  # Qwen's newest flagship, then the generation before it, all on DashScope's
+  # key (answered 2026-11-25), then the older nabu-qwen chain.
+  nabu-qwen4:
+    primary:
+      model: qwen4-max
+    fallback:
+      - model: qwen3.8-max
+      - model: qwen3.7-plus
+      - model: qwen-max
+      - model: gemini-2.5-flash
+
+  # Cheap and quick on the newest Qwen generation.
+  nabu-qwen-flash:
+    primary:
+      model: qwen3.8-flash
+    fallback:
+      - model: qwen3.7-flash
+      - model: qwen-turbo
+      - model: gemini-2.5-flash-lite
+
+  # Kimi K3 through DashScope. The older nabu-kimi chain (K2.6 on Dahl and
+  # OpenRouter) stays as it is; this is the door to the new generation.
+  nabu-kimi3:
+    primary:
+      model: kimi-k3.1-pro
+    fallback:
+      - model: kimi-k3
+      - model: qwen3.8-max
+      - model: qwen-max
+
+  # Zhipu GLM-5.3 on DashScope, with the GLM-5.3 Flash routers behind it.
+  nabu-glm:
+    primary:
+      model: glm-5.3
+    fallback:
+      - model: glm-5.3-flash
+      - model: qwen3.7-plus
+
+  # Gemini 4: hydrogen answered on 2026-11-25; the other three were at quota
+  # that day, so they come after it and the chain ends on a Qwen that did.
+  nabu-gemini4:
+    primary:
+      model: gemini-4-hydrogen
+    fallback:
+      - model: gemini-4-argon
+      - model: gemini-4-carbon
+      - model: gemini-3.8-flash
+      - model: gemini-3.7-flash
+      - model: gemini-3.6-flash
+      - model: qwen3.8-max
+
+  # The newest GPT-6.x. OpenAI had no credit on 2026-11-25, so the chain falls
+  # through to models that answered until it does.
+  nabu-gpt62:
+    primary:
+      model: gpt-6.2-sol
+    fallback:
+      - model: gpt-6.1-sol
+      - model: gpt-6-sol
+      - model: qwen4-max
+      - model: gemini-4-hydrogen
+
+  # Machine translation (Persian, Arabic, English and more). Send the text as
+  # the user message with no system message — the model refuses one.
+  nabu-translate:
+    primary:
+      model: qwen-mt-plus
+    fallback:
+      - model: qwen3.7-plus
 
   # Qwen3-Coder alias. For callers that want a code-specialised model
   # instead of a general-purpose one: agentic coding, repo-level context,
@@ -3047,6 +3230,30 @@ pricing:
   qwen-max: { input: 1.60, output: 6.40 }
   qwen-plus: { input: 0.40, output: 1.20 }
   qwen-turbo: { input: 0.05, output: 0.20 }
+  # Added 2026-11-25. qwen-mt-plus from Alibaba Model Studio's own page
+  # (Singapore/international list price); the rest from openrouter.ai's
+  # catalogue the same day, which passes the vendor's list price through
+  # (qwen3.8-max at its dated snapshot qwen3.8-max-0902's price).
+  qwen4-max: { input: 1.425, output: 4.275 }
+  qwen3.8-max: { input: 2.00, output: 6.00 }
+  qwen3.8-flash: { input: 0.15, output: 0.47 }
+  qwen3.8-omni-flash: { input: 0.15, output: 0.47 }
+  qwen3.7-plus: { input: 0.32, output: 1.28 }
+  qwen3.7-flash: { input: 0.03, output: 0.13 }
+  kimi-k3.1-pro: { input: 0.24, output: 8.402 }
+  kimi-k3: { input: 0.192, output: 16.00 }
+  glm-5.3: { input: 0.07, output: 1.40 }
+  qwen-mt-plus: { input: 2.46, output: 7.37 }
+  gemini-4-hydrogen: { input: 1.50, output: 7.50 }
+  gemini-4-argon: { input: 2.00, output: 10.00 }
+  gemini-4-carbon: { input: 2.00, output: 10.00 }
+  gemini-4-neon: { input: 3.00, output: 15.00 }
+  gemini-3.8-flash: { input: 0.825, output: 4.125 }
+  gemini-3.7-flash: { input: 0.75, output: 3.75 }
+  gemini-3.5-flash-lite: { input: 0.30, output: 2.50 }
+  gpt-6.2-sol: { input: 2.00, output: 10.00 }
+  gpt-6.2-astra: { input: 8.00, output: 40.00 }
+  gpt-6.1-terra: { input: 1.00, output: 5.00 }
   # Base tier, up to 32k tokens of context; longer contexts cost more.
   "dashscope/qwen3-coder-plus": { input: 0.55, output: 2.20 }
   "dashscope/qwen3-coder-next": { input: 0.15, output: 0.55 }

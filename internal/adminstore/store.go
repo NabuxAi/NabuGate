@@ -259,6 +259,9 @@ type state struct {
 	// AliasSettings are what an administrator chose per alias in the console;
 	// see aliassettings.go.
 	AliasSettings map[string]AliasSetting `json:"alias_settings,omitempty"`
+	// Engagement is the public pages' time-on-page counters per UTC day and
+	// page; see engagement.go.
+	Engagement map[string]map[string]*EngagementDay `json:"engagement,omitempty"`
 }
 
 // Store is the persisted gateway state.

@@ -2,12 +2,15 @@ package server
 
 import (
 	"bytes"
+	"compress/gzip"
 	"crypto/sha256"
 	"encoding/hex"
+	"io"
 	"io/fs"
 	"mime"
 	"net/http"
 	"path"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -81,22 +84,130 @@ func newStaticSite(assets fs.FS) (*staticSite, error) {
 	return s, nil
 }
 
+// ServeHTTP serves the site at the root: the public pages, their files, and
+// robots.txt and sitemap.xml.
+//
+// Every path used to be answered with the app shell and a 200, so a search
+// engine found the same page at /sitemap.xml, at any typo and at every made-up
+// URL, and reported them as soft 404s. Now only a public page or a console view
+// is a 200; anything else is a 404 whose body is still the shell, so a person
+// who mistypes a link still lands in the app.
 func (s *staticSite) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	p := strings.TrimPrefix(path.Clean("/"+r.URL.Path), "/")
-	f := s.files[p]
-	if f == nil {
-		// A hashed asset that does not exist is a stale page asking for a chunk
-		// from a previous deploy. Answering it with index.html (the SPA
-		// fallback) hands the browser HTML where it expects JavaScript, which
-		// fails with a MIME error that says nothing useful; a 404 is honest.
-		if strings.HasPrefix(p, "assets/") {
-			http.NotFound(w, r)
-			return
-		}
-		// Any other path is a client-side route: serve the app shell.
-		f = s.files["index.html"]
+
+	switch p {
+	case "robots.txt":
+		serveGenerated(w, r, "text/plain; charset=utf-8", robotsTxt(r))
+		return
+	case "sitemap.xml":
+		serveGenerated(w, r, "application/xml; charset=utf-8", sitemapXML(r))
+		return
 	}
 
+	if pg, ok := publicPage(p, r.URL.Query()); ok {
+		faOrigin, intlOrigin := siteOrigins(r)
+		serveShell(w, r, http.StatusOK, renderShell(s.files["index.html"].body, pg, faOrigin, intlOrigin))
+		return
+	}
+	if f := s.files[p]; f != nil {
+		serveFile(w, r, f)
+		return
+	}
+	// A hashed asset that does not exist is a stale page asking for a chunk
+	// from a previous deploy. Answering it with index.html (the SPA fallback)
+	// hands the browser HTML where it expects JavaScript, which fails with a
+	// MIME error that says nothing useful; a plain 404 is honest.
+	if strings.HasPrefix(p, "assets/") {
+		http.NotFound(w, r)
+		return
+	}
+	w.Header().Set("X-Robots-Tag", "noindex")
+	if consoleViews[p] {
+		serveFile(w, r, s.files["index.html"])
+		return
+	}
+	serveShell(w, r, http.StatusNotFound, s.files["index.html"].body)
+}
+
+// console serves the same bundle under /admin/ and /panel/, where every path
+// is a client-side route of the console: unknown paths are the shell with a
+// 200, as before, and none of it is indexed.
+func (s *staticSite) console() http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		p := strings.TrimPrefix(path.Clean("/"+r.URL.Path), "/")
+		f := s.files[p]
+		if f == nil {
+			if strings.HasPrefix(p, "assets/") {
+				http.NotFound(w, r)
+				return
+			}
+			f = s.files["index.html"]
+		}
+		if f == s.files["index.html"] {
+			w.Header().Set("X-Robots-Tag", "noindex, nofollow")
+		}
+		serveFile(w, r, f)
+	})
+}
+
+// serveShell sends a rendered (or 404) copy of the app shell. It is a few
+// kilobytes and differs per URL and host, so it is compressed on the fly
+// rather than precompressed, and keeps no-cache with an ETag of its own.
+func serveShell(w http.ResponseWriter, r *http.Request, status int, body []byte) {
+	h := w.Header()
+	h.Set("Content-Type", "text/html; charset=utf-8")
+	h.Set("Cache-Control", "no-cache")
+	h.Add("Vary", "Accept-Encoding")
+	sum := sha256.Sum256(body)
+	etag := `"` + hex.EncodeToString(sum[:12]) + `"`
+	if status == http.StatusOK {
+		h.Set("ETag", etag)
+		if etagMatches(r.Header.Get("If-None-Match"), etag) {
+			w.WriteHeader(http.StatusNotModified)
+			return
+		}
+	}
+	if acceptsEncoding(r.Header.Get("Accept-Encoding"), "gzip") {
+		var buf bytes.Buffer
+		zw := gzip.NewWriter(&buf)
+		_, _ = zw.Write(body)
+		_ = zw.Close()
+		body = buf.Bytes()
+		h.Set("Content-Encoding", "gzip")
+	}
+	h.Set("Content-Length", strconv.Itoa(len(body)))
+	w.WriteHeader(status)
+	if r.Method != http.MethodHead {
+		_, _ = w.Write(body)
+	}
+}
+
+// etagMatches reports whether an If-None-Match header names etag.
+func etagMatches(header, etag string) bool {
+	for _, v := range strings.Split(header, ",") {
+		v = strings.TrimPrefix(strings.TrimSpace(v), "W/")
+		if v == etag || v == "*" {
+			return true
+		}
+	}
+	return false
+}
+
+// serveGenerated sends robots.txt or sitemap.xml. They depend on the host, so
+// they are built per request; an hour of caching is plenty for crawlers.
+func serveGenerated(w http.ResponseWriter, r *http.Request, ctype, body string) {
+	h := w.Header()
+	h.Set("Content-Type", ctype)
+	h.Set("Cache-Control", "public, max-age=3600")
+	h.Set("Content-Length", strconv.Itoa(len(body)))
+	if r.Method != http.MethodHead {
+		_, _ = io.WriteString(w, body)
+	}
+}
+
+// serveFile sends one file of the bundle with its cache policy and, where the
+// build made them, its precompressed copy.
+func serveFile(w http.ResponseWriter, r *http.Request, f *staticFile) {
 	h := w.Header()
 	h.Set("Content-Type", f.ctype)
 	if f.immutable {

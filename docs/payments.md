@@ -63,7 +63,7 @@ charge the payer answers on `GET /api/v1/pay/rate`, cached for five minutes.
 With no answer from the bridge, no toman figure is shown or sent, and the
 bridge converts at checkout as before.
 
-On a `.ir` host the panel goes straight to `bank_payment` (the AccountCity
+On a `.ir` host the server (and the panel) go straight to `bank_payment` — or `NABUPAY_IR_GATEWAY` — when no method was picked; the payer is redirected from the panel to AccountCity's order page and on to the bank with no chooser in between, and returns to `{host}/panel/account`, where settling credits the wallet. Previously only the panel did this (the AccountCity
 WooCommerce bank relay) when the bridge lists it for `country=IR`. Whether it
 is listed is NabuDesk's decision: a `billing_gateway_settings` row for the
 slug wins over `PAY_BANK_PAYMENT_ENABLED`. Check with

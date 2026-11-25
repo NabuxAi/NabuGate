@@ -22,6 +22,7 @@ type rateBridge struct {
 	bodies   []map[string]any
 	verifies int
 	paid     bool
+	noBank   bool
 }
 
 func newRateBridge(t *testing.T, rate int, invoice string) *rateBridge {
@@ -39,7 +40,11 @@ func newRateBridge(t *testing.T, rate int, invoice string) *rateBridge {
 			}
 			json.NewEncoder(w).Encode(map[string]any{"success": true, "usd_toman": b.rate})
 		case r.URL.Path == "/api/v1/pay/gateways":
-			json.NewEncoder(w).Encode(map[string]any{"success": true, "gateways": []map[string]string{{"slug": "bank_payment", "label": "درگاه پرداخت بانکی"}}})
+			gws := []map[string]string{{"slug": "aqayepardakht", "label": "آقای پرداخت"}}
+			if !b.noBank {
+				gws = append(gws, map[string]string{"slug": "bank_payment", "label": "درگاه پرداخت بانکی"})
+			}
+			json.NewEncoder(w).Encode(map[string]any{"success": true, "gateways": gws})
 		case r.Method == http.MethodPost && r.URL.Path == "/api/v1/pay/checkout":
 			raw, _ := io.ReadAll(r.Body)
 			var body map[string]any
@@ -224,5 +229,44 @@ func TestTomanFor(t *testing.T) {
 		if got := tomanFor(c.usd, c.rate); got != c.want {
 			t.Errorf("tomanFor(%v, %v) = %v, want %v", c.usd, c.rate, got, c.want)
 		}
+	}
+}
+
+// A .ir payer who names no method goes straight to the AccountCity bank
+// relay when the bridge lists it — no chooser page in between.
+func TestIranCheckoutDefaultsToAccountCityBank(t *testing.T) {
+	main := newRateBridge(t, 289698, "INV-MAIN") // lists bank_payment
+	s, _ := payServer(t, main.URL)
+	s.rechargeMe(httptest.NewRecorder(), iranRecharge(`{"amount":5}`))
+	if got := main.lastBody(t)["gateway"]; got != "bank_payment" {
+		t.Errorf("gateway = %v, want bank_payment", got)
+	}
+}
+
+func TestIranCheckoutKeepsChooserWhenBankNotListed(t *testing.T) {
+	main := newRateBridge(t, 289698, "INV-MAIN")
+	main.noBank = true
+	s, _ := payServer(t, main.URL)
+	s.rechargeMe(httptest.NewRecorder(), iranRecharge(`{"amount":5}`))
+	if got := main.lastBody(t)["gateway"]; got != "" {
+		t.Errorf("gateway = %v, want empty (hosted chooser)", got)
+	}
+}
+
+func TestIranCheckoutRespectsANamedGateway(t *testing.T) {
+	main := newRateBridge(t, 289698, "INV-MAIN")
+	s, _ := payServer(t, main.URL)
+	s.rechargeMe(httptest.NewRecorder(), iranRecharge(`{"amount":5,"gateway":"aqayepardakht"}`))
+	if got := main.lastBody(t)["gateway"]; got != "aqayepardakht" {
+		t.Errorf("gateway = %v, want the named one", got)
+	}
+}
+
+func TestComCheckoutDoesNotForceTheBank(t *testing.T) {
+	main := newRateBridge(t, 289698, "INV-MAIN")
+	s, _ := payServer(t, main.URL)
+	s.rechargeMe(httptest.NewRecorder(), asUser(httptest.NewRequest(http.MethodPost, "/api/me/recharge", strings.NewReader(`{"amount":5}`)), "a@b.com"))
+	if got := main.lastBody(t)["gateway"]; got != "" {
+		t.Errorf(".com gateway = %v, want empty", got)
 	}
 }

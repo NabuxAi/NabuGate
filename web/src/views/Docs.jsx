@@ -3,7 +3,8 @@ import Layout from '../components/Layout.jsx';
 import Icon from '../components/Icon.jsx';
 import { SkeletonText } from '../components/Skeleton.jsx';
 import { LangSwitch, Logo, ThemeToggle } from '../components/Brand.jsx';
-import { DEFAULT_LANG, useI18n, useT } from '../i18n/index.jsx';
+import { DEFAULT_LANG, langHref, useI18n, useT } from '../i18n/index.jsx';
+import { useEngagement } from './landing/engagement.js';
 import { gatewayBase, siteOrigin } from '../origin.js';
 import { ALL, ALL_IDS, GROUPS } from './docs/toc.js';
 import { CONTENT_LOADERS } from './docs/load.js';
@@ -83,6 +84,8 @@ function fromHash() {
 export default function Docs({ embedded = false, signedIn = false }) {
   const t = useT(T);
   const { lang } = useI18n();
+  // Inside the console the docs are a reference, not a visit to measure.
+  useEngagement(embedded ? null : 'docs', lang);
   const [active, setActive] = useState(fromHash);
   const [query, setQuery] = useState('');
   const [menuOpen, setMenuOpen] = useState(false);
@@ -263,14 +266,14 @@ export default function Docs({ embedded = false, signedIn = false }) {
     <div className="docs-page">
       <header className="docs-header">
         <div className="docs-header-in">
-          <a href="/" className="docs-brand">
+          <a href={langHref('/', lang)} className="docs-brand">
             <Logo size={32} />
             <span>NabuGate</span>
             <span className="docs-badge">{t('docs')}</span>
           </a>
           <nav className="docs-top-nav">
-            <a href="/">{t('home')}</a>
-            <a href="/#pricing">{t('pricing')}</a>
+            <a href={langHref('/', lang)}>{t('home')}</a>
+            <a href={langHref('/#pricing', lang)}>{t('pricing')}</a>
           </nav>
           <div className="docs-top-actions">
             <LangSwitch size="sm" />

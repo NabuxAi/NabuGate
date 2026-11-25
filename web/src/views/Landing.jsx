@@ -3,10 +3,12 @@ import * as api from '../api.js';
 import Icon from '../components/Icon.jsx';
 import CodeBlock from '../components/CodeBlock.jsx';
 import { LangSwitch, Logo, ThemeToggle } from '../components/Brand.jsx';
-import { fmtDigits, fmtInt, useI18n, useT } from '../i18n/index.jsx';
+import { fmtDigits, fmtInt, langHref, useI18n, useT } from '../i18n/index.jsx';
 import { gatewayBase, siteOrigin } from '../origin.js';
 import { IntroButton, IntroDialog, useIntro } from './IntroVideo.jsx';
 import ClaudeAdvisor from './ClaudeAdvisor.jsx';
+import TryLive from './landing/TryLive.jsx';
+import { useEngagement } from './landing/engagement.js';
 import '../styles/landing.css';
 
 /*
@@ -398,6 +400,7 @@ function Section({ id, eyebrow, title, sub, children, className = '' }) {
 export default function Landing({ signedIn = false }) {
   const t = useT(T);
   const { lang } = useI18n();
+  useEngagement('home', lang);
   const isIranHost = typeof window !== 'undefined' && window.location.hostname.toLowerCase() === 'gate.nabuxai.ir';
   const intro = useIntro();
   const [models, setModels] = useState([]);
@@ -456,7 +459,7 @@ export default function Landing({ signedIn = false }) {
     ['#features', t('navFeatures')],
     ['#how', t('navHow')],
     ['#pricing', t('navPricing')],
-    ['/docs', t('navDocs')],
+    [langHref('/docs', lang), t('navDocs')],
   ];
 
   return (
@@ -469,7 +472,7 @@ export default function Landing({ signedIn = false }) {
 
       <header className={'lp-header' + (scrolled ? ' scrolled' : '') + (menu ? ' open' : '')}>
         <div className="lp-container lp-header-in">
-          <a href="/" className="lp-logo" aria-label="NabuGate">
+          <a href={langHref('/', lang)} className="lp-logo" aria-label="NabuGate">
             <Logo size={34} />
             <span>{t('brand')}</span>
           </a>
@@ -514,8 +517,8 @@ export default function Landing({ signedIn = false }) {
                 <a href={cta} className="lp-btn lp-btn-primary lp-btn-lg">
                   {ctaLabel}<Icon name="arrow" size={18} className="flip-rtl" />
                 </a>
-                <a href="/docs" className="lp-btn lp-btn-outline lp-btn-lg"><Icon name="book" size={18} />{t('readDocs')}</a>
-                {isIranHost ? <a href="/docs#claude-desktop" className="lp-btn lp-btn-outline lp-btn-lg"><Icon name="terminal" size={18} />{t('iranGuide')}</a> : <IntroButton onClick={intro.replay} />}
+                <a href={langHref('/docs', lang)} className="lp-btn lp-btn-outline lp-btn-lg"><Icon name="book" size={18} />{t('readDocs')}</a>
+                {isIranHost ? <a href={langHref('/docs#claude-desktop', lang)} className="lp-btn lp-btn-outline lp-btn-lg"><Icon name="terminal" size={18} />{t('iranGuide')}</a> : <IntroButton onClick={intro.replay} />}
               </div>
               <div className="lp-tools lp-reveal">
                 <span>{t('worksWith')}</span>
@@ -584,6 +587,9 @@ export default function Landing({ signedIn = false }) {
           </div>
         </section>
 
+        {/* ── Live demo: the one thing here a visitor can do, not just read ── */}
+        <TryLive lang={lang} signedIn={signedIn} />
+
         {/* ── Stats ─────────────────────────────────────────────────────────── */}
         <section className="lp-stats-band">
           <div className="lp-container">
@@ -605,7 +611,7 @@ export default function Landing({ signedIn = false }) {
                 <h2 id="lp-iran-heading">{t('iranTitle')}</h2>
                 <p>{t('iranSub')}</p>
                 <div className="lp-iran-actions">
-                  <a href="/docs#claude-desktop" className="lp-btn lp-btn-primary lp-btn-lg">
+                  <a href={langHref('/docs#claude-desktop', lang)} className="lp-btn lp-btn-primary lp-btn-lg">
                     {t('iranGuide')}<Icon name="arrow" size={18} className="flip-rtl" />
                   </a>
                   <a href={cta} className="lp-btn lp-btn-outline lp-btn-lg">{t('iranStart')}</a>
@@ -717,7 +723,7 @@ export default function Landing({ signedIn = false }) {
                   <span dir="ltr">{s.label}</span>
                 </button>
               ))}
-              <a href="/docs#env" className="lp-dev-more">{t('devMore')}<Icon name="arrow" size={14} className="flip-rtl" /></a>
+              <a href={langHref('/docs#env', lang)} className="lp-dev-more">{t('devMore')}<Icon name="arrow" size={14} className="flip-rtl" /></a>
             </div>
             <div className="lp-dev-code">
               <CodeBlock key={snip.id} code={snip.code} label={snip.file} />
@@ -751,7 +757,7 @@ export default function Landing({ signedIn = false }) {
               <span className="lp-eyebrow">{t('faqEyebrow')}</span>
               <h2>{t('faqTitle')}</h2>
               <p>{t('faqSub')}</p>
-              <a href="/docs" className="lp-btn lp-btn-outline"><Icon name="book" size={16} />{t('fullDocs')}</a>
+              <a href={langHref('/docs', lang)} className="lp-btn lp-btn-outline"><Icon name="book" size={16} />{t('fullDocs')}</a>
             </header>
             <div className="lp-faq-list lp-reveal">
               {(FAQ[lang] || FAQ.fa).map(([q, a]) => (
@@ -774,7 +780,7 @@ export default function Landing({ signedIn = false }) {
               </div>
               <div className="lp-cta-btns">
                 <a href={cta} className="lp-btn lp-btn-light lp-btn-lg">{ctaLabel}<Icon name="arrow" size={18} className="flip-rtl" /></a>
-                <a href="/docs" className="lp-btn lp-btn-glass lp-btn-lg">{t('readDocs')}</a>
+                <a href={langHref('/docs', lang)} className="lp-btn lp-btn-glass lp-btn-lg">{t('readDocs')}</a>
               </div>
             </div>
           </div>
@@ -785,7 +791,7 @@ export default function Landing({ signedIn = false }) {
         <div className="lp-container">
           <div className="lp-footer-top">
             <div className="lp-footer-brand">
-              <a href="/" className="lp-logo"><Logo size={32} /><span>{t('brand')}</span></a>
+              <a href={langHref('/', lang)} className="lp-logo"><Logo size={32} /><span>{t('brand')}</span></a>
               <p>{t('footTag')}</p>
             </div>
             <div className="lp-footer-cols">
@@ -793,12 +799,12 @@ export default function Landing({ signedIn = false }) {
                 <h4>{t('footProduct')}</h4>
                 <a href="#features">{t('navFeatures')}</a>
                 <a href="#pricing">{t('navPricing')}</a>
-                <a href="/docs#models">{t('footModels')}</a>
+                <a href={langHref('/docs#models', lang)}>{t('footModels')}</a>
               </div>
               <div>
                 <h4>{t('footDev')}</h4>
-                <a href="/docs">{t('navDocs')}</a>
-                <a href="/docs#api-reference">{t('footApi')}</a>
+                <a href={langHref('/docs', lang)}>{t('navDocs')}</a>
+                <a href={langHref('/docs#api-reference', lang)}>{t('footApi')}</a>
                 <a href="/healthz">{t('footStatus')}</a>
               </div>
               <div>

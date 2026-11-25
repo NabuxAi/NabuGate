@@ -105,12 +105,23 @@ export default function App() {
 
   useEffect(() => {
     const brand = 'NabuGate';
-    const landingTitle = { fa: 'نبوگیت — دروازهٔ یکپارچهٔ هوش مصنوعی', en: 'NabuGate — one API for every AI model', ar: 'نابوغيت — واجهة واحدة لكل نماذج الذكاء الاصطناعي' };
-    const docsTitle = { fa: 'مستندات', en: 'Docs', ar: 'التوثيق' };
+    // The server writes the same titles into the page before any script runs
+    // (seoCopy in internal/server/seo.go); search engines keep the one set
+    // here after rendering, so the two must say the same thing.
+    const landingTitle = {
+      fa: 'نبوگیت — API هوش مصنوعی در ایران با یک کلید',
+      en: 'NabuGate — OpenAI-compatible AI API gateway with fallback',
+      ar: 'نابوغيت — بوابة API للذكاء الاصطناعي متوافقة مع OpenAI',
+    };
+    const docsTitle = {
+      fa: 'مستندات نبوگیت — اتصال Cursor، Claude Code و SDKها',
+      en: 'NabuGate Docs — connect Cursor, Claude Code and SDKs',
+      ar: 'توثيق نابوغيت — ربط Cursor وClaude Code وحزم SDK',
+    };
     if (view === 'landing') document.title = landingTitle[lang] || landingTitle.fa;
-    else if (view === 'docs') document.title = `${docsTitle[lang] || docsTitle.fa} · ${brand}`;
+    else if (view === 'docs' && isPublic) document.title = docsTitle[lang] || docsTitle.fa;
     else document.title = `${tNav(view)} · ${brand}`;
-  }, [view, lang, tNav]);
+  }, [view, lang, tNav, isPublic]);
 
   if (isPublic) {
     // The public pages look the same signed in or out; only the header's call
