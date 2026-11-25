@@ -116,10 +116,12 @@ export default function Templates({ admin }) {
   -H "Authorization: Bearer $NABU_KEY" \\
   -H "Content-Type: application/json" \\
   -d '${JSON.stringify({ variables: filled }, null, 0).replace(/'/g, "'\\''")}'` : '';
-  const skillCurl = (name) => `curl ${base}/chat/completions \\
-  -H "Authorization: Bearer $NABU_KEY" \\
-  -H "Content-Type: application/json" \\
-  -d '{"model":"nabu-smart","nabu_skills":["${name}"],"messages":[{"role":"user","content":"..."}]}'`;
+  const skillCurl = (name) => `POST ${base}/chat/completions
+{
+  "model": "nabu-smart",
+  "nabu_skills": ["${name}"],
+  "messages": [...]
+}`;
 
   const missing = sel ? (sel.variables || []).some((x) => x.required && !String(vars[x.name] || '').trim()) : true;
 
@@ -136,9 +138,9 @@ export default function Templates({ admin }) {
         <input className="input" style={{ maxWidth: 240 }} placeholder={t('search')} value={q} onChange={(e) => setQ(e.target.value)} />
       </div>
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 16 }}>
-        <button type="button" className={`btn btn-ghost${!cat ? ' active' : ''}`} onClick={() => setCat('')}>{t('all')}</button>
+        <button type="button" className={`btn ${!cat ? 'btn-primary' : 'btn-ghost'}`} onClick={() => setCat('')}>{t('all')}</button>
         {cats.map((c) => (
-          <button key={c} type="button" className={`btn btn-ghost${cat === c ? ' active' : ''}`} onClick={() => setCat(c)}>{L.cat[c] || c}</button>
+          <button key={c} type="button" className={`btn ${cat === c ? 'btn-primary' : 'btn-ghost'}`} onClick={() => setCat(c)}>{L.cat[c] || c}</button>
         ))}
       </div>
 
@@ -149,25 +151,26 @@ export default function Templates({ admin }) {
               <div className="card-head"><h3 className="card-title">{pick(s.title, lang)}</h3></div>
               <p className="card-sub" style={{ lineHeight: 1.6 }}>{pick(s.description, lang)}</p>
               <p className="card-sub"><code dir="ltr">{s.name}</code>{s.response_format === 'json_object' && <> · {t('json')}</>}</p>
-              <CodeBlock label={t('chatUse')} code={skillCurl(s.name)} />
+              <p className="card-sub" style={{ marginTop: 8 }}>{t('chatUse')}</p>
+              <CodeBlock code={skillCurl(s.name)} />
             </div>
           ))}
         </div>
       ) : !data.templates.length ? (
         <div className="card"><p className="card-sub">{t('empty')}</p></div>
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(220px, 320px) 1fr', gap: 16, alignItems: 'start' }} className="tpl-grid">
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, alignItems: 'flex-start' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, flex: '1 1 260px', maxWidth: 360, minWidth: 0 }}>
             {shown.map((tpl) => (
               <button key={tpl.name} type="button" onClick={() => choose(tpl)}
-                className="card" style={{ textAlign: 'start', cursor: 'pointer', outline: sel?.name === tpl.name ? '2px solid var(--accent, #6366f1)' : 'none' }}>
-                <strong>{pick(tpl.title, lang)}</strong>
+                className="card" style={{ textAlign: 'start', cursor: 'pointer', color: 'inherit', font: 'inherit', width: '100%', outline: sel?.name === tpl.name ? '2px solid var(--accent, #6366f1)' : 'none' }}>
+                <strong style={{ display: 'block', fontSize: 15 }}>{pick(tpl.title, lang)}</strong>
                 <span className="card-sub" style={{ display: 'block', marginTop: 4, lineHeight: 1.5 }}>{pick(tpl.description, lang)}</span>
               </button>
             ))}
           </div>
-          {!sel ? <div className="card"><p className="card-sub">{t('pick')}</p></div> : (
-            <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {!sel ? <div className="card" style={{ flex: '3 1 420px' }}><p className="card-sub">{t('pick')}</p></div> : (
+            <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: 12, flex: '3 1 420px', minWidth: 0 }}>
               <div>
                 <h3 className="card-title">{pick(sel.title, lang)}</h3>
                 <p className="card-sub">{t('model')}: <code dir="ltr">{sel.model}</code>
@@ -206,7 +209,8 @@ export default function Templates({ admin }) {
                   )}
                 </div>
               )}
-              <CodeBlock label={t('apiCall')} code={curl} />
+              <p className="card-sub" style={{ marginBottom: 0 }}>{t('apiCall')}</p>
+              <CodeBlock code={curl} />
             </div>
           )}
         </div>
