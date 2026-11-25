@@ -1,0 +1,17 @@
+name: extract-invoice
+category: data
+title: { fa: "استخراج اطلاعات فاکتور", en: "Invoice data extraction" }
+description:
+  fa: "فیلدهای فاکتور یا رسید را از متن به JSON درمی‌آورد."
+  en: "Pulls invoice/receipt fields out of text as JSON."
+model: nabu-fast
+skills: [json-extract]
+prompt: |
+  Extract these fields from the invoice text below: seller, buyer,
+  invoice_number, date (ISO 8601; convert a Jalali date and also return it as
+  date_jalali), currency, subtotal, tax, total, items (array of {description,
+  quantity, unit_price, amount}).
+
+  {{text}}
+variables:
+  - { name: text, required: true, multiline: true, label: { fa: "متن فاکتور", en: "Invoice text" } }

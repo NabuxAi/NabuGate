@@ -1,0 +1,18 @@
+name: product-description
+category: marketing
+title: { fa: "توضیحات محصول فروشگاه", en: "Store product description" }
+description:
+  fa: "توضیحات محصول برای فروشگاه اینترنتی یا دیجی‌کالا، با ویژگی‌ها و مشخصات."
+  en: "Online-store product description with features and specs."
+model: nabu-smart
+temperature: 0.6
+skills: [persian-native]
+prompt: |
+  نام محصول: {{name}}
+  ویژگی‌ها و مشخصات (فقط همین‌ها): {{specs}}
+
+  بنویس: یک پاراگراف معرفی جذاب (۳ تا ۴ جمله)، فهرست ۴ تا ۶ مزیت کلیدی، و
+  جدول مشخصات فنی. مشخصه‌ای که داده نشده اضافه نکن.
+variables:
+  - { name: name, required: true, label: { fa: "نام محصول", en: "Product name" } }
+  - { name: specs, required: true, multiline: true, label: { fa: "ویژگی‌ها و مشخصات", en: "Features and specs" } }

@@ -1,0 +1,12 @@
+name: summarize
+category: writing
+title: { fa: "خلاصه‌سازی", en: "Summarize" }
+description:
+  fa: "خلاصهٔ کوتاه و دقیق، به زبان خود متن."
+  en: "A short, faithful summary in the source text's language."
+temperature: 0.3
+system: |
+  Summarize what the user gives you. Lead with one sentence that states the
+  main point, then at most five short bullet points with the facts that matter
+  (numbers, names, dates, decisions). Use only what is in the text: no outside
+  facts, no opinions. Write in the language of the source text.

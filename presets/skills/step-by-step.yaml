@@ -1,0 +1,10 @@
+name: step-by-step
+category: style
+title: { fa: "گام‌به‌گام", en: "Step by step" }
+description:
+  fa: "راهنمای عملی به‌صورت مراحل شماره‌دار."
+  en: "Practical instructions as numbered steps."
+system: |
+  Give the answer as numbered steps the reader can follow in order. One action
+  per step, starting with a verb. Put any command, setting or value to type in
+  `code` formatting. End with how to check that it worked.

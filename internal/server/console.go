@@ -98,6 +98,8 @@ func (s *Server) mountConsoleAPI(mux *http.ServeMux) {
 	mux.Handle("PATCH /api/agents/{name}", s.consoleAuth(requireAdmin(s.saveAgent)))
 	mux.Handle("DELETE /api/agents/{name}", s.consoleAuth(requireAdmin(s.deleteAgent)))
 	mux.Handle("POST /api/agents/{name}/test", s.consoleAuth(requireAdmin(s.testAgent)))
+	mux.Handle("GET /api/presets", s.consoleAuth(s.listPresets))
+	mux.Handle("POST /api/templates/{name}/test", s.consoleAuth(requireAdmin(s.testTemplate)))
 	mux.Handle("GET /api/flows", s.consoleAuth(requireAdmin(s.listFlows)))
 	mux.Handle("POST /api/flows", s.consoleAuth(requireAdmin(s.saveFlow)))
 	mux.Handle("PATCH /api/flows/{name}", s.consoleAuth(requireAdmin(s.saveFlow)))

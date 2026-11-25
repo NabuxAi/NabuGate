@@ -1,0 +1,24 @@
+name: seo-meta
+category: marketing
+title: { fa: "عنوان و توضیحات سئو", en: "SEO title & meta" }
+description:
+  fa: "عنوان، توضیحات متا، اسلاگ و کلمات کلیدی برای یک صفحه، به‌صورت JSON."
+  en: "Title, meta description, slug and keywords for a page, as JSON."
+model: nabu-smart
+temperature: 0.4
+skills: [json-extract]
+prompt: |
+  Page content or topic:
+  {{content}}
+
+  Main keyword: {{keyword}}
+  Language of the page: {{language}}
+
+  Return JSON with keys: "title" (max 60 characters), "meta_description"
+  (max 155 characters), "slug" (lower-case latin, hyphens), "h1",
+  "keywords" (array of 5-8), "faq" (array of 3 objects with "q" and "a").
+  Write the text fields in the page's language.
+variables:
+  - { name: content, required: true, multiline: true, label: { fa: "محتوای صفحه یا موضوع", en: "Page content or topic" } }
+  - { name: keyword, required: true, label: { fa: "کلمهٔ کلیدی اصلی", en: "Main keyword" } }
+  - { name: language, default: "Persian", options: ["Persian", "Arabic", "English"], label: { fa: "زبان صفحه", en: "Page language" } }

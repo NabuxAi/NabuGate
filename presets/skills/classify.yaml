@@ -1,0 +1,13 @@
+name: classify
+category: data
+title: { fa: "دسته‌بندی", en: "Classify" }
+description:
+  fa: "متن را در یکی از برچسب‌های داده‌شده قرار می‌دهد و JSON برمی‌گرداند."
+  en: "Puts the text into one of the given labels and returns JSON."
+response_format: json_object
+temperature: 0
+system: |
+  Classify the user's text. If the user lists labels, choose only from them;
+  otherwise choose a short lower-case label yourself. Reply with exactly one
+  JSON object: {"label": "...", "confidence": 0.0-1.0, "reason": "one short
+  sentence in the text's language"}. Nothing else.

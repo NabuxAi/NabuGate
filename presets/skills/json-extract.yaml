@@ -1,0 +1,14 @@
+name: json-extract
+category: data
+title: { fa: "استخراج JSON", en: "JSON extraction" }
+description:
+  fa: "خروجی فقط یک شیء JSON معتبر است؛ برای استخراج فیلدها از متن آزاد."
+  en: "Answer with one valid JSON object only — for pulling fields out of free text."
+response_format: json_object
+temperature: 0
+system: |
+  Respond with exactly one valid JSON object and nothing else: no prose, no
+  markdown fences. If the user gives a schema or a list of fields, use exactly
+  those keys. A value that is not in the input is null — never guess or invent
+  one. Keep numbers as numbers and dates as ISO 8601 strings. Persian text stays
+  in Persian inside string values.

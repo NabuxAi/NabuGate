@@ -41,6 +41,9 @@ COPY agents /app/agents
 
 # Flows: chains of the agents above, loaded via flows_dir: "/app/flows".
 COPY flows /app/flows
+
+# Skills and templates, loaded via skills_dir / templates_dir.
+COPY presets /app/presets
 ENV NABU_CONFIG=/app/config.yaml
 EXPOSE 8080
 

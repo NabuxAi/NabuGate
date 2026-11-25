@@ -1,0 +1,21 @@
+name: meeting-summary
+category: business
+title: { fa: "خلاصهٔ جلسه و کارها", en: "Meeting notes & action items" }
+description:
+  fa: "از متن یا رونوشت جلسه: تصمیم‌ها، کارها با مسئول و مهلت."
+  en: "From meeting notes or a transcript: decisions, and action items with owner and due date."
+model: nabu-smart
+temperature: 0.2
+skills: [grounded-answer]
+prompt: |
+  Meeting transcript or notes:
+  {{transcript}}
+
+  Write, in {{language}}:
+  1. Three-line summary.
+  2. Decisions made.
+  3. Action items as a table: task | owner | due date (— when not stated).
+  4. Open questions.
+variables:
+  - { name: transcript, required: true, multiline: true, label: { fa: "متن یا رونوشت جلسه", en: "Transcript or notes" } }
+  - { name: language, default: "Persian", options: ["Persian", "English", "Arabic"], label: { fa: "زبان خروجی", en: "Output language" } }

@@ -27,6 +27,7 @@ import (
 	"nabugate/internal/nabupay"
 	"nabugate/internal/photos"
 	"nabugate/internal/policy"
+	"nabugate/internal/preset"
 	"nabugate/internal/provider"
 	"nabugate/internal/router"
 	"nabugate/internal/usage"
@@ -48,6 +49,8 @@ type Server struct {
 	usage  *usage.Tracker
 	agents *agent.Registry
 	flows  *flow.Registry // nil = no flows configured
+	// presets are the skills and templates (see presets.go); nil = none.
+	presets *preset.Registry
 	photos *photos.Client // nil = photo proxy disabled
 	log    *slog.Logger
 
@@ -231,6 +234,10 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /healthz", s.handleHealth)
 	mux.HandleFunc("GET /v1/models", s.auth(s.handleModels))
 	mux.HandleFunc("GET /v1/agents", s.auth(s.handleAgents))
+	mux.HandleFunc("GET /v1/skills", s.auth(s.handleSkills))
+	mux.HandleFunc("GET /v1/templates", s.auth(s.handleTemplates))
+	mux.HandleFunc("GET /v1/templates/{name}", s.auth(s.handleTemplate))
+	mux.HandleFunc("POST /v1/templates/{name}/run", s.auth(s.handleTemplateRun))
 	mux.HandleFunc("GET /v1/health", s.auth(s.handleKeyHealth))
 	mux.HandleFunc("POST /v1/chat/completions", s.auth(s.handleChat))
 	mux.HandleFunc("POST /v1/messages", s.auth(s.handleAnthropicMessages))
@@ -930,6 +937,15 @@ func (s *Server) handleChat(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Skills are a gateway field, never an upstream one: read and drop it
+	// before the body is forwarded.
+	skills, err := s.requestSkills(raw, r.Header.Get(skillsHeader))
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	delete(raw, "nabu_skills")
+
 	// Typed fields are used by the non-OpenAI adapters (Anthropic, Gemini); the
 	// OpenAI-wire adapter forwards the raw body directly.
 	var temperature, topP *float64
@@ -989,6 +1005,10 @@ func (s *Server) handleChat(w http.ResponseWriter, r *http.Request) {
 		applyAgentReferences(ag, &chatReq, r.Header.Get(networkHeader))
 		routeModel = ag.Model
 		w.Header().Set("X-Nabu-Agent", ag.Name)
+	}
+	if len(skills) > 0 {
+		applySkillsToChat(skills, &chatReq)
+		w.Header().Set(skillsHeader, skillNames(skills))
 	}
 
 	// Conversation memory. The turns arriving in this request are captured

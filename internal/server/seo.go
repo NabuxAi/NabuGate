@@ -286,5 +286,5 @@ var consoleViews = map[string]bool{
 	"tokens": true, "providers": true, "models": true, "decisions": true,
 	"requests": true, "integration": true, "profile": true, "security": true,
 	"usage": true, "users": true, "provider-requests": true, "agents": true,
-	"keys": true, "opsless": true,
+	"keys": true, "opsless": true, "templates": true,
 }

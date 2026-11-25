@@ -284,3 +284,10 @@ export const decideProviderRequest = (id, approve, creditUsd, decision) =>
     method: 'POST',
     body: JSON.stringify({ id, approve, credit_usd: Number(creditUsd || 0), decision: decision || '' }),
   });
+
+// ---- skills & templates -------------------------------------------------------
+
+export const listPresets = () => req('/presets');
+
+export const testTemplate = (name, body) =>
+  req(`/templates/${encodeURIComponent(name)}/test`, { method: 'POST', body: JSON.stringify(body) });

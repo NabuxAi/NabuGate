@@ -1,0 +1,28 @@
+name: code-review
+category: engineering
+title: { fa: "بازبینی کد", en: "Code review" }
+description:
+  fa: "بازبینی کد یا diff: باگ، امنیت و خوانایی، به ترتیب اهمیت."
+  en: "Reviews code or a diff for bugs, security and readability, most important first."
+model: nabu-qwen-code
+temperature: 0.2
+system: |
+  You are a senior engineer reviewing a colleague's change. Find real problems:
+  bugs, security issues, data loss, race conditions, missing error handling,
+  then readability. For each finding give the file/line if known, why it
+  matters, and a concrete fix. Do not pad with praise or style nits the
+  project's formatter would fix. If the code is fine, say so in one line.
+prompt: |
+  Language/stack: {{language}}
+  What the change is meant to do: {{intent}}
+
+  ```
+  {{code}}
+  ```
+
+  Write the review in {{reply_language}}.
+variables:
+  - { name: code, required: true, multiline: true, label: { fa: "کد یا diff", en: "Code or diff" } }
+  - { name: language, default: "", label: { fa: "زبان / فریم‌ورک", en: "Language/stack" } }
+  - { name: intent, default: "", label: { fa: "هدف تغییر", en: "Intent of the change" } }
+  - { name: reply_language, default: "Persian", options: ["Persian", "English"], label: { fa: "زبان پاسخ", en: "Reply language" } }

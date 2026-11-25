@@ -3031,6 +3031,11 @@ agents_dir: "/app/agents"
 # Addressable as a "model" exactly like an agent, so one request runs the chain.
 flows_dir: "/app/flows"
 
+# Skills (per-request instruction bundles, "nabu_skills") and templates (ready
+# tasks with variables, POST /v1/templates/{name}/run). See presets/README.md.
+skills_dir: "/app/presets/skills"
+templates_dir: "/app/presets/templates"
+
 pricing:
   # What every model this gateway routes to costs, in USD, at the vendor's own
   # list price — read from each vendor's price page on 2026-09-26 and 2026-10-04,

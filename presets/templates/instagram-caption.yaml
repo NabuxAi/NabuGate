@@ -1,0 +1,25 @@
+name: instagram-caption
+category: marketing
+title: { fa: "کپشن اینستاگرام", en: "Instagram caption" }
+description:
+  fa: "کپشن با قلاب اول، متن کوتاه، دعوت به اقدام و هشتگ‌های فارسی مرتبط."
+  en: "Caption with a hook line, short body, call to action and relevant Persian hashtags."
+model: nabu-smart
+temperature: 0.8
+skills: [persian-native]
+prompt: |
+  موضوع پست: {{topic}}
+  برند یا صفحه: {{brand}}
+  هدف پست: {{goal}}
+
+  یک کپشن اینستاگرام بنویس:
+  ۱. خط اول یک قلاب که کاربر را از اسکرول نگه دارد (حداکثر ۱۰ کلمه).
+  ۲. سه تا پنج خط متن کوتاه.
+  ۳. یک دعوت به اقدام مشخص.
+  ۴. هشت تا دوازده هشتگ فارسی و انگلیسی مرتبط، نه عمومی.
+
+  تخفیف، قیمت، آمار یا وعده‌ای که در موضوع نیامده ننویس.
+variables:
+  - { name: topic, required: true, multiline: true, label: { fa: "موضوع پست", en: "Post topic" } }
+  - { name: brand, default: "", label: { fa: "نام برند یا صفحه", en: "Brand/page" } }
+  - { name: goal, default: "تعامل", options: ["تعامل", "فروش", "آگاهی از برند", "جذب فالوور"], label: { fa: "هدف", en: "Goal" } }

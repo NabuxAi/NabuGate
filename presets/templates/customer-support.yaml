@@ -1,0 +1,21 @@
+name: customer-support
+category: support
+title: { fa: "پاسخ پشتیبانی مشتری", en: "Customer support reply" }
+description:
+  fa: "پاسخ آماده برای پیام مشتری، فقط بر اساس اطلاعاتی که می‌دهید."
+  en: "A ready reply to a customer message, based only on the facts you give."
+model: nabu-smart
+temperature: 0.4
+skills: [friendly-tone, grounded-answer]
+prompt: |
+  اطلاعات کسب‌وکار و قوانین (فقط از این استفاده کن):
+  {{policy}}
+
+  پیام مشتری:
+  {{message}}
+
+  یک پاسخ آمادهٔ ارسال بنویس، به زبان پیام مشتری. اگر جواب در اطلاعات بالا نیست،
+  بگو که پیگیری می‌کنید و چه اطلاعاتی از مشتری لازم است.
+variables:
+  - { name: policy, required: true, multiline: true, label: { fa: "اطلاعات و قوانین کسب‌وکار", en: "Business facts and policies" } }
+  - { name: message, required: true, multiline: true, label: { fa: "پیام مشتری", en: "Customer message" } }

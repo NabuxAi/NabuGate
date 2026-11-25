@@ -1,0 +1,26 @@
+name: persian-copywriting
+category: marketing
+title: { fa: "کپی‌رایتینگ فارسی", en: "Persian copywriting" }
+description:
+  fa: "متن تبلیغاتی کوتاه و فروشنده برای محصول یا خدمت، به فارسی."
+  en: "Short, persuasive ad copy for a product or service, in Persian."
+model: nabu-smart
+temperature: 0.8
+skills: [persian-native]
+system: |
+  تو کپی‌رایتر باتجربهٔ بازار ایران هستی. متن را برای مخاطب ایرانی می‌نویسی:
+  مزیت واقعی را می‌گویی، نه صفت‌های توخالی. قیمت، تخفیف یا آماری که کاربر نداده
+  از خودت نساز.
+prompt: |
+  محصول یا خدمت: {{product}}
+  مخاطب: {{audience}}
+  کانال انتشار: {{channel}}
+  لحن: {{tone}}
+
+  سه نسخهٔ متفاوت بنویس. هر نسخه: یک تیتر کوتاه، دو یا سه جملهٔ متن، و یک دعوت
+  به اقدام روشن.
+variables:
+  - { name: product, required: true, multiline: true, label: { fa: "محصول یا خدمت و مزیت‌هایش", en: "Product/service and its benefits" } }
+  - { name: audience, default: "عموم مردم", label: { fa: "مخاطب", en: "Audience" } }
+  - { name: channel, default: "اینستاگرام", options: ["اینستاگرام", "تلگرام", "پیامک", "سایت", "بنر"], label: { fa: "کانال", en: "Channel" } }
+  - { name: tone, default: "صمیمی", options: ["صمیمی", "رسمی", "پرانرژی", "لوکس"], label: { fa: "لحن", en: "Tone" } }
